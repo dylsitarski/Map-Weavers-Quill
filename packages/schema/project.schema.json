@@ -1,0 +1,508 @@
+{
+  "$defs": {
+    "Bounds": {
+      "additionalProperties": false,
+      "properties": {
+        "height": {
+          "exclusiveMinimum": 0,
+          "title": "Height",
+          "type": "number"
+        },
+        "origin": {
+          "$ref": "#/$defs/Point"
+        },
+        "width": {
+          "exclusiveMinimum": 0,
+          "title": "Width",
+          "type": "number"
+        }
+      },
+      "required": [
+        "origin",
+        "width",
+        "height"
+      ],
+      "title": "Bounds",
+      "type": "object"
+    },
+    "Door": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "door",
+          "title": "Kind",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "position": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Position",
+          "type": "number"
+        },
+        "revision": {
+          "minimum": 0,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "secret": {
+          "title": "Secret",
+          "type": "boolean"
+        },
+        "state": {
+          "enum": [
+            "open",
+            "closed",
+            "locked"
+          ],
+          "title": "State",
+          "type": "string"
+        },
+        "wallId": {
+          "format": "uuid",
+          "title": "Wallid",
+          "type": "string"
+        },
+        "width": {
+          "exclusiveMinimum": 0,
+          "title": "Width",
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "label",
+        "kind",
+        "wallId",
+        "position",
+        "width",
+        "state",
+        "secret"
+      ],
+      "title": "Door",
+      "type": "object"
+    },
+    "Grid": {
+      "additionalProperties": false,
+      "properties": {
+        "distance": {
+          "exclusiveMinimum": 0,
+          "title": "Distance",
+          "type": "number"
+        },
+        "sizePx": {
+          "exclusiveMinimum": 0,
+          "title": "Sizepx",
+          "type": "number"
+        },
+        "snap": {
+          "title": "Snap",
+          "type": "boolean"
+        },
+        "type": {
+          "const": "square",
+          "title": "Type",
+          "type": "string"
+        },
+        "units": {
+          "enum": [
+            "ft",
+            "m"
+          ],
+          "title": "Units",
+          "type": "string"
+        },
+        "visible": {
+          "title": "Visible",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "type",
+        "sizePx",
+        "distance",
+        "units",
+        "visible",
+        "snap"
+      ],
+      "title": "Grid",
+      "type": "object"
+    },
+    "JsonValue": {},
+    "Light": {
+      "additionalProperties": false,
+      "properties": {
+        "brightRadius": {
+          "minimum": 0,
+          "title": "Brightradius",
+          "type": "number"
+        },
+        "color": {
+          "pattern": "^#[0-9a-fA-F]{6}$",
+          "title": "Color",
+          "type": "string"
+        },
+        "dimRadius": {
+          "minimum": 0,
+          "title": "Dimradius",
+          "type": "number"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "intensity": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Intensity",
+          "type": "number"
+        },
+        "kind": {
+          "const": "light",
+          "title": "Kind",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "origin": {
+          "$ref": "#/$defs/Point"
+        },
+        "revision": {
+          "minimum": 0,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "units": {
+          "enum": [
+            "ft",
+            "m"
+          ],
+          "title": "Units",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "label",
+        "kind",
+        "origin",
+        "brightRadius",
+        "dimRadius",
+        "units",
+        "color",
+        "intensity"
+      ],
+      "title": "Light",
+      "type": "object"
+    },
+    "Map": {
+      "additionalProperties": false,
+      "properties": {
+        "coordinateSystem": {
+          "const": "bottom-left-y-up-ccw",
+          "title": "Coordinatesystem",
+          "type": "string"
+        },
+        "grid": {
+          "$ref": "#/$defs/Grid"
+        },
+        "height": {
+          "exclusiveMinimum": 0,
+          "title": "Height",
+          "type": "number"
+        },
+        "width": {
+          "exclusiveMinimum": 0,
+          "title": "Width",
+          "type": "number"
+        }
+      },
+      "required": [
+        "width",
+        "height",
+        "coordinateSystem",
+        "grid"
+      ],
+      "title": "Map",
+      "type": "object"
+    },
+    "Point": {
+      "additionalProperties": false,
+      "properties": {
+        "x": {
+          "title": "X",
+          "type": "number"
+        },
+        "y": {
+          "title": "Y",
+          "type": "number"
+        }
+      },
+      "required": [
+        "x",
+        "y"
+      ],
+      "title": "Point",
+      "type": "object"
+    },
+    "RasterLayer": {
+      "additionalProperties": false,
+      "properties": {
+        "assetHash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Assethash",
+          "type": "string"
+        },
+        "bounds": {
+          "$ref": "#/$defs/Bounds"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "raster",
+          "title": "Kind",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "opacity": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Opacity",
+          "type": "number"
+        },
+        "revision": {
+          "minimum": 0,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "rotation": {
+          "exclusiveMaximum": 360,
+          "minimum": 0,
+          "title": "Rotation",
+          "type": "number"
+        },
+        "visible": {
+          "title": "Visible",
+          "type": "boolean"
+        },
+        "zIndex": {
+          "title": "Zindex",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "label",
+        "kind",
+        "assetHash",
+        "bounds",
+        "rotation",
+        "zIndex",
+        "opacity",
+        "visible"
+      ],
+      "title": "RasterLayer",
+      "type": "object"
+    },
+    "Room": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "room",
+          "title": "Kind",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "polygon": {
+          "items": {
+            "$ref": "#/$defs/Point"
+          },
+          "minItems": 3,
+          "title": "Polygon",
+          "type": "array"
+        },
+        "prompt": {
+          "title": "Prompt",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 0,
+          "title": "Revision",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "label",
+        "kind",
+        "polygon",
+        "prompt"
+      ],
+      "title": "Room",
+      "type": "object"
+    },
+    "Wall": {
+      "additionalProperties": false,
+      "properties": {
+        "end": {
+          "$ref": "#/$defs/Point"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "wall",
+          "title": "Kind",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "movement": {
+          "title": "Movement",
+          "type": "boolean"
+        },
+        "revision": {
+          "minimum": 0,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "sight": {
+          "title": "Sight",
+          "type": "boolean"
+        },
+        "start": {
+          "$ref": "#/$defs/Point"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "label",
+        "kind",
+        "start",
+        "end",
+        "movement",
+        "sight"
+      ],
+      "title": "Wall",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "doors": {
+      "items": {
+        "$ref": "#/$defs/Door"
+      },
+      "title": "Doors",
+      "type": "array"
+    },
+    "layers": {
+      "items": {
+        "$ref": "#/$defs/RasterLayer"
+      },
+      "title": "Layers",
+      "type": "array"
+    },
+    "lights": {
+      "items": {
+        "$ref": "#/$defs/Light"
+      },
+      "title": "Lights",
+      "type": "array"
+    },
+    "map": {
+      "$ref": "#/$defs/Map"
+    },
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "projectId": {
+      "format": "uuid",
+      "title": "Projectid",
+      "type": "string"
+    },
+    "revision": {
+      "minimum": 0,
+      "title": "Revision",
+      "type": "integer"
+    },
+    "rooms": {
+      "items": {
+        "$ref": "#/$defs/Room"
+      },
+      "title": "Rooms",
+      "type": "array"
+    },
+    "schemaVersion": {
+      "const": "0.1.0",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "settings": {
+      "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+      },
+      "title": "Settings",
+      "type": "object"
+    },
+    "walls": {
+      "items": {
+        "$ref": "#/$defs/Wall"
+      },
+      "title": "Walls",
+      "type": "array"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "projectId",
+    "revision",
+    "name",
+    "map",
+    "rooms",
+    "walls",
+    "doors",
+    "lights",
+    "layers",
+    "settings"
+  ],
+  "title": "Project",
+  "type": "object"
+}

@@ -1,0 +1,25 @@
+{
+  "negative-width": [
+    "map",
+    "width"
+  ],
+  "wrong-axis": [
+    "map",
+    "coordinateSystem"
+  ],
+  "short-polygon": [
+    "rooms",
+    0,
+    "polygon"
+  ],
+  "invalid-door-position": [
+    "doors",
+    0,
+    "position"
+  ],
+  "invalid-color": [
+    "lights",
+    0,
+    "color"
+  ]
+}

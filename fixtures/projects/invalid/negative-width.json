@@ -1,0 +1,121 @@
+{
+  "schemaVersion": "0.1.0",
+  "projectId": "00000000-0000-4000-8000-000000000001",
+  "revision": 0,
+  "name": "Two-room foundation fixture",
+  "map": {
+    "width": -1,
+    "height": 600,
+    "coordinateSystem": "bottom-left-y-up-ccw",
+    "grid": {
+      "type": "square",
+      "sizePx": 100,
+      "distance": 5,
+      "units": "ft",
+      "visible": true,
+      "snap": true
+    }
+  },
+  "rooms": [
+    {
+      "id": "00000000-0000-4000-8000-000000000002",
+      "kind": "room",
+      "label": "West room",
+      "revision": 0,
+      "polygon": [
+        {
+          "x": 100,
+          "y": 100
+        },
+        {
+          "x": 500,
+          "y": 100
+        },
+        {
+          "x": 500,
+          "y": 500
+        },
+        {
+          "x": 100,
+          "y": 500
+        }
+      ],
+      "prompt": "Stone room"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000003",
+      "kind": "room",
+      "label": "East room",
+      "revision": 0,
+      "polygon": [
+        {
+          "x": 500,
+          "y": 100
+        },
+        {
+          "x": 900,
+          "y": 100
+        },
+        {
+          "x": 900,
+          "y": 500
+        },
+        {
+          "x": 500,
+          "y": 500
+        }
+      ],
+      "prompt": "Library"
+    }
+  ],
+  "walls": [
+    {
+      "id": "00000000-0000-4000-8000-000000000004",
+      "kind": "wall",
+      "label": "Shared wall",
+      "revision": 0,
+      "start": {
+        "x": 500,
+        "y": 100
+      },
+      "end": {
+        "x": 500,
+        "y": 500
+      },
+      "movement": true,
+      "sight": true
+    }
+  ],
+  "doors": [
+    {
+      "id": "00000000-0000-4000-8000-000000000005",
+      "kind": "door",
+      "label": "Connecting door",
+      "revision": 0,
+      "wallId": "00000000-0000-4000-8000-000000000004",
+      "position": 0.5,
+      "width": 100,
+      "state": "closed",
+      "secret": false
+    }
+  ],
+  "lights": [
+    {
+      "id": "00000000-0000-4000-8000-000000000006",
+      "kind": "light",
+      "label": "West light",
+      "revision": 0,
+      "origin": {
+        "x": 300,
+        "y": 300
+      },
+      "brightRadius": 10,
+      "dimRadius": 20,
+      "units": "ft",
+      "color": "#ffcc88",
+      "intensity": 0.8
+    }
+  ],
+  "layers": [],
+  "settings": {}
+}
