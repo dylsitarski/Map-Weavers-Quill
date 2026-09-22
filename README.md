@@ -5,7 +5,7 @@ Windows 11 follows. See [PROJECT_MANIFEST.md](PROJECT_MANIFEST.md).
 
 ## Development status
 
-Milestone 0 is **in progress**, not complete. The repository includes React and
+Milestone 0 is **complete**. The repository includes React and
 FastAPI shells, Python models with generated JSON Schema and TypeScript types,
 cross-runtime validation, coordinate transforms, and a deterministic offline
 image provider. The web page is a connection-status shell, not a map editor.
@@ -42,16 +42,25 @@ The committed Python lockfile pins the full development dependency closure.
 GitHub Actions runs `make check`, `make browser`, and `make audit` on Ubuntu for pushes and PRs.
 Tests use synthetic data, no credentials, paid APIs, or GPUs.
 
-## Next Milestone 0 work
+## Milestone 0 verification
 
-- Resolve the pending browser CI run and verify clean-install checks against the latest commit.
-- Confirm all Milestone 0 exit criteria before starting the editor.
+Ubuntu clean-checkout CI passed on commit `2af87f4`: 20 Python tests, 10 TypeScript
+tests, 3 Chromium browser tests, schema/type drift checks, linting, typing,
+production build, and Python/npm dependency audits.
+See [the successful run](https://github.com/dylsitarski/Map-Weavers-Quill/actions/runs/35686075197).
+The browser suite also verifies development service startup and shutdown; repeated
+termination signals are covered by a launcher regression test. Local Chromium
+installation was unavailable in the agent environment, so browser evidence comes
+from hosted Ubuntu CI. Windows 11 and Foundry compatibility are not yet tested.
 
 Provider contracts now include version tags, capability vocabulary, reference
 images, negative prompts, neutral parameters, namespaced extensions and normalized
 errors. The mock rejects unsupported options and cancellation explicitly. All
 seven initial architecture decisions are recorded. Geometry topology and
 cross-entity relationship validation belong to Milestone 1, before persistence.
+
+Next: Milestone 1 deterministic editor foundation, starting with the canvas
+viewport and room geometry validation. No editor features have started yet.
 
 The schema now covers every planned entity category, including namespaced
 metadata, object transforms, sounds, regions, and generation provenance. The
