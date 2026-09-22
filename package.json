@@ -12,13 +12,15 @@
     "test": "node --import tsx --test tests/*.test.ts",
     "types": "node scripts/generate-types.mjs",
     "types:check": "node scripts/generate-types.mjs --check",
-    "lint": "biome check apps/web/src apps/web/vite.config.ts tests/contracts.test.ts tests/browser playwright.config.ts scripts/*.mjs",
+    "lint": "biome check apps/web/src apps/web/vite.config.ts tests/*.test.ts tests/browser playwright.config.ts scripts/*.mjs",
     "test:browser": "playwright test",
     "preinstall": "node scripts/check-node.mjs"
   },
   "dependencies": {
+    "konva": "10.6.0",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "react-konva": "19.3.0"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.14",

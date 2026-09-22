@@ -1,7 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { compile } from 'json-schema-to-typescript';
 
-for (const name of ['project', 'provider']) {
+for (const name of ['project', 'provider', 'geometry']) {
   const schema = JSON.parse(
     await readFile(`packages/schema/${name}.schema.json`, 'utf8'),
   );

@@ -8,7 +8,9 @@ Windows 11 follows. See [PROJECT_MANIFEST.md](PROJECT_MANIFEST.md).
 Milestone 0 is **complete**. The repository includes React and
 FastAPI shells, Python models with generated JSON Schema and TypeScript types,
 cross-runtime validation, coordinate transforms, and a deterministic offline
-image provider. The web page is a connection-status shell, not a map editor.
+image provider. Milestone 1 is **in progress**: the Konva viewport supports pan,
+pointer-anchored zoom, resize, grid visibility, snapping, rectangular room creation,
+and undo/redo of room additions. Rooms pass server-side polygon validation.
 There is no project persistence or Foundry importer yet.
 
 ### Setup (Linux, Python 3.12 and Node 24)
@@ -24,9 +26,10 @@ make check
 
 `make dev` starts the web shell at http://127.0.0.1:5173 and API at
 http://127.0.0.1:8000. Ctrl-C stops both. This launcher currently targets Linux.
-The API exposes `/health`, `/api/health`, and `/api/providers`.
+The API exposes `/health`, `/api/health`, `/api/providers`, and
+`POST /api/geometry/validate`. Visit `/docs` for API documentation; `/` returns 404.
 
-`make schema` regenerates both schemas and TypeScript declarations. `make test`
+`make schema` regenerates all schemas and TypeScript declarations. `make test`
 runs Python/TypeScript tests and checks generated files for drift. `make check`
 also runs Ruff lint/format checks, mypy, TypeScript checks and the Vite build.
 `make audit` checks dependencies online; ordinary tests are offline.
@@ -59,8 +62,18 @@ errors. The mock rejects unsupported options and cancellation explicitly. All
 seven initial architecture decisions are recorded. Geometry topology and
 cross-entity relationship validation belong to Milestone 1, before persistence.
 
-Next: Milestone 1 deterministic editor foundation, starting with the canvas
-viewport and room geometry validation. No editor features have started yet.
+## Milestone 1 first increment
+
+Run `make dev`, open the web interface, and drag inside the map to draw a room.
+Choose Pan to drag the view, scroll to zoom, or use Fit map to recenter. Grid
+visibility and snapping are independent. The room list shows native coordinates.
+Undo/Redo applies to room additions. Invalid geometry and API failures do not
+add a room or change history. Dragging out of the drawing surface cancels a draft.
+
+This is a mouse-based, in-memory session on a fixed 1200 by 800 map with a 50-unit
+grid. **Refreshing discards rooms.** Saving is not implemented. Next work:
+polygon drawing, selection/move/vertex editing, stable derived walls, constrained
+doors, and atomic project persistence. This increment does not complete Milestone 1.
 
 The schema now covers every planned entity category, including namespaced
 metadata, object transforms, sounds, regions, and generation provenance. The

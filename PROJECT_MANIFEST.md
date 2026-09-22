@@ -983,7 +983,8 @@ As of this manifest version:
 - Distribution is planned as a public, free, noncommercial release, with Linux prioritized before Windows 11.
 - Node 24 is enforced, frontend lint/format checks are enabled, and Playwright shell tests are included in Ubuntu CI. Clean-checkout CI run 35686075197 passed on code commit 2af87f4, including 20 Python tests, 10 TypeScript tests, 3 browser tests, build, typing, linting, schema drift checks, and dependency audits. Repeated termination signals no longer interrupt service cleanup.
 - Provider contracts include versioning, optional references and parameters, namespaced extensions, typed failures, and explicit unsupported cancellation. Python and TypeScript agree on namespace rejection. ADR-0001 through ADR-0007 are recorded. Language operations and asynchronous orchestration remain their scheduled later milestones.
-- All Milestone 0 exit criteria are demonstrated by clean Ubuntu CI, cross-runtime project round trips, generated-file drift checks, and mock provider contract tests. Windows 11 and Foundry compatibility remain unverified. Milestone 1 has not started; next work is the canvas viewport and deterministic room geometry validation.
+- All Milestone 0 exit criteria are demonstrated by clean Ubuntu CI, cross-runtime project round trips, generated-file drift checks, and mock provider contract tests. Windows 11 and Foundry compatibility remain unverified.
+- Milestone 1 is in progress. The first slice implements a React/Konva viewport, pan/zoom/resize, grid and snapping controls, rectangular room proposals, stateless Shapely geometry validation, and undo/redo for accepted room additions. The session is in memory and refresh discards rooms. Polygon drawing, selection/move/vertex editing, derived walls, constrained doors, and atomic persistence remain unfinished. See ADR-0009.
 
 ## 23. First implementation ticket
 

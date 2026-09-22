@@ -7,13 +7,13 @@ body {
   margin: 0;
 }
 main {
-  max-width: 800px;
-  margin: 12vh auto;
+  max-width: 1440px;
+  margin: auto;
   padding: 24px;
 }
 h1 {
   font:
-    3.5rem Georgia,
+    2.5rem Georgia,
     serif;
   margin: 12px 0;
 }
@@ -31,10 +31,68 @@ p {
   font-size: 0.8rem;
 }
 section {
-  margin-top: 48px;
-  padding: 24px;
   border: 1px solid #607364;
   border-radius: 12px;
+  overflow: hidden;
+}
+.toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 14px;
+  background: #22382e;
+}
+button {
+  font: inherit;
+  background: #e8dfca;
+  color: #203328;
+  border: 1px solid #aa9e82;
+  border-radius: 5px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+button[aria-pressed="true"] {
+  background: #dec28a;
+  border-color: #ffe3a6;
+}
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+button:focus-visible,
+input:focus-visible {
+  outline: 3px solid #efc766;
+  outline-offset: 3px;
+}
+label {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+.hint,
+.room-summary,
+[role="alert"] {
+  margin: 0;
+  padding: 12px 16px;
+}
+.hint,
+.room-summary {
+  color: #c7c7b2;
+  font-size: 0.85rem;
+}
+[role="alert"] {
+  color: #ffc5b1;
+  background: #452f28;
+}
+.canvas {
+  height: 58vh;
+  min-height: 320px;
+  background: #111e19;
+  touch-action: none;
+}
+ul {
+  font-size: 0.85rem;
 }
 @media (max-width: 540px) {
   h1 {

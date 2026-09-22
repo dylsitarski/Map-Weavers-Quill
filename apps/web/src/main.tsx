@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { Editor } from './Editor';
 import './style.css';
 
 export function App() {
@@ -27,14 +28,8 @@ export function App() {
       <p className="eyebrow">YOUR NEXT ADVENTURE STARTS HERE</p>
       <h1>Map-Weaver’s Quill</h1>
       <p>A canvas for places worth exploring.</p>
-      <section>
-        <h2>The workshop is taking shape</h2>
-        <p>
-          The editor is under construction. Map creation will arrive in the next
-          milestone.
-        </p>
-        <p role="status">{status}</p>
-      </section>
+      <p role="status">{status}</p>
+      <Editor />
     </main>
   );
 }
