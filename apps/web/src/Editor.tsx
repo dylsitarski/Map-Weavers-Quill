@@ -184,7 +184,6 @@ export function Editor() {
         Drag to draw a room. Choose Pan to move the view; scroll to zoom.
         Session only—refreshing clears rooms.
       </p>
-      {error && <p role="alert">{error}</p>}
       <div ref={container} className="canvas" data-testid="map-canvas">
         <Stage
           width={size.width}
@@ -269,6 +268,9 @@ export function Editor() {
           </Layer>
         </Stage>
       </div>
+      <p className="editor-error" role="alert" aria-atomic="true">
+        {error}
+      </p>
       <div className="room-summary" aria-live="polite">
         {busy ? 'Validating room…' : `${history.present.length} rooms`} · 1200 ×
         800 · origin bottom-left

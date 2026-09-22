@@ -25,9 +25,7 @@ export function App() {
   }, []);
   return (
     <main>
-      <p className="eyebrow">YOUR NEXT ADVENTURE STARTS HERE</p>
       <h1>Map-Weaver’s Quill</h1>
-      <p>A canvas for places worth exploring.</p>
       <p role="status">{status}</p>
       <Editor />
     </main>

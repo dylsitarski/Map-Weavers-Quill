@@ -25,11 +25,6 @@ h2 {
 p {
   line-height: 1.6;
 }
-.eyebrow {
-  color: #d4b882;
-  letter-spacing: 0.15em;
-  font-size: 0.8rem;
-}
 section {
   border: 1px solid #607364;
   border-radius: 12px;
@@ -71,8 +66,7 @@ label {
   align-items: center;
 }
 .hint,
-.room-summary,
-[role="alert"] {
+.room-summary {
   margin: 0;
   padding: 12px 16px;
 }
@@ -81,9 +75,14 @@ label {
   color: #c7c7b2;
   font-size: 0.85rem;
 }
-[role="alert"] {
+.editor-error {
+  box-sizing: border-box;
+  height: 3rem;
+  margin: 0;
+  padding: 8px 16px;
+  overflow-y: auto;
+  font-size: 0.85rem;
   color: #ffc5b1;
-  background: #452f28;
 }
 .canvas {
   height: 58vh;
