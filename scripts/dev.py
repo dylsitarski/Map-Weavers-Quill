@@ -10,13 +10,16 @@ from pathlib import Path
 root = Path(__file__).resolve().parents[1]
 env = dict(os.environ, PYTHONPATH=str(root / "apps/server"))
 processes: list[subprocess.Popen[bytes]] = []
+stopping = False
 
 
 def stop(signum, frame):
-    raise KeyboardInterrupt
+    global stopping
+    stopping = True
 
 
 signal.signal(signal.SIGTERM, stop)
+signal.signal(signal.SIGINT, stop)
 try:
     processes.append(
         subprocess.Popen(
@@ -32,24 +35,28 @@ try:
             ],
             cwd=root,
             env=env,
+            start_new_session=True,
         )
     )
     processes.append(subprocess.Popen(["npm", "run", "dev"], cwd=root, start_new_session=True))
-    while all(p.poll() is None for p in processes):
+    while not stopping and all(p.poll() is None for p in processes):
         time.sleep(0.2)
-    raise SystemExit(next(p.returncode for p in processes if p.returncode is not None))
-except KeyboardInterrupt:
-    pass
+    if not stopping:
+        raise SystemExit(next(p.returncode for p in processes if p.returncode is not None))
 finally:
-    for index, process in enumerate(processes):
-        if process.poll() is None:
-            if index == 1:
-                os.killpg(process.pid, signal.SIGTERM)
-            else:
-                process.terminate()
+    # A signal may arrive both directly and forwarded by make. Handlers only set
+    # the flag, so repeated signals cannot interrupt this bounded cleanup.
+    for process in processes:
+        try:
+            os.killpg(process.pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
     for process in processes:
         try:
             process.wait(timeout=5)
         except subprocess.TimeoutExpired:
-            process.kill()
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
             process.wait()
