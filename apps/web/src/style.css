@@ -1,42 +1,68 @@
 :root {
   font-family: system-ui, sans-serif;
   color: #eee6d6;
-  background: #182722;
+  background: #111e19;
 }
-body {
-  margin: 0;
+* {
+  box-sizing: border-box;
 }
+html,
+body,
+#root,
 main {
-  max-width: 1440px;
-  margin: auto;
-  padding: 24px;
-}
-h1 {
-  font:
-    2.5rem Georgia,
-    serif;
-  margin: 12px 0;
-}
-h2 {
-  font:
-    1.6rem Georgia,
-    serif;
-}
-p {
-  line-height: 1.6;
-}
-section {
-  border: 1px solid #607364;
-  border-radius: 12px;
+  width: 100%;
+  height: 100%;
+  margin: 0;
   overflow: hidden;
 }
+main {
+  position: fixed;
+  inset: 0;
+}
+.workshop,
+.canvas {
+  position: absolute;
+  inset: 0;
+}
+.canvas {
+  touch-action: none;
+}
+.app-title,
+.connection-status,
+.toolbar,
+.hint,
+.room-summary,
+.editor-error,
+.workshop > ul {
+  position: absolute;
+  z-index: 2;
+  margin: 0;
+  border: 1px solid #60736480;
+  border-radius: 8px;
+  background: #182722ed;
+  box-shadow: 0 2px 10px #0003;
+}
+.app-title {
+  top: 12px;
+  left: 12px;
+  padding: 8px 12px;
+  font:
+    1.1rem Georgia,
+    serif;
+  pointer-events: none;
+}
 .toolbar {
+  top: 58px;
+  left: 12px;
+  right: 12px;
+  width: fit-content;
+  max-width: calc(100% - 24px);
   display: flex;
-  gap: 12px;
+  gap: 10px;
   align-items: center;
   flex-wrap: wrap;
-  padding: 14px;
-  background: #22382e;
+  padding: 8px;
+  font-size: 0.85rem;
 }
 button {
   font: inherit;
@@ -44,7 +70,7 @@ button {
   color: #203328;
   border: 1px solid #aa9e82;
   border-radius: 5px;
-  padding: 8px 12px;
+  padding: 6px 10px;
   cursor: pointer;
 }
 button[aria-pressed="true"] {
@@ -66,35 +92,65 @@ label {
   align-items: center;
 }
 .hint,
-.room-summary {
-  margin: 0;
-  padding: 12px 16px;
-}
-.hint,
-.room-summary {
+.room-summary,
+.connection-status {
+  padding: 6px 10px;
+  font-size: 0.75rem;
   color: #c7c7b2;
-  font-size: 0.85rem;
+  pointer-events: none;
+}
+.hint {
+  bottom: 50px;
+  left: 12px;
+  max-width: min(550px, calc(100% - 24px));
+}
+.room-summary {
+  bottom: 12px;
+  left: 12px;
+}
+.connection-status {
+  bottom: 12px;
+  right: 12px;
+  max-width: 280px;
 }
 .editor-error {
-  box-sizing: border-box;
-  height: 3rem;
-  margin: 0;
-  padding: 8px 16px;
-  overflow-y: auto;
+  bottom: 112px;
+  left: 12px;
+  max-width: min(550px, calc(100% - 24px));
+  max-height: 25%;
+  overflow: auto;
+  padding: 8px 12px;
   font-size: 0.85rem;
   color: #ffc5b1;
+  border-color: #a6786380;
 }
-.canvas {
-  height: 58vh;
-  min-height: 320px;
-  background: #111e19;
-  touch-action: none;
+.editor-error:empty {
+  display: none;
 }
-ul {
-  font-size: 0.85rem;
+.workshop > ul {
+  top: 116px;
+  right: 12px;
+  max-width: 230px;
+  max-height: 25%;
+  overflow: auto;
+  padding: 8px 12px 8px 28px;
+  font-size: 0.75rem;
 }
-@media (max-width: 540px) {
-  h1 {
-    font-size: 2.5rem;
+.workshop > ul:empty {
+  display: none;
+}
+@media (max-width: 600px) {
+  .connection-status {
+    top: 12px;
+    bottom: auto;
+    max-width: 155px;
+    font-size: 0.65rem;
+  }
+  .app-title {
+    max-width: calc(100% - 185px);
+  }
+  .workshop > ul {
+    top: 166px;
+    max-width: 180px;
   }
 }

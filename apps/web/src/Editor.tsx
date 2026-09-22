@@ -46,6 +46,23 @@ export function Editor() {
     observer.observe(node);
     return () => observer.disconnect();
   }, []);
+  useEffect(() => {
+    function wheel(event: WheelEvent) {
+      event.preventDefault();
+      if (start || pan.current) return;
+      const bounds = container.current?.getBoundingClientRect();
+      if (!bounds) return;
+      const point = {
+        x: event.clientX - bounds.left,
+        y: event.clientY - bounds.top,
+      };
+      setView((current) =>
+        zoomAt(current, point, event.deltaY < 0 ? 1.1 : 1 / 1.1),
+      );
+    }
+    window.addEventListener('wheel', wheel, { passive: false });
+    return () => window.removeEventListener('wheel', wheel);
+  }, [start]);
   function world(point: Point) {
     const value = screenToWorld(point, view);
     return snap
@@ -188,13 +205,6 @@ export function Editor() {
         <Stage
           width={size.width}
           height={size.height}
-          onWheel={(e) => {
-            e.evt.preventDefault();
-            if (start || pan.current) return;
-            const pointer = e.target.getStage()?.getPointerPosition();
-            if (pointer)
-              setView(zoomAt(view, pointer, e.evt.deltaY < 0 ? 1.1 : 1 / 1.1));
-          }}
           onMouseDown={(e) => {
             if (busy || e.evt.button !== 0) return;
             const pointer = e.target.getStage()?.getPointerPosition();
