@@ -4,21 +4,25 @@
   "version": "0.0.0",
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": "24.x"
   },
   "scripts": {
-    "dev": "vite --config apps/web/vite.config.ts",
+    "dev": "node scripts/check-node.mjs && vite --config apps/web/vite.config.ts",
     "build": "tsc --noEmit && vite build --config apps/web/vite.config.ts",
     "test": "node --import tsx --test tests/*.test.ts",
     "types": "node scripts/generate-types.mjs",
     "types:check": "node scripts/generate-types.mjs --check",
-    "lint": "tsc --noEmit"
+    "lint": "biome check apps/web/src apps/web/vite.config.ts tests/contracts.test.ts tests/browser playwright.config.ts scripts/*.mjs",
+    "test:browser": "playwright test",
+    "preinstall": "node scripts/check-node.mjs"
   },
   "dependencies": {
     "react": "19.3.0",
     "react-dom": "19.3.0"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.5.14",
+    "@playwright/test": "1.63.0",
     "@types/node": "26.6.2",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",

@@ -11,6 +11,27 @@ FIXTURES = Path(__file__).resolve().parents[1] / "fixtures/projects"
 
 
 class ProjectTests(unittest.TestCase):
+    def test_all_entities_round_trip(self):
+        raw = (FIXTURES / "all-entities.json").read_text()
+        self.assertEqual(
+            json.loads(Project.model_validate_json(raw).model_dump_json()), json.loads(raw)
+        )
+
+    def test_new_contract_constraints(self):
+        cases = [
+            ("objects", "rotation", 360),
+            ("sounds", "volume", 2),
+            ("layers", "assetHash", "../bad"),
+            ("regions", "polygons", []),
+            ("generations", "status", "invented"),
+            ("objects", "metadata", {"unscoped": True}),
+        ]
+        for kind, field, value in cases:
+            raw = json.loads((FIXTURES / "all-entities.json").read_text())
+            raw[kind][0][field] = value
+            with self.subTest(kind=kind), self.assertRaises(ValidationError):
+                Project.model_validate_json(json.dumps(raw))
+
     def test_round_trip(self):
         raw = (FIXTURES / "two-rooms.json").read_text()
         project = Project.model_validate_json(raw)

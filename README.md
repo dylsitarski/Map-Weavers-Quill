@@ -14,6 +14,8 @@ There is no project persistence or Foundry importer yet.
 ### Setup (Linux, Python 3.12 and Node 24)
 
 ```sh
+nvm install
+nvm use
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.lock
 npm ci
@@ -29,18 +31,27 @@ runs Python/TypeScript tests and checks generated files for drift. `make check`
 also runs Ruff lint/format checks, mypy, TypeScript checks and the Vite build.
 `make audit` checks dependencies online; ordinary tests are offline.
 
+Node 24 is declared in `.nvmrc` and enforced by npm and `make doctor`. The nvm
+commands assume nvm is installed; another Node manager may also select Node 24.
+For real-browser checks, run `npx playwright install --with-deps chromium`, then
+`make browser`. On Linux, installing browser system dependencies may require sudo.
+Browser tests cover loading, API connectivity through Vite, and failure messaging.
+They start and stop the same launcher as `make dev`, with no external AI calls.
+
 The committed Python lockfile pins the full development dependency closure.
 GitHub Actions runs `make check` and `make audit` on Ubuntu for pushes and PRs.
 Tests use synthetic data, no credentials, paid APIs, or GPUs.
 
 ## Next Milestone 0 work
 
-- Complete the remaining project entity fields and provider extension contracts.
-- Add browser UI tests, front-end formatting/linting beyond TypeScript, and a
-  clean-install development-server smoke test.
-- Confirm hosted CI/audit results and document the initial supported toolchain.
+- Finalize provider extension contracts and record all architecture decisions.
+- Verify browser tests and clean-install CI against the latest commit.
 - Geometry topology and cross-entity relationship validation before persistence.
 
+The schema now covers every planned entity category, including namespaced
+metadata, object transforms, sounds, regions, and generation provenance. The
+all-entities fixture is checked across Python and TypeScript. This unreleased
+schema was expanded in place; old synthetic fixtures were updated together.
 The current schema validates structural data, not polygon simplicity or door
 attachment geometry. These limitations are explicit; do not use it as a complete
 editor validation boundary yet.

@@ -6,7 +6,7 @@
   "map": {
     "width": 1000,
     "height": 600,
-    "coordinateSystem": "top-left",
+    "coordinateSystem": "bottom-left-y-up-ccw",
     "grid": {
       "type": "square",
       "sizePx": 100,
@@ -136,10 +136,129 @@
       "animation": null
     }
   ],
-  "layers": [],
+  "layers": [
+    {
+      "id": "00000000-0000-4000-8000-000000000023",
+      "kind": "raster",
+      "revision": 0,
+      "label": "raster",
+      "metadata": {
+        "quill.fixture": true
+      },
+      "assetHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bounds": {
+        "origin": {
+          "x": 150,
+          "y": 150
+        },
+        "width": 20,
+        "height": 20
+      },
+      "rotation": 90,
+      "zIndex": 0,
+      "opacity": 1,
+      "visible": true,
+      "blendMode": "normal"
+    }
+  ],
   "settings": {},
-  "objects": [],
-  "regions": [],
-  "sounds": [],
-  "generations": []
+  "objects": [
+    {
+      "id": "00000000-0000-4000-8000-000000000020",
+      "kind": "object",
+      "revision": 0,
+      "label": "object",
+      "metadata": {
+        "quill.fixture": true
+      },
+      "anchor": {
+        "x": 150,
+        "y": 150
+      },
+      "footprint": {
+        "origin": {
+          "x": 150,
+          "y": 150
+        },
+        "width": 20,
+        "height": 20
+      },
+      "rotation": 90,
+      "description": "wooden table",
+      "assetHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "properties": {}
+    }
+  ],
+  "regions": [
+    {
+      "id": "00000000-0000-4000-8000-000000000021",
+      "kind": "region",
+      "revision": 0,
+      "label": "region",
+      "metadata": {
+        "quill.fixture": true
+      },
+      "polygons": [
+        [
+          {
+            "x": 100,
+            "y": 100
+          },
+          {
+            "x": 200,
+            "y": 100
+          },
+          {
+            "x": 100,
+            "y": 200
+          }
+        ]
+      ],
+      "regionType": "hazard",
+      "visualStyle": {
+        "color": "#ff0000"
+      },
+      "behavior": {}
+    }
+  ],
+  "sounds": [
+    {
+      "id": "00000000-0000-4000-8000-000000000022",
+      "kind": "sound",
+      "revision": 0,
+      "label": "sound",
+      "metadata": {
+        "quill.fixture": true
+      },
+      "origin": {
+        "x": 100,
+        "y": 100
+      },
+      "radius": 20,
+      "units": "ft",
+      "assetHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "volume": 0.5
+    }
+  ],
+  "generations": [
+    {
+      "id": "00000000-0000-4000-8000-000000000024",
+      "kind": "generation",
+      "revision": 0,
+      "label": "generation",
+      "metadata": {
+        "quill.fixture": true
+      },
+      "providerId": "mock",
+      "capability": "text_to_image",
+      "prompt": "stone",
+      "inputHashes": [],
+      "outputHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "parameters": {
+        "seed": 42
+      },
+      "status": "succeeded",
+      "baseRevision": 0
+    }
+  ]
 }

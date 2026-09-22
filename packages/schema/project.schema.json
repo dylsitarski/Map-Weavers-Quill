@@ -28,6 +28,14 @@
     "Door": {
       "additionalProperties": false,
       "properties": {
+        "doorType": {
+          "enum": [
+            "door",
+            "window"
+          ],
+          "title": "Doortype",
+          "type": "string"
+        },
         "id": {
           "format": "uuid",
           "title": "Id",
@@ -41,6 +49,15 @@
         "label": {
           "title": "Label",
           "type": "string"
+        },
+        "metadata": {
+          "patternProperties": {
+            "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)+$": {
+              "$ref": "#/$defs/JsonValue"
+            }
+          },
+          "title": "Metadata",
+          "type": "object"
         },
         "position": {
           "maximum": 1,
@@ -81,14 +98,122 @@
         "id",
         "revision",
         "label",
+        "metadata",
         "kind",
         "wallId",
         "position",
         "width",
         "state",
-        "secret"
+        "secret",
+        "doorType"
       ],
       "title": "Door",
+      "type": "object"
+    },
+    "GenerationRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "baseRevision": {
+          "minimum": 0,
+          "title": "Baserevision",
+          "type": "integer"
+        },
+        "capability": {
+          "title": "Capability",
+          "type": "string"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "inputHashes": {
+          "items": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "title": "Inputhashes",
+          "type": "array"
+        },
+        "kind": {
+          "const": "generation",
+          "title": "Kind",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "metadata": {
+          "patternProperties": {
+            "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)+$": {
+              "$ref": "#/$defs/JsonValue"
+            }
+          },
+          "title": "Metadata",
+          "type": "object"
+        },
+        "outputHash": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Outputhash"
+        },
+        "parameters": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Parameters",
+          "type": "object"
+        },
+        "prompt": {
+          "title": "Prompt",
+          "type": "string"
+        },
+        "providerId": {
+          "title": "Providerid",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 0,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "running",
+            "succeeded",
+            "failed",
+            "cancelled",
+            "stale"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "label",
+        "metadata",
+        "kind",
+        "providerId",
+        "capability",
+        "prompt",
+        "inputHashes",
+        "outputHash",
+        "parameters",
+        "status",
+        "baseRevision"
+      ],
+      "title": "GenerationRecord",
       "type": "object"
     },
     "Grid": {
@@ -141,6 +266,17 @@
     "Light": {
       "additionalProperties": false,
       "properties": {
+        "animation": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Animation"
+        },
         "brightRadius": {
           "minimum": 0,
           "title": "Brightradius",
@@ -176,6 +312,15 @@
           "title": "Label",
           "type": "string"
         },
+        "metadata": {
+          "patternProperties": {
+            "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)+$": {
+              "$ref": "#/$defs/JsonValue"
+            }
+          },
+          "title": "Metadata",
+          "type": "object"
+        },
         "origin": {
           "$ref": "#/$defs/Point"
         },
@@ -197,13 +342,15 @@
         "id",
         "revision",
         "label",
+        "metadata",
         "kind",
         "origin",
         "brightRadius",
         "dimRadius",
         "units",
         "color",
-        "intensity"
+        "intensity",
+        "animation"
       ],
       "title": "Light",
       "type": "object"
@@ -224,6 +371,9 @@
           "title": "Height",
           "type": "number"
         },
+        "style": {
+          "$ref": "#/$defs/MapStyle"
+        },
         "width": {
           "exclusiveMinimum": 0,
           "title": "Width",
@@ -234,9 +384,137 @@
         "width",
         "height",
         "coordinateSystem",
-        "grid"
+        "grid",
+        "style"
       ],
       "title": "Map",
+      "type": "object"
+    },
+    "MapObject": {
+      "additionalProperties": false,
+      "properties": {
+        "anchor": {
+          "$ref": "#/$defs/Point"
+        },
+        "assetHash": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Assethash"
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "footprint": {
+          "$ref": "#/$defs/Bounds"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "object",
+          "title": "Kind",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "metadata": {
+          "patternProperties": {
+            "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)+$": {
+              "$ref": "#/$defs/JsonValue"
+            }
+          },
+          "title": "Metadata",
+          "type": "object"
+        },
+        "properties": {
+          "patternProperties": {
+            "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)+$": {
+              "$ref": "#/$defs/JsonValue"
+            }
+          },
+          "title": "Properties",
+          "type": "object"
+        },
+        "revision": {
+          "minimum": 0,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "rotation": {
+          "exclusiveMaximum": 360,
+          "minimum": 0,
+          "title": "Rotation",
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "label",
+        "metadata",
+        "kind",
+        "anchor",
+        "footprint",
+        "rotation",
+        "description",
+        "assetHash",
+        "properties"
+      ],
+      "title": "MapObject",
+      "type": "object"
+    },
+    "MapStyle": {
+      "additionalProperties": false,
+      "properties": {
+        "bakedLighting": {
+          "const": "neutral",
+          "title": "Bakedlighting",
+          "type": "string"
+        },
+        "camera": {
+          "const": "strict orthographic top-down",
+          "title": "Camera",
+          "type": "string"
+        },
+        "environment": {
+          "title": "Environment",
+          "type": "string"
+        },
+        "palette": {
+          "title": "Palette",
+          "type": "string"
+        },
+        "renderStyle": {
+          "title": "Renderstyle",
+          "type": "string"
+        },
+        "wallThicknessPx": {
+          "exclusiveMinimum": 0,
+          "title": "Wallthicknesspx",
+          "type": "number"
+        }
+      },
+      "required": [
+        "camera",
+        "environment",
+        "renderStyle",
+        "palette",
+        "wallThicknessPx",
+        "bakedLighting"
+      ],
+      "title": "MapStyle",
       "type": "object"
     },
     "Point": {
@@ -266,6 +544,15 @@
           "title": "Assethash",
           "type": "string"
         },
+        "blendMode": {
+          "enum": [
+            "normal",
+            "multiply",
+            "screen"
+          ],
+          "title": "Blendmode",
+          "type": "string"
+        },
         "bounds": {
           "$ref": "#/$defs/Bounds"
         },
@@ -282,6 +569,15 @@
         "label": {
           "title": "Label",
           "type": "string"
+        },
+        "metadata": {
+          "patternProperties": {
+            "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)+$": {
+              "$ref": "#/$defs/JsonValue"
+            }
+          },
+          "title": "Metadata",
+          "type": "object"
         },
         "opacity": {
           "maximum": 1,
@@ -313,15 +609,100 @@
         "id",
         "revision",
         "label",
+        "metadata",
         "kind",
         "assetHash",
         "bounds",
         "rotation",
         "zIndex",
         "opacity",
-        "visible"
+        "visible",
+        "blendMode"
       ],
       "title": "RasterLayer",
+      "type": "object"
+    },
+    "Region": {
+      "additionalProperties": false,
+      "properties": {
+        "behavior": {
+          "patternProperties": {
+            "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)+$": {
+              "$ref": "#/$defs/JsonValue"
+            }
+          },
+          "title": "Behavior",
+          "type": "object"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "region",
+          "title": "Kind",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "metadata": {
+          "patternProperties": {
+            "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)+$": {
+              "$ref": "#/$defs/JsonValue"
+            }
+          },
+          "title": "Metadata",
+          "type": "object"
+        },
+        "polygons": {
+          "items": {
+            "items": {
+              "$ref": "#/$defs/Point"
+            },
+            "minItems": 3,
+            "type": "array"
+          },
+          "minItems": 1,
+          "title": "Polygons",
+          "type": "array"
+        },
+        "regionType": {
+          "enum": [
+            "hazard",
+            "difficult_terrain",
+            "annotation"
+          ],
+          "title": "Regiontype",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 0,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "visualStyle": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Visualstyle",
+          "type": "object"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "label",
+        "metadata",
+        "kind",
+        "polygons",
+        "regionType",
+        "visualStyle",
+        "behavior"
+      ],
+      "title": "Region",
       "type": "object"
     },
     "Room": {
@@ -341,6 +722,15 @@
           "title": "Label",
           "type": "string"
         },
+        "metadata": {
+          "patternProperties": {
+            "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)+$": {
+              "$ref": "#/$defs/JsonValue"
+            }
+          },
+          "title": "Metadata",
+          "type": "object"
+        },
         "polygon": {
           "items": {
             "$ref": "#/$defs/Point"
@@ -353,21 +743,117 @@
           "title": "Prompt",
           "type": "string"
         },
+        "renderLayerId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Renderlayerid"
+        },
         "revision": {
           "minimum": 0,
           "title": "Revision",
           "type": "integer"
+        },
+        "styleOverrides": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Styleoverrides",
+          "type": "object"
         }
       },
       "required": [
         "id",
         "revision",
         "label",
+        "metadata",
         "kind",
         "polygon",
-        "prompt"
+        "prompt",
+        "styleOverrides",
+        "renderLayerId"
       ],
       "title": "Room",
+      "type": "object"
+    },
+    "Sound": {
+      "additionalProperties": false,
+      "properties": {
+        "assetHash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Assethash",
+          "type": "string"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "sound",
+          "title": "Kind",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "metadata": {
+          "patternProperties": {
+            "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)+$": {
+              "$ref": "#/$defs/JsonValue"
+            }
+          },
+          "title": "Metadata",
+          "type": "object"
+        },
+        "origin": {
+          "$ref": "#/$defs/Point"
+        },
+        "radius": {
+          "minimum": 0,
+          "title": "Radius",
+          "type": "number"
+        },
+        "revision": {
+          "minimum": 0,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "units": {
+          "enum": [
+            "ft",
+            "m"
+          ],
+          "title": "Units",
+          "type": "string"
+        },
+        "volume": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Volume",
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "label",
+        "metadata",
+        "kind",
+        "origin",
+        "radius",
+        "units",
+        "assetHash",
+        "volume"
+      ],
+      "title": "Sound",
       "type": "object"
     },
     "Wall": {
@@ -390,6 +876,15 @@
           "title": "Label",
           "type": "string"
         },
+        "metadata": {
+          "patternProperties": {
+            "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)+$": {
+              "$ref": "#/$defs/JsonValue"
+            }
+          },
+          "title": "Metadata",
+          "type": "object"
+        },
         "movement": {
           "title": "Movement",
           "type": "boolean"
@@ -403,6 +898,18 @@
           "title": "Sight",
           "type": "boolean"
         },
+        "sourceRoomId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Sourceroomid"
+        },
         "start": {
           "$ref": "#/$defs/Point"
         }
@@ -411,11 +918,13 @@
         "id",
         "revision",
         "label",
+        "metadata",
         "kind",
         "start",
         "end",
         "movement",
-        "sight"
+        "sight",
+        "sourceRoomId"
       ],
       "title": "Wall",
       "type": "object"
@@ -429,6 +938,13 @@
         "$ref": "#/$defs/Door"
       },
       "title": "Doors",
+      "type": "array"
+    },
+    "generations": {
+      "items": {
+        "$ref": "#/$defs/GenerationRecord"
+      },
+      "title": "Generations",
       "type": "array"
     },
     "layers": {
@@ -453,10 +969,24 @@
       "title": "Name",
       "type": "string"
     },
+    "objects": {
+      "items": {
+        "$ref": "#/$defs/MapObject"
+      },
+      "title": "Objects",
+      "type": "array"
+    },
     "projectId": {
       "format": "uuid",
       "title": "Projectid",
       "type": "string"
+    },
+    "regions": {
+      "items": {
+        "$ref": "#/$defs/Region"
+      },
+      "title": "Regions",
+      "type": "array"
     },
     "revision": {
       "minimum": 0,
@@ -482,6 +1012,13 @@
       "title": "Settings",
       "type": "object"
     },
+    "sounds": {
+      "items": {
+        "$ref": "#/$defs/Sound"
+      },
+      "title": "Sounds",
+      "type": "array"
+    },
     "walls": {
       "items": {
         "$ref": "#/$defs/Wall"
@@ -501,6 +1038,10 @@
     "doors",
     "lights",
     "layers",
+    "objects",
+    "regions",
+    "sounds",
+    "generations",
     "settings"
   ],
   "title": "Project",

@@ -7,6 +7,8 @@ from pydantic import BaseModel, ConfigDict, Field, JsonValue
 
 Positive = Annotated[float, Field(gt=0)]
 Nonnegative = Annotated[float, Field(ge=0)]
+Namespace = Annotated[str, Field(pattern=r"^[a-z][a-z0-9_-]*(\.[a-z][a-z0-9_-]*)+$")]
+Hash = Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
 
 
 class Contract(BaseModel):
@@ -22,12 +24,15 @@ class Entity(Contract):
     id: UUID
     revision: Annotated[int, Field(ge=0)]
     label: str
+    metadata: dict[Namespace, JsonValue]
 
 
 class Room(Entity):
     kind: Literal["room"]
     polygon: Annotated[list[Point], Field(min_length=3)]
     prompt: str
+    styleOverrides: dict[str, str]
+    renderLayerId: UUID | None
 
 
 class Wall(Entity):
@@ -36,6 +41,7 @@ class Wall(Entity):
     end: Point
     movement: bool
     sight: bool
+    sourceRoomId: UUID | None
 
 
 class Door(Entity):
@@ -45,6 +51,7 @@ class Door(Entity):
     width: Positive
     state: Literal["open", "closed", "locked"]
     secret: bool
+    doorType: Literal["door", "window"]
 
 
 class Light(Entity):
@@ -55,6 +62,7 @@ class Light(Entity):
     units: Literal["ft", "m"]
     color: Annotated[str, Field(pattern=r"^#[0-9a-fA-F]{6}$")]
     intensity: Annotated[float, Field(ge=0, le=1)]
+    animation: str | None
 
 
 class Bounds(Contract):
@@ -71,6 +79,55 @@ class RasterLayer(Entity):
     zIndex: int
     opacity: Annotated[float, Field(ge=0, le=1)]
     visible: bool
+    blendMode: Literal["normal", "multiply", "screen"]
+
+
+class MapObject(Entity):
+    kind: Literal["object"]
+    anchor: Point
+    footprint: Bounds
+    rotation: Annotated[float, Field(ge=0, lt=360)]
+    description: str
+    assetHash: Hash | None
+    properties: dict[Namespace, JsonValue]
+
+
+class Region(Entity):
+    kind: Literal["region"]
+    polygons: Annotated[list[Annotated[list[Point], Field(min_length=3)]], Field(min_length=1)]
+    regionType: Literal["hazard", "difficult_terrain", "annotation"]
+    visualStyle: dict[str, str]
+    behavior: dict[Namespace, JsonValue]
+
+
+class Sound(Entity):
+    kind: Literal["sound"]
+    origin: Point
+    radius: Nonnegative
+    units: Literal["ft", "m"]
+    assetHash: Hash
+    volume: Annotated[float, Field(ge=0, le=1)]
+
+
+class GenerationRecord(Entity):
+    kind: Literal["generation"]
+    providerId: str
+    capability: str
+    prompt: str
+    inputHashes: list[Hash]
+    outputHash: Hash | None
+    parameters: dict[str, JsonValue]
+    status: Literal["pending", "running", "succeeded", "failed", "cancelled", "stale"]
+    baseRevision: Annotated[int, Field(ge=0)]
+
+
+class MapStyle(Contract):
+    camera: Literal["strict orthographic top-down"]
+    environment: str
+    renderStyle: str
+    palette: str
+    wallThicknessPx: Positive
+    bakedLighting: Literal["neutral"]
 
 
 class Grid(Contract):
@@ -87,6 +144,7 @@ class Map(Contract):
     height: Positive
     coordinateSystem: Literal["bottom-left-y-up-ccw"]
     grid: Grid
+    style: MapStyle
 
 
 class Project(Contract):
@@ -100,4 +158,8 @@ class Project(Contract):
     doors: list[Door]
     lights: list[Light]
     layers: list[RasterLayer]
+    objects: list[MapObject]
+    regions: list[Region]
+    sounds: list[Sound]
+    generations: list[GenerationRecord]
     settings: dict[str, JsonValue]

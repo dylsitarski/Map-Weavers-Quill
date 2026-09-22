@@ -1,6 +1,7 @@
 """Start both loopback services; stop the other if either exits."""
 
 import os
+import signal
 import subprocess
 import sys
 import time
@@ -9,6 +10,13 @@ from pathlib import Path
 root = Path(__file__).resolve().parents[1]
 env = dict(os.environ, PYTHONPATH=str(root / "apps/server"))
 processes: list[subprocess.Popen[bytes]] = []
+
+
+def stop(signum, frame):
+    raise KeyboardInterrupt
+
+
+signal.signal(signal.SIGTERM, stop)
 try:
     processes.append(
         subprocess.Popen(
@@ -33,8 +41,6 @@ try:
 except KeyboardInterrupt:
     pass
 finally:
-    import signal
-
     for index, process in enumerate(processes):
         if process.poll() is None:
             if index == 1:

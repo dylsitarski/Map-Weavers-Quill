@@ -8,3 +8,5 @@ dist/
 !.env.example
 data/
 .pytest_cache/
+test-results/
+playwright-report/

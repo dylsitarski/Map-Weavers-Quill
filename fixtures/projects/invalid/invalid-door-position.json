@@ -14,6 +14,14 @@
       "units": "ft",
       "visible": true,
       "snap": true
+    },
+    "style": {
+      "camera": "strict orthographic top-down",
+      "environment": "stone abbey",
+      "renderStyle": "painterly",
+      "palette": "neutral",
+      "wallThicknessPx": 18,
+      "bakedLighting": "neutral"
     }
   },
   "rooms": [
@@ -40,7 +48,10 @@
           "y": 500
         }
       ],
-      "prompt": "Stone room"
+      "prompt": "Stone room",
+      "metadata": {},
+      "styleOverrides": {},
+      "renderLayerId": null
     },
     {
       "id": "00000000-0000-4000-8000-000000000003",
@@ -65,7 +76,10 @@
           "y": 500
         }
       ],
-      "prompt": "Library"
+      "prompt": "Library",
+      "metadata": {},
+      "styleOverrides": {},
+      "renderLayerId": null
     }
   ],
   "walls": [
@@ -83,7 +97,9 @@
         "y": 500
       },
       "movement": true,
-      "sight": true
+      "sight": true,
+      "metadata": {},
+      "sourceRoomId": null
     }
   ],
   "doors": [
@@ -96,7 +112,9 @@
       "position": 2,
       "width": 100,
       "state": "closed",
-      "secret": false
+      "secret": false,
+      "metadata": {},
+      "doorType": "door"
     }
   ],
   "lights": [
@@ -113,9 +131,15 @@
       "dimRadius": 20,
       "units": "ft",
       "color": "#ffcc88",
-      "intensity": 0.8
+      "intensity": 0.8,
+      "metadata": {},
+      "animation": null
     }
   ],
   "layers": [],
-  "settings": {}
+  "settings": {},
+  "objects": [],
+  "regions": [],
+  "sounds": [],
+  "generations": []
 }

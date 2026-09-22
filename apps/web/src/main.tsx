@@ -8,20 +8,37 @@ export function App() {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 5000);
     fetch('/api/health', { signal: controller.signal })
-      .then(async response => {
-        if (!response.ok || (await response.json()).status !== 'ok') throw Error('Unavailable');
+      .then(async (response) => {
+        if (!response.ok || (await response.json()).status !== 'ok')
+          throw Error('Unavailable');
         setStatus('Local server connected');
       })
-      .catch(() => { setStatus('Server unavailable. Start make dev and reload.'); })
+      .catch(() => {
+        setStatus('Server unavailable. Start make dev and reload.');
+      })
       .finally(() => clearTimeout(timer));
-    return () => { clearTimeout(timer); controller.abort(); };
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
   }, []);
-  return <main><p className="eyebrow">YOUR NEXT ADVENTURE STARTS HERE</p>
-    <h1>Map-Weaver’s Quill</h1><p>A canvas for places worth exploring.</p>
-    <section><h2>The workshop is taking shape</h2>
-      <p>The editor is under construction. Map creation will arrive in the next milestone.</p>
-      <p role="status">{status}</p>
-    </section></main>;
+  return (
+    <main>
+      <p className="eyebrow">YOUR NEXT ADVENTURE STARTS HERE</p>
+      <h1>Map-Weaver’s Quill</h1>
+      <p>A canvas for places worth exploring.</p>
+      <section>
+        <h2>The workshop is taking shape</h2>
+        <p>
+          The editor is under construction. Map creation will arrive in the next
+          milestone.
+        </p>
+        <p role="status">{status}</p>
+      </section>
+    </main>
+  );
 }
 
-createRoot(document.getElementById('root')!).render(<App />);
+const root = document.getElementById('root');
+if (!root) throw new Error('Missing application root');
+createRoot(root).render(<App />);

@@ -15,11 +15,13 @@ jobs:
           python-version: '3.12'
       - uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version-file: '.nvmrc'
           cache: npm
       - run: python -m venv .venv
       - run: .venv/bin/python -m pip install -r requirements.lock
       - run: npm ci
       - run: make check
+      - run: npx playwright install --with-deps chromium
+      - run: make browser
       - name: Dependency audit
         run: make audit
