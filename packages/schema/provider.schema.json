@@ -1,0 +1,239 @@
+{
+  "$defs": {
+    "GenerateRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "height": {
+          "maximum": 512,
+          "minimum": 1,
+          "title": "Height",
+          "type": "integer"
+        },
+        "prompt": {
+          "title": "Prompt",
+          "type": "string"
+        },
+        "requestId": {
+          "title": "Requestid",
+          "type": "string"
+        },
+        "seed": {
+          "default": 0,
+          "title": "Seed",
+          "type": "integer"
+        },
+        "width": {
+          "maximum": 512,
+          "minimum": 1,
+          "title": "Width",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "requestId",
+        "prompt",
+        "width",
+        "height"
+      ],
+      "title": "GenerateRequest",
+      "type": "object"
+    },
+    "GenerationResult": {
+      "additionalProperties": false,
+      "properties": {
+        "assetHash": {
+          "title": "Assethash",
+          "type": "string"
+        },
+        "height": {
+          "title": "Height",
+          "type": "integer"
+        },
+        "mediaType": {
+          "const": "image/png",
+          "title": "Mediatype",
+          "type": "string"
+        },
+        "providerId": {
+          "title": "Providerid",
+          "type": "string"
+        },
+        "requestId": {
+          "title": "Requestid",
+          "type": "string"
+        },
+        "width": {
+          "title": "Width",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "requestId",
+        "providerId",
+        "assetHash",
+        "width",
+        "height",
+        "mediaType"
+      ],
+      "title": "GenerationResult",
+      "type": "object"
+    },
+    "InpaintRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "context": {
+          "default": "",
+          "title": "Context",
+          "type": "string"
+        },
+        "height": {
+          "maximum": 512,
+          "minimum": 1,
+          "title": "Height",
+          "type": "integer"
+        },
+        "maskConvention": {
+          "const": "white-edit-black-preserve",
+          "title": "Maskconvention",
+          "type": "string"
+        },
+        "maskRef": {
+          "title": "Maskref",
+          "type": "string"
+        },
+        "prompt": {
+          "title": "Prompt",
+          "type": "string"
+        },
+        "requestId": {
+          "title": "Requestid",
+          "type": "string"
+        },
+        "seed": {
+          "default": 0,
+          "title": "Seed",
+          "type": "integer"
+        },
+        "sourceRef": {
+          "title": "Sourceref",
+          "type": "string"
+        },
+        "width": {
+          "maximum": 512,
+          "minimum": 1,
+          "title": "Width",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "requestId",
+        "prompt",
+        "width",
+        "height",
+        "sourceRef",
+        "maskRef",
+        "maskConvention"
+      ],
+      "title": "InpaintRequest",
+      "type": "object"
+    },
+    "ProviderDescriptor": {
+      "additionalProperties": false,
+      "properties": {
+        "capabilities": {
+          "items": {
+            "enum": [
+              "text_to_image",
+              "inpainting",
+              "seed"
+            ],
+            "type": "string"
+          },
+          "title": "Capabilities",
+          "type": "array"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "local": {
+          "title": "Local",
+          "type": "boolean"
+        },
+        "maxHeight": {
+          "title": "Maxheight",
+          "type": "integer"
+        },
+        "maxWidth": {
+          "title": "Maxwidth",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "capabilities",
+        "maxWidth",
+        "maxHeight",
+        "local"
+      ],
+      "title": "ProviderDescriptor",
+      "type": "object"
+    },
+    "ProviderError": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "enum": [
+            "missing_asset",
+            "invalid_image",
+            "unsupported_capability"
+          ],
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "retryable": {
+          "default": false,
+          "title": "Retryable",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "ProviderError",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "descriptor": {
+      "$ref": "#/$defs/ProviderDescriptor"
+    },
+    "error": {
+      "$ref": "#/$defs/ProviderError"
+    },
+    "generate": {
+      "$ref": "#/$defs/GenerateRequest"
+    },
+    "inpaint": {
+      "$ref": "#/$defs/InpaintRequest"
+    },
+    "result": {
+      "$ref": "#/$defs/GenerationResult"
+    }
+  },
+  "required": [
+    "descriptor",
+    "generate",
+    "inpaint",
+    "result",
+    "error"
+  ],
+  "title": "ProviderContracts",
+  "type": "object"
+}

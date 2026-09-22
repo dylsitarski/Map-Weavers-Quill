@@ -976,12 +976,12 @@ As of this manifest version:
 - Product architecture and staged implementation plan are defined.
 - Milestone 0 is in progress: strict Python structural models, generated JSON Schema with drift checking, continuous coordinate transforms, a two-room fixture, five invalid fixtures, and nine offline unit tests are implemented.
 - The current schema is an unreleased subset, not a complete persistence boundary. Polygon topology, cross-entity references, remaining entity types, and metadata extensions still need implementation.
-- React/TypeScript and FastAPI shells, cross-runtime validation, provider contracts/mock generation, CI, linting, typing, and dependency scanning remain pending. See README.md and docs/adr/0001-foundation-contracts.md.
+- React/TypeScript and FastAPI shells, generated TypeScript declarations, cross-runtime fixture validation, image-provider contracts, an offline mock, Python lint/format/type checks, and an Ubuntu CI workflow are implemented. Dependency auditing is configured but requires network access. See README.md and docs/adr for current scope and limitations.
 - No AI provider, Foundry version, or public model is yet committed.
 - The project name is **Map-Weaver's Quill**.
 - Native geometry uses a bottom-left origin, +y upward, and counter-clockwise angles; target adapters own all coordinate conversion.
 - Distribution is planned as a public, free, noncommercial release, with Linux prioritized before Windows 11.
-- The next action is to continue **Milestone 0: Repository and contracts**, adding the application shells and generated TypeScript contract validation. Milestone 0 is not complete.
+- The next action is to continue **Milestone 0: Repository and contracts**, completing remaining contract fields, browser-level shell checks, and clean-install/CI verification. Milestone 0 is not complete.
 
 ## 23. First implementation ticket
 

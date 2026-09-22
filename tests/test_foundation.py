@@ -1,11 +1,11 @@
 import json
 import math
-from pathlib import Path
 import unittest
+from pathlib import Path
 
 from pydantic import ValidationError
+from quill.coordinates import clockwise_from_positive_x, raster_rectangle, reflect_point
 from quill.models import Project
-from quill.coordinates import reflect_point, raster_rectangle, clockwise_from_positive_x
 
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures/projects"
 
@@ -40,9 +40,13 @@ class ProjectTests(unittest.TestCase):
 
 class CoordinateTests(unittest.TestCase):
     def test_corners_and_inverse(self):
-        for point, expected in [((0, 0), (0, 600)), ((0, 600), (0, 0)),
-                                ((1000, 0), (1000, 600)), ((1000, 600), (1000, 0)),
-                                ((123.5, 222.25), (123.5, 377.75))]:
+        for point, expected in [
+            ((0, 0), (0, 600)),
+            ((0, 600), (0, 0)),
+            ((1000, 0), (1000, 600)),
+            ((1000, 600), (1000, 0)),
+            ((123.5, 222.25), (123.5, 377.75)),
+        ]:
             with self.subTest(point=point):
                 actual = reflect_point(*point, 600)
                 self.assertEqual(actual, expected)
@@ -57,8 +61,10 @@ class CoordinateTests(unittest.TestCase):
 
     def test_winding_reverses(self):
         points = [(0, 0), (5, 0), (5, 5), (0, 5)]
+
         def area(p):
-            return sum(a[0]*b[1]-b[0]*a[1] for a,b in zip(p, p[1:]+p[:1])) / 2
+            return sum(a[0] * b[1] - b[0] * a[1] for a, b in zip(p, p[1:] + p[:1])) / 2
+
         self.assertEqual(area(points), -area([reflect_point(*p, 600) for p in points]))
 
     def test_invalid_inputs(self):

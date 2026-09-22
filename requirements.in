@@ -1,0 +1,8 @@
+-r requirements.lock
+fastapi
+uvicorn
+httpx
+pillow
+ruff
+mypy
+pip-audit

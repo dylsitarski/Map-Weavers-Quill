@@ -16,8 +16,9 @@ def reflect_point(x: float, y: float, map_height: float) -> tuple[float, float]:
     return x, map_height - y
 
 
-def raster_rectangle(x: float, y: float, width: float, height: float,
-                     map_height: float) -> tuple[float, float, float, float]:
+def raster_rectangle(
+    x: float, y: float, width: float, height: float, map_height: float
+) -> tuple[float, float, float, float]:
     """Bottom-left world bounds to top-left raster bounds at scale one."""
     _finite(width, height)
     if width <= 0 or height <= 0:
