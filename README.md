@@ -39,14 +39,19 @@ Browser tests cover loading, API connectivity through Vite, and failure messagin
 They start and stop the same launcher as `make dev`, with no external AI calls.
 
 The committed Python lockfile pins the full development dependency closure.
-GitHub Actions runs `make check` and `make audit` on Ubuntu for pushes and PRs.
+GitHub Actions runs `make check`, `make browser`, and `make audit` on Ubuntu for pushes and PRs.
 Tests use synthetic data, no credentials, paid APIs, or GPUs.
 
 ## Next Milestone 0 work
 
-- Finalize provider extension contracts and record all architecture decisions.
-- Verify browser tests and clean-install CI against the latest commit.
-- Geometry topology and cross-entity relationship validation before persistence.
+- Resolve the pending browser CI run and verify clean-install checks against the latest commit.
+- Confirm all Milestone 0 exit criteria before starting the editor.
+
+Provider contracts now include version tags, capability vocabulary, reference
+images, negative prompts, neutral parameters, namespaced extensions and normalized
+errors. The mock rejects unsupported options and cancellation explicitly. All
+seven initial architecture decisions are recorded. Geometry topology and
+cross-entity relationship validation belong to Milestone 1, before persistence.
 
 The schema now covers every planned entity category, including namespaced
 metadata, object transforms, sounds, regions, and generation provenance. The

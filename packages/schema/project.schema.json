@@ -51,6 +51,7 @@
           "type": "string"
         },
         "metadata": {
+          "additionalProperties": false,
           "patternProperties": {
             "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)+$": {
               "$ref": "#/$defs/JsonValue"
@@ -145,6 +146,7 @@
           "type": "string"
         },
         "metadata": {
+          "additionalProperties": false,
           "patternProperties": {
             "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)+$": {
               "$ref": "#/$defs/JsonValue"
@@ -313,6 +315,7 @@
           "type": "string"
         },
         "metadata": {
+          "additionalProperties": false,
           "patternProperties": {
             "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)+$": {
               "$ref": "#/$defs/JsonValue"
@@ -430,6 +433,7 @@
           "type": "string"
         },
         "metadata": {
+          "additionalProperties": false,
           "patternProperties": {
             "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)+$": {
               "$ref": "#/$defs/JsonValue"
@@ -439,6 +443,7 @@
           "type": "object"
         },
         "properties": {
+          "additionalProperties": false,
           "patternProperties": {
             "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)+$": {
               "$ref": "#/$defs/JsonValue"
@@ -571,6 +576,7 @@
           "type": "string"
         },
         "metadata": {
+          "additionalProperties": false,
           "patternProperties": {
             "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)+$": {
               "$ref": "#/$defs/JsonValue"
@@ -626,6 +632,7 @@
       "additionalProperties": false,
       "properties": {
         "behavior": {
+          "additionalProperties": false,
           "patternProperties": {
             "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)+$": {
               "$ref": "#/$defs/JsonValue"
@@ -649,6 +656,7 @@
           "type": "string"
         },
         "metadata": {
+          "additionalProperties": false,
           "patternProperties": {
             "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)+$": {
               "$ref": "#/$defs/JsonValue"
@@ -723,6 +731,7 @@
           "type": "string"
         },
         "metadata": {
+          "additionalProperties": false,
           "patternProperties": {
             "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)+$": {
               "$ref": "#/$defs/JsonValue"
@@ -805,6 +814,7 @@
           "type": "string"
         },
         "metadata": {
+          "additionalProperties": false,
           "patternProperties": {
             "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)+$": {
               "$ref": "#/$defs/JsonValue"
@@ -877,6 +887,7 @@
           "type": "string"
         },
         "metadata": {
+          "additionalProperties": false,
           "patternProperties": {
             "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)+$": {
               "$ref": "#/$defs/JsonValue"

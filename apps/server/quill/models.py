@@ -24,7 +24,7 @@ class Entity(Contract):
     id: UUID
     revision: Annotated[int, Field(ge=0)]
     label: str
-    metadata: dict[Namespace, JsonValue]
+    metadata: dict[Namespace, JsonValue] = Field(json_schema_extra={"additionalProperties": False})
 
 
 class Room(Entity):
@@ -89,7 +89,9 @@ class MapObject(Entity):
     rotation: Annotated[float, Field(ge=0, lt=360)]
     description: str
     assetHash: Hash | None
-    properties: dict[Namespace, JsonValue]
+    properties: dict[Namespace, JsonValue] = Field(
+        json_schema_extra={"additionalProperties": False}
+    )
 
 
 class Region(Entity):
@@ -97,7 +99,7 @@ class Region(Entity):
     polygons: Annotated[list[Annotated[list[Point], Field(min_length=3)]], Field(min_length=1)]
     regionType: Literal["hazard", "difficult_terrain", "annotation"]
     visualStyle: dict[str, str]
-    behavior: dict[Namespace, JsonValue]
+    behavior: dict[Namespace, JsonValue] = Field(json_schema_extra={"additionalProperties": False})
 
 
 class Sound(Entity):

@@ -3,17 +3,70 @@
     "GenerateRequest": {
       "additionalProperties": false,
       "properties": {
+        "contractVersion": {
+          "const": "0.1.0",
+          "default": "0.1.0",
+          "title": "Contractversion",
+          "type": "string"
+        },
+        "extensions": {
+          "additionalProperties": false,
+          "patternProperties": {
+            "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)+$": {
+              "additionalProperties": {
+                "$ref": "#/$defs/JsonValue"
+              },
+              "type": "object"
+            }
+          },
+          "title": "Extensions",
+          "type": "object"
+        },
         "height": {
-          "maximum": 512,
+          "maximum": 16384,
           "minimum": 1,
           "title": "Height",
           "type": "integer"
+        },
+        "negativePrompt": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Negativeprompt"
+        },
+        "parameters": {
+          "additionalProperties": {
+            "exclusiveMinimum": 0,
+            "type": "number"
+          },
+          "propertyNames": {
+            "enum": [
+              "steps",
+              "guidance"
+            ]
+          },
+          "title": "Parameters",
+          "type": "object"
         },
         "prompt": {
           "title": "Prompt",
           "type": "string"
         },
+        "referenceImages": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Referenceimages",
+          "type": "array"
+        },
         "requestId": {
+          "minLength": 1,
           "title": "Requestid",
           "type": "string"
         },
@@ -23,7 +76,7 @@
           "type": "integer"
         },
         "width": {
-          "maximum": 512,
+          "maximum": 16384,
           "minimum": 1,
           "title": "Width",
           "type": "integer"
@@ -43,6 +96,12 @@
       "properties": {
         "assetHash": {
           "title": "Assethash",
+          "type": "string"
+        },
+        "contractVersion": {
+          "const": "0.1.0",
+          "default": "0.1.0",
+          "title": "Contractversion",
           "type": "string"
         },
         "height": {
@@ -86,8 +145,27 @@
           "title": "Context",
           "type": "string"
         },
+        "contractVersion": {
+          "const": "0.1.0",
+          "default": "0.1.0",
+          "title": "Contractversion",
+          "type": "string"
+        },
+        "extensions": {
+          "additionalProperties": false,
+          "patternProperties": {
+            "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)+$": {
+              "additionalProperties": {
+                "$ref": "#/$defs/JsonValue"
+              },
+              "type": "object"
+            }
+          },
+          "title": "Extensions",
+          "type": "object"
+        },
         "height": {
-          "maximum": 512,
+          "maximum": 16384,
           "minimum": 1,
           "title": "Height",
           "type": "integer"
@@ -101,11 +179,45 @@
           "title": "Maskref",
           "type": "string"
         },
+        "negativePrompt": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Negativeprompt"
+        },
+        "parameters": {
+          "additionalProperties": {
+            "exclusiveMinimum": 0,
+            "type": "number"
+          },
+          "propertyNames": {
+            "enum": [
+              "steps",
+              "guidance"
+            ]
+          },
+          "title": "Parameters",
+          "type": "object"
+        },
         "prompt": {
           "title": "Prompt",
           "type": "string"
         },
+        "referenceImages": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Referenceimages",
+          "type": "array"
+        },
         "requestId": {
+          "minLength": 1,
           "title": "Requestid",
           "type": "string"
         },
@@ -119,7 +231,7 @@
           "type": "string"
         },
         "width": {
-          "maximum": 512,
+          "maximum": 16384,
           "minimum": 1,
           "title": "Width",
           "type": "integer"
@@ -137,6 +249,7 @@
       "title": "InpaintRequest",
       "type": "object"
     },
+    "JsonValue": {},
     "ProviderDescriptor": {
       "additionalProperties": false,
       "properties": {
@@ -145,12 +258,25 @@
             "enum": [
               "text_to_image",
               "inpainting",
-              "seed"
+              "image_to_image",
+              "reference_image",
+              "control_image",
+              "transparent_background",
+              "seed",
+              "negative_prompt",
+              "maximum_dimensions",
+              "asynchronous_jobs"
             ],
             "type": "string"
           },
           "title": "Capabilities",
           "type": "array"
+        },
+        "contractVersion": {
+          "const": "0.1.0",
+          "default": "0.1.0",
+          "title": "Contractversion",
+          "type": "string"
         },
         "id": {
           "title": "Id",
@@ -161,10 +287,14 @@
           "type": "boolean"
         },
         "maxHeight": {
+          "maximum": 16384,
+          "minimum": 1,
           "title": "Maxheight",
           "type": "integer"
         },
         "maxWidth": {
+          "maximum": 16384,
+          "minimum": 1,
           "title": "Maxwidth",
           "type": "integer"
         }
@@ -186,7 +316,14 @@
           "enum": [
             "missing_asset",
             "invalid_image",
-            "unsupported_capability"
+            "unsupported_capability",
+            "invalid_request",
+            "authentication",
+            "rate_limited",
+            "timeout",
+            "unavailable",
+            "cancelled",
+            "invalid_output"
           ],
           "title": "Code",
           "type": "string"

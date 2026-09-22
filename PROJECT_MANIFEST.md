@@ -974,14 +974,15 @@ These questions should be resolved near the stated milestone, not guessed by an 
 As of this manifest version:
 
 - Product architecture and staged implementation plan are defined.
-- Milestone 0 is in progress: strict Python structural models, generated JSON Schema with drift checking, continuous coordinate transforms, a two-room fixture, five invalid fixtures, and nine offline unit tests are implemented.
+- Milestone 0 is in progress: strict Python structural models, generated JSON Schema with drift checking, continuous coordinate transforms, two valid project fixtures, and five invalid fixtures are implemented.
 - The unreleased structural schema now covers every planned entity category, namespaced metadata, style, and generation provenance. Polygon topology and cross-entity relationship validation remain Milestone 1 work before persistence.
 - React/TypeScript and FastAPI shells, generated TypeScript declarations, cross-runtime fixture validation, image-provider contracts, an offline mock, Python lint/format/type checks, and an Ubuntu CI workflow are implemented. Dependency auditing is configured but requires network access. See README.md and docs/adr for current scope and limitations.
 - No AI provider, Foundry version, or public model is yet committed.
 - The project name is **Map-Weaver's Quill**.
 - Native geometry uses a bottom-left origin, +y upward, and counter-clockwise angles; target adapters own all coordinate conversion.
 - Distribution is planned as a public, free, noncommercial release, with Linux prioritized before Windows 11.
-- Node 24 is enforced, frontend lint/format checks are enabled, and Playwright shell tests are included in Ubuntu CI. See README.md for browser setup and remaining provider contract work. Milestone 0 is not complete.
+- Node 24 is enforced, frontend lint/format checks are enabled, and Playwright shell tests are included in Ubuntu CI. Browser CI verification remains unresolved; Milestone 0 is not complete.
+- Provider contracts include versioning, optional references and parameters, namespaced extensions, typed failures, and explicit unsupported cancellation. Python and TypeScript agree on namespace rejection. ADR-0001 through ADR-0007 are recorded. Language operations and asynchronous orchestration remain their scheduled later milestones.
 
 ## 23. First implementation ticket
 

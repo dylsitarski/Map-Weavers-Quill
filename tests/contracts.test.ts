@@ -13,6 +13,49 @@ const validate = ajv.compile<Project>(
 );
 const raw = readFileSync('fixtures/projects/two-rooms.json', 'utf8');
 
+test('provider requests validate consistently in both runtimes', () => {
+  const schema = JSON.parse(
+    readFileSync('packages/schema/provider.schema.json', 'utf8'),
+  );
+  const requestSchema = {
+    $defs: schema.$defs,
+    $ref: '#/$defs/GenerateRequest',
+  };
+  const validateRequest = ajv.compile(requestSchema);
+  const base = {
+    requestId: 'contract-test',
+    prompt: 'stone',
+    width: 16,
+    height: 16,
+    referenceImages: ['synthetic-reference'],
+    extensions: { 'example.adapter': { quality: 'high' } },
+  };
+  for (const [change, expected] of [
+    [{}, true],
+    [{ width: 513 }, true],
+    [{ width: 16385 }, false],
+    [{ extensions: { unnamespaced: {} } }, false],
+    [{ parameters: { unknown: 1 } }, false],
+    [{ contractVersion: '2.0.0' }, false],
+  ] as const) {
+    const value = { ...base, ...change };
+    assert.equal(validateRequest(value), expected);
+    const result = spawnSync(
+      process.env.PYTHON ?? '.venv/bin/python',
+      [
+        '-c',
+        'import sys; from quill.providers import GenerateRequest; GenerateRequest.model_validate_json(sys.stdin.read())',
+      ],
+      {
+        input: JSON.stringify(value),
+        encoding: 'utf8',
+        env: { ...process.env, PYTHONPATH: 'apps/server' },
+      },
+    );
+    assert.equal(result.status === 0, expected, result.stderr);
+  }
+});
+
 for (const fixture of ['two-rooms', 'all-entities']) {
   test(`${fixture} survives Python and TypeScript unchanged`, () => {
     const value: unknown = JSON.parse(
@@ -63,4 +106,10 @@ test('reject coercion and unknown fields without mutation', () => {
     assert.equal(validate(value), false);
     assert.equal(JSON.stringify(value), before);
   }
+});
+
+test('reject unnamespaced entity metadata', () => {
+  const value = JSON.parse(raw);
+  value.rooms[0].metadata = { unnamespaced: true };
+  assert.equal(validate(value), false);
 });

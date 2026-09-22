@@ -23,5 +23,8 @@ jobs:
       - run: make check
       - run: npx playwright install --with-deps chromium
       - run: make browser
+        timeout-minutes: 3
+        env:
+          DEBUG: pw:webserver
       - name: Dependency audit
         run: make audit

@@ -65,7 +65,41 @@ class ProviderContractTests(unittest.IsolatedAsyncioTestCase):
 
     def test_dimension_limits(self):
         with self.assertRaises(ValidationError):
-            GenerateRequest(requestId="bad", prompt="", width=513, height=1)
+            GenerateRequest(requestId="bad", prompt="", width=16385, height=1)
+
+    async def test_adapter_limits_before_allocation(self):
+        request = self.request.model_copy(update={"width": 513})
+        with self.assertRaises(ProviderFailure) as error:
+            await self.provider.generate(request)
+        self.assertEqual(error.exception.error.code, "invalid_request")
+        self.assertEqual(self.provider.assets, {})
+
+    async def test_unsupported_options_and_cancellation(self):
+        for option in (
+            {"negativePrompt": "labels"},
+            {"referenceImages": ["synthetic-reference"]},
+            {"parameters": {"steps": 10.0}},
+            {"extensions": {"example.adapter": {"quality": "high"}}},
+        ):
+            request = GenerateRequest.model_validate(self.request.model_dump() | option)
+            with self.assertRaises(ProviderFailure) as error:
+                await self.provider.generate(request)
+            self.assertEqual(error.exception.error.code, "unsupported_capability")
+        with self.assertRaises(ProviderFailure) as error:
+            await self.provider.cancel("no-job")
+        self.assertEqual(error.exception.error.code, "unsupported_capability")
+        self.assertEqual(self.provider.assets, {})
+
+    def test_extension_validation_and_version(self):
+        for option in (
+            {"extensions": {"unnamespaced": {}}},
+            {"parameters": {"unknown": 1.0}},
+            {"parameters": {"guidance": float("nan")}},
+            {"contractVersion": "2.0.0"},
+            {"requestId": ""},
+        ):
+            with self.assertRaises(ValidationError):
+                GenerateRequest.model_validate(self.request.model_dump() | option)
 
 
 class ApiTests(unittest.TestCase):
