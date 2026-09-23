@@ -3,6 +3,7 @@ import { Layer, Line, Rect, Stage } from 'react-konva';
 import type { GeometryResult } from '../../../packages/schema/geometry';
 import type { Point } from '../../../packages/schema/project';
 import { EditorPanels } from './EditorPanels';
+import { initialTools, toolsReducer } from './editorTools';
 import {
   emptyHistory,
   fitView,
@@ -21,7 +22,10 @@ export function Editor({ status }: { status: string }) {
   const pending = useRef(false);
   const [size, setSize] = useState({ width: 800, height: 560 });
   const [view, setView] = useState<View>(fitView(800, 560));
-  const [tool, setTool] = useState<'pan' | 'room'>('room');
+  const [tools, changeTools] = useReducer(toolsReducer, initialTools);
+  const { tool, scope } = tools;
+  const [pointer, setPointer] = useState<Point | null>(null);
+  const [temporaryPan, setTemporaryPan] = useState(false);
   const [grid, setGrid] = useState(true);
   const [snap, setSnap] = useState(true);
   const [history, dispatch] = useReducer(historyReducer, emptyHistory);
@@ -43,12 +47,13 @@ export function Editor({ status }: { status: string }) {
       if (
         e.target instanceof HTMLElement &&
         (e.target.isContentEditable ||
-          ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(e.target.tagName))
+          ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName))
       )
         return;
       if (e.code === 'Space') {
         e.preventDefault();
         space.current = true;
+        setTemporaryPan(true);
       }
       if (e.key === 'Escape') {
         setStart(null);
@@ -57,10 +62,15 @@ export function Editor({ status }: { status: string }) {
       }
     }
     function up(e: KeyboardEvent) {
-      if (e.code === 'Space') space.current = false;
+      if (e.code === 'Space' && space.current) {
+        e.preventDefault();
+        space.current = false;
+        setTemporaryPan(false);
+      }
     }
     function blur() {
       space.current = false;
+      setTemporaryPan(false);
       pan.current = null;
       setStart(null);
       setEnd(null);
@@ -74,6 +84,14 @@ export function Editor({ status }: { status: string }) {
       window.removeEventListener('blur', blur);
     };
   }, []);
+  useEffect(() => {
+    // A scope/tool transition cancels a draft without changing document history.
+    void tool;
+    void scope;
+    setStart(null);
+    setEnd(null);
+    pan.current = null;
+  }, [tool, scope]);
   useEffect(() => {
     const node = container.current;
     if (!node) return;
@@ -174,6 +192,18 @@ export function Editor({ status }: { status: string }) {
     }
   }
   const gridLines = [];
+  const snapWorld =
+    pointer && snap && tool === 'room' && !temporaryPan && !pan.current && !busy
+      ? world(pointer)
+      : null;
+  const snapPoint =
+    snapWorld &&
+    snapWorld.x >= 0 &&
+    snapWorld.y >= 0 &&
+    snapWorld.x <= mapSize.width &&
+    snapWorld.y <= mapSize.height
+      ? worldToScreen(snapWorld, view)
+      : null;
   if (grid) {
     for (let x = 0; x <= mapSize.width; x += 50)
       gridLines.push([
@@ -197,6 +227,7 @@ export function Editor({ status }: { status: string }) {
             if (busy || e.evt.button !== 0) return;
             const pointer = e.target.getStage()?.getPointerPosition();
             if (!pointer) return;
+            setPointer(pointer);
             if (tool === 'pan' || space.current)
               pan.current = { point: pointer, view };
             else {
@@ -207,6 +238,7 @@ export function Editor({ status }: { status: string }) {
           onMouseMove={(e) => {
             const pointer = e.target.getStage()?.getPointerPosition();
             if (!pointer) return;
+            setPointer(pointer);
             if (pan.current)
               setView({
                 ...pan.current.view,
@@ -223,6 +255,7 @@ export function Editor({ status }: { status: string }) {
             setEnd(null);
           }}
           onMouseLeave={() => {
+            setPointer(null);
             pan.current = null;
             setStart(null);
             setEnd(null);
@@ -266,11 +299,22 @@ export function Editor({ status }: { status: string }) {
             )}
           </Layer>
         </Stage>
+        {snapPoint && (
+          <span
+            className="snap-point"
+            data-testid="snap-point"
+            aria-hidden="true"
+            style={{ left: snapPoint.x, top: snapPoint.y }}
+          />
+        )}
       </div>
       <EditorPanels
         status={status}
         tool={tool}
-        setTool={setTool}
+        setTool={(tool) => changeTools({ type: 'tool', tool })}
+        scope={scope}
+        toggleScope={(scope) => changeTools({ type: 'scope', scope })}
+        closeScope={() => changeTools({ type: 'close' })}
         grid={grid}
         setGrid={setGrid}
         snap={snap}

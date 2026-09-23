@@ -27,6 +27,17 @@ main {
 .canvas {
   touch-action: none;
 }
+.snap-point {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #345845;
+  border: 1px solid #fff9;
+  box-shadow: 0 0 0 1px #234d3966;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
 .surface,
 .brand {
   background: #182722f2;
@@ -124,6 +135,7 @@ input:focus-visible {
   top: 70px;
 }
 .global-panel {
+  z-index: 6;
   left: 76px;
   top: 62px;
 }
@@ -142,6 +154,9 @@ label {
   gap: 8px;
   font-size: 0.85rem;
   padding: 8px 0;
+}
+.topbar label {
+  padding: 0 6px;
 }
 .info-panel {
   position: absolute;

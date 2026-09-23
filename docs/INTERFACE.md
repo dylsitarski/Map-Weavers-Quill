@@ -11,24 +11,39 @@ or dismissing panels must never resize or shift the canvas. No document scrollin
 | Position | Purpose | Implemented now | Planned additions |
 |---|---|---|---|
 | Top-left | Compact identity | MQ mark and accessible project title | Project name |
-| Top bar | Global actions | File/View/Settings/Help disclosures, Pan, Undo/Redo | New/Open/Save, save state, export |
-| Left rail | Editing scope (what) | Map and Room | Region, Object, Light, Sound |
-| Beside rail | Scope tools (how) | Map facts, rectangle tool | Polygon, selection, move, vertices, walls/doors |
+| Top bar | Global actions | File/View/Settings/Help disclosures, always-visible Snap, Pan, Undo/Redo | New/Open/Save, save state, export |
+| Left rail | Editing scope (what) | Room | Region, Object, Light, Sound |
+| Beside rail | Scope tools (how) | Rectangle tool | Polygon, selection, move, vertices, walls/doors |
 | Upper-right | Collapsible persistent information | Map facts, room list, connection status | Selection inspector, layers, provider/job panels |
 | Bottom-left | Temporary feedback | Validation progress, dismissible errors, fading success | Job notifications and contextual guidance |
 | Bottom-right | View status | Active tool and zoom | Cursor coordinates and grid scale |
 
 ## Interaction rules
 
-- Scope and active tool are separate state. Closing a tool panel retains the tool.
-- Clicking the canvas closes transient menus and scope flyouts. Persistent info
-  stays open until collapsed. Escape cancels a draft and closes transient panels.
+- Default to Pan with no scope open. At most one scope and one tool are active.
+  Scope buttons toggle their panel; tool buttons toggle back to Pan when pressed
+  again. Closing a scope suspends its tool and returns to Pan. Remember the last
+  explicit tool choice per scope (including Pan); reopening restores it. Changing
+  scopes suspends the old tool and restores the destination's choice, or Pan for
+  a scope never used. This restoration takes precedence over the Pan fallback.
+- Canvas clicks dismiss global dropdowns only. Scope tools remain available while
+  drawing and while interacting with other controls. Escape cancels drafts and
+  closes the global dropdown first, otherwise the scope (preserving its memory).
+- Remove Map scope until it has actual editing tools; dimensions live in Info and
+  Fit map in View. Do not introduce a redundant or empty Map panel.
 - Pan is globally available. Space-drag temporarily pans, except when typing in
-  form fields; releasing Space restores the previous tool.
+  form fields; releasing Space restores the previous tool without changing scope
+  or remembered tools. Space is reserved for pan even with a button focused; Enter
+  activates focused buttons. Checkboxes retain their native Space behavior.
+- Snap stays visible on the top bar. A small fixed-size point marks the snapped
+  drawing position inside the map; hide it when snapping is off, the pointer leaves
+  the canvas, validation is pending, or Pan/temporary pan is active. It uses the
+  exact same native-to-screen conversion as the proposed room corner.
 - Wheel input zooms the map, including over overlays. Long information panels use
   bounded regions with draggable scrollbars and keyboard scrolling; the page
   itself never scrolls. Horizontal-only wheel input does not change zoom.
-- On narrow windows, opening a flyout collapses persistent info and vice versa.
+- On narrow windows, opening a scope or dropdown collapses persistent info.
+  Reopening info must not close the scope or change its tool.
 - Buttons use visible labels or accessible names and tooltips. Expanded/pressed
   states are exposed to assistive technology. Escape returns focus to the opener.
 - Temporary confirmations fade. Errors requiring attention stay until dismissed
@@ -54,6 +69,23 @@ export with a compatibility summary. Provider secrets stay on the server.
 Milestones 6–7: Enable Region/Object/Light/Sound scopes as tools land. Brush masks
 and language proposals use the same preview/approval area; they must not obscure
 the selected map area unnecessarily.
+
+## Standalone walls: proposed direction, not yet implemented
+
+Independent wall segments can use the existing nullable `sourceRoomId`; room
+boundaries are not a prerequisite for a floating wall. A pillar is a closed
+obstacle footprint, not automatically a room. The current room schema has one
+outer polygon and no holes; pillar exclusions from room floors/generation need
+an explicit geometry decision and contract tests before implementation.
+
+Recommend detecting bounded wall circuits and offering a previewed **Create room
+from enclosure** command, rather than silently creating rooms for every loop.
+Optional automatic proposals may come later. Endpoint snapping, intersection
+splitting, shared boundaries, nested loops and stable wall/door references need
+deterministic topology rules first. Open doors still belong to a structural
+boundary. Creating a room from walls must not duplicate the existing segments;
+the result should be one validated, undoable transaction. This is a design proposal
+for the Milestone 1 wall work, not an accepted schema change or implemented tool.
 
 ## Current limits
 

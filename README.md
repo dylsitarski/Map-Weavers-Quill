@@ -65,13 +65,16 @@ cross-entity relationship validation belong to Milestone 1, before persistence.
 ## Milestone 1 first increment
 
 The accepted UI scheme and future feature placement are in [docs/INTERFACE.md](docs/INTERFACE.md).
-The left rail opens Map/Room tools, global menus live along the top, and the
+The left rail toggles persistent Room tools, global menus live along the top, and the
 Information panel at upper-right collapses. View contains Fit map and Grid;
-Settings contains Snap. Space-drag temporarily pans. Escape closes flyouts or
+Snap is always visible on the top bar. Pan is the default. Closing a scope returns
+to Pan; reopening restores its last tool. Tool buttons toggle off to Pan.
+Space-drag temporarily pans, including with a tool button focused (Enter activates
+focused buttons). A small point previews the snapped drawing position. Escape closes menus or
 cancels a draft. Errors remain at bottom-left until dismissed; confirmations fade.
 Panels overlay the canvas without changing its size. Future scopes are disabled.
 
-Run `make dev`, open the web interface, and drag inside the map to draw a room.
+Run `make dev`, open the web interface, choose Room → Rectangle room, and drag inside the map.
 Choose Pan to drag the view, scroll to zoom, or use Fit map to recenter. Grid
 visibility and snapping are independent. The room list shows native coordinates.
 Undo/Redo applies to room additions. Invalid geometry and API failures do not

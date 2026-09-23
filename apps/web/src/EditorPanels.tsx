@@ -1,10 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Room } from '../../../packages/schema/project';
+import type { Scope, Tool } from './editorTools';
 
 type Props = {
   status: string;
-  tool: 'pan' | 'room';
-  setTool: (tool: 'pan' | 'room') => void;
+  tool: Tool;
+  setTool: (tool: Tool) => void;
+  scope: Scope | null;
+  toggleScope: (scope: Scope) => void;
+  closeScope: () => void;
   grid: boolean;
   setGrid: (value: boolean) => void;
   snap: boolean;
@@ -24,9 +28,9 @@ type Props = {
 };
 export function EditorPanels(p: Props) {
   const [panel, setPanel] = useState<string | null>(null);
-  const [scope, setScope] = useState('Room');
   const [infoOpen, setInfoOpen] = useState(window.innerWidth >= 900);
   const opener = useRef<HTMLButtonElement | null>(null);
+  const scopeOpener = useRef<HTMLButtonElement | null>(null);
   const previousDismiss = useRef(p.dismissVersion);
   useEffect(() => {
     if (previousDismiss.current !== p.dismissVersion) setPanel(null);
@@ -37,11 +41,14 @@ export function EditorPanels(p: Props) {
       if (e.key === 'Escape' && panel) {
         setPanel(null);
         opener.current?.focus();
+      } else if (e.key === 'Escape' && p.scope) {
+        p.closeScope();
+        scopeOpener.current?.focus();
       }
     }
     window.addEventListener('keydown', closeOnEscape);
     return () => window.removeEventListener('keydown', closeOnEscape);
-  }, [panel]);
+  }, [panel, p.scope, p.closeScope]);
   function open(name: string, button: HTMLButtonElement) {
     opener.current = button;
     setPanel(panel === name ? null : name);
@@ -66,6 +73,14 @@ export function EditorPanels(p: Props) {
           </button>
         ))}
         <span className="separator" />
+        <label>
+          <input
+            type="checkbox"
+            checked={p.snap}
+            onChange={(e) => p.setSnap(e.target.checked)}
+          />
+          Snap
+        </label>
         <button
           type="button"
           aria-pressed={p.tool === 'pan'}
@@ -109,38 +124,29 @@ export function EditorPanels(p: Props) {
               </label>
             </>
           )}
-          {panel === 'Settings' && (
-            <>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={p.snap}
-                  onChange={(e) => p.setSnap(e.target.checked)}
-                />
-                Snap
-              </label>
-              <p>Grid spacing: 50 map units.</p>
-            </>
-          )}
+          {panel === 'Settings' && <p>Grid spacing: 50 map units.</p>}
           {panel === 'Help' && (
             <p>
               Drag to draw a rectangle. Use Pan or hold Space to move the view.
-              Scroll to zoom. Escape cancels a draft or closes a menu.
+              Scroll to zoom. Escape cancels a draft or closes a menu. Use Enter
+              to activate focused buttons; Space temporarily pans.
             </p>
           )}
         </section>
       )}
       <nav className="scope-rail surface" aria-label="Editing scopes">
-        {['Map', 'Room'].map((name) => (
+        {(['Room'] as const).map((name) => (
           <button
             key={name}
             type="button"
-            aria-pressed={scope === name}
-            aria-expanded={panel === name}
+            aria-pressed={p.scope === name}
+            aria-expanded={p.scope === name}
             aria-controls="scope-panel"
             onClick={(e) => {
-              setScope(name);
-              open(name, e.currentTarget);
+              scopeOpener.current = e.currentTarget;
+              p.toggleScope(name);
+              setPanel(null);
+              if (window.innerWidth < 900) setInfoOpen(false);
             }}
           >
             {name}
@@ -157,26 +163,14 @@ export function EditorPanels(p: Props) {
           </button>
         ))}
       </nav>
-      {(panel === 'Map' || panel === 'Room') && (
+      {p.scope && (
         <section
           id="scope-panel"
           className="scope-panel surface"
-          aria-label={`${panel} tools`}
+          aria-label={`${p.scope} tools`}
         >
-          <h2>{panel}</h2>
-          {panel === 'Map' ? (
-            <>
-              <p>1200 × 800 map units</p>
-              <p>
-                Origin: bottom-left
-                <br />
-                +y up · angles counter-clockwise
-              </p>
-              <button type="button" onClick={p.fit}>
-                Fit map
-              </button>
-            </>
-          ) : (
+          <h2>{p.scope}</h2>
+          {p.scope === 'Room' && (
             <>
               <button
                 type="button"
