@@ -1,7 +1,7 @@
 import { useEffect, useReducer, useRef, useState } from 'react';
-import { Layer, Line, Rect, Stage } from 'react-konva';
+import { Circle, Layer, Line, Rect, Stage } from 'react-konva';
 import type { GeometryResult } from '../../../packages/schema/geometry';
-import type { Point } from '../../../packages/schema/project';
+import type { Point, Polygon } from '../../../packages/schema/project';
 import { EditorPanels } from './EditorPanels';
 import { initialTools, toolsReducer } from './editorTools';
 import {
@@ -31,6 +31,7 @@ export function Editor({ status }: { status: string }) {
   const [history, dispatch] = useReducer(historyReducer, emptyHistory);
   const [start, setStart] = useState<Point | null>(null);
   const [end, setEnd] = useState<Point | null>(null);
+  const [vertices, setVertices] = useState<Point[]>([]);
   const pan = useRef<{ point: Point; view: View } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -56,6 +57,7 @@ export function Editor({ status }: { status: string }) {
         setTemporaryPan(true);
       }
       if (e.key === 'Escape') {
+        setVertices([]);
         setStart(null);
         setEnd(null);
         pan.current = null;
@@ -90,6 +92,7 @@ export function Editor({ status }: { status: string }) {
     void scope;
     setStart(null);
     setEnd(null);
+    setVertices([]);
     pan.current = null;
   }, [tool, scope]);
   useEffect(() => {
@@ -138,12 +141,17 @@ export function Editor({ status }: { status: string }) {
       return [q.x, q.y];
     });
   }
-  async function accept(a: Point, b: Point) {
-    if (pending.current) return;
+  async function accept(proposal: Point[]) {
+    if (pending.current || proposal.length < 3) return;
+    const polygon: Polygon = [
+      proposal[0],
+      proposal[1],
+      proposal[2],
+      ...proposal.slice(3),
+    ];
     pending.current = true;
     setBusy(true);
     setError('');
-    const polygon = rectangle(a, b);
     try {
       const response = await fetch('/api/geometry/validate', {
         method: 'POST',
@@ -182,6 +190,7 @@ export function Editor({ status }: { status: string }) {
         },
       });
       setNotice(`Room ${history.present.length + 1} added.`);
+      setVertices([]);
     } catch (failure) {
       setError(
         `${failure instanceof Error ? failure.message : 'Could not validate room.'} No room was added.`,
@@ -192,8 +201,33 @@ export function Editor({ status }: { status: string }) {
     }
   }
   const gridLines = [];
+  function finishPolygon() {
+    if (vertices.length >= 3) void accept(vertices);
+  }
+  function addVertex(point: Point) {
+    const value = world(point);
+    const first = vertices[0];
+    const screenFirst = first && worldToScreen(first, view);
+    if (
+      first &&
+      ((value.x === first.x && value.y === first.y) ||
+        (screenFirst &&
+          Math.hypot(point.x - screenFirst.x, point.y - screenFirst.y) <= 8))
+    ) {
+      finishPolygon();
+      return;
+    }
+    if (vertices.some((p) => p.x === value.x && p.y === value.y)) return;
+    if (vertices.length >= 2048) {
+      setError(
+        'A room can contain at most 2048 vertices. Finish the polygon or remove its last point.',
+      );
+      return;
+    }
+    setVertices([...vertices, value]);
+  }
   const snapWorld =
-    pointer && snap && tool === 'room' && !temporaryPan && !pan.current && !busy
+    pointer && snap && tool !== 'pan' && !temporaryPan && !pan.current && !busy
       ? world(pointer)
       : null;
   const snapPoint =
@@ -230,6 +264,7 @@ export function Editor({ status }: { status: string }) {
             setPointer(pointer);
             if (tool === 'pan' || space.current)
               pan.current = { point: pointer, view };
+            else if (tool === 'polygon') addVertex(pointer);
             else {
               setStart(world(pointer));
               setEnd(world(pointer));
@@ -250,7 +285,7 @@ export function Editor({ status }: { status: string }) {
           onMouseUp={(e) => {
             pan.current = null;
             const pointer = e.target.getStage()?.getPointerPosition();
-            if (start && pointer) void accept(start, world(pointer));
+            if (start && pointer) void accept(rectangle(start, world(pointer)));
             setStart(null);
             setEnd(null);
           }}
@@ -297,6 +332,34 @@ export function Editor({ status }: { status: string }) {
                 dash={[6, 4]}
               />
             )}
+            {vertices.length > 0 && (
+              <>
+                <Line
+                  points={points(
+                    pointer && !temporaryPan && !pan.current
+                      ? [...vertices, world(pointer)]
+                      : vertices,
+                  )}
+                  closed={vertices.length >= 2}
+                  fill="#d9af4d33"
+                  stroke="#875c18"
+                  dash={[6, 4]}
+                />
+                {vertices.map((p, index) => {
+                  const screen = worldToScreen(p, view);
+                  return (
+                    <Circle
+                      key={`${p.x},${p.y}`}
+                      x={screen.x}
+                      y={screen.y}
+                      radius={index === 0 ? 5 : 3}
+                      fill="#e9e2ce"
+                      stroke="#875c18"
+                    />
+                  );
+                })}
+              </>
+            )}
           </Layer>
         </Stage>
         {snapPoint && (
@@ -325,6 +388,10 @@ export function Editor({ status }: { status: string }) {
         canUndo={!!history.past.length}
         canRedo={!!history.future.length}
         busy={busy}
+        vertexCount={vertices.length}
+        finishPolygon={finishPolygon}
+        removeVertex={() => setVertices(vertices.slice(0, -1))}
+        cancelPolygon={() => setVertices([])}
         rooms={history.present}
         zoom={Math.round(view.scale * 100)}
         error={error}

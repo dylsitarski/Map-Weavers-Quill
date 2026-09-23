@@ -1,5 +1,5 @@
 export type Scope = 'Room';
-export type Tool = 'pan' | 'room';
+export type Tool = 'pan' | 'room' | 'polygon';
 export type ToolState = {
   scope: Scope | null;
   tool: Tool;

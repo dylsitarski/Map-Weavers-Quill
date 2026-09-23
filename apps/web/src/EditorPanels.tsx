@@ -19,6 +19,10 @@ type Props = {
   canUndo: boolean;
   canRedo: boolean;
   busy: boolean;
+  vertexCount: number;
+  finishPolygon: () => void;
+  removeVertex: () => void;
+  cancelPolygon: () => void;
   rooms: Room[];
   zoom: number;
   error: string;
@@ -180,7 +184,45 @@ export function EditorPanels(p: Props) {
               >
                 Rectangle room
               </button>
-              <p>Drag opposite corners on the map.</p>
+              <button
+                type="button"
+                disabled={p.busy}
+                aria-pressed={p.tool === 'polygon'}
+                onClick={() => p.setTool('polygon')}
+              >
+                Polygon room
+              </button>
+              {p.tool === 'room' && <p>Drag opposite corners on the map.</p>}
+              {p.tool === 'polygon' && (
+                <>
+                  <p>
+                    Click corners, then the first point or Finish polygon.
+                    Escape cancels.
+                  </p>
+                  <p data-testid="vertex-count">{p.vertexCount} vertices</p>
+                  <button
+                    type="button"
+                    disabled={p.busy || p.vertexCount < 3}
+                    onClick={p.finishPolygon}
+                  >
+                    Finish polygon
+                  </button>
+                  <button
+                    type="button"
+                    disabled={p.busy || !p.vertexCount}
+                    onClick={p.removeVertex}
+                  >
+                    Remove last point
+                  </button>
+                  <button
+                    type="button"
+                    disabled={p.busy || !p.vertexCount}
+                    onClick={p.cancelPolygon}
+                  >
+                    Cancel polygon
+                  </button>
+                </>
+              )}
             </>
           )}
         </section>
@@ -241,8 +283,12 @@ export function EditorPanels(p: Props) {
         </p>
       </div>
       <div className="view-status surface">
-        {p.tool === 'room' ? 'Rectangle room' : 'Pan'} ·{' '}
-        <span data-testid="zoom">{p.zoom}%</span>
+        {p.tool === 'room'
+          ? 'Rectangle room'
+          : p.tool === 'polygon'
+            ? 'Polygon room'
+            : 'Pan'}{' '}
+        · <span data-testid="zoom">{p.zoom}%</span>
       </div>
     </>
   );

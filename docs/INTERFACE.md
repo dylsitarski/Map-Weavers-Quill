@@ -13,7 +13,7 @@ or dismissing panels must never resize or shift the canvas. No document scrollin
 | Top-left | Compact identity | MQ mark and accessible project title | Project name |
 | Top bar | Global actions | File/View/Settings/Help disclosures, always-visible Snap, Pan, Undo/Redo | New/Open/Save, save state, export |
 | Left rail | Editing scope (what) | Room | Region, Object, Light, Sound |
-| Beside rail | Scope tools (how) | Rectangle tool | Polygon, selection, move, vertices, walls/doors |
+| Beside rail | Scope tools (how) | Rectangle and polygon tools | Selection, move, vertices, walls/doors |
 | Upper-right | Collapsible persistent information | Map facts, room list, connection status | Selection inspector, layers, provider/job panels |
 | Bottom-left | Temporary feedback | Validation progress, dismissible errors, fading success | Job notifications and contextual guidance |
 | Bottom-right | View status | Active tool and zoom | Cursor coordinates and grid scale |
@@ -55,7 +55,7 @@ or dismissing panels must never resize or shift the canvas. No document scrollin
 
 ## Future feature placement
 
-Milestone 1: Room flyout adds polygon and select/edit tools. Map click selection
+Milestone 1: Room flyout adds select/edit tools. Map click selection
 feeds the right inspector (name, prompt, geometry). Walls and doors initially live
 under Room. File gains real New/Open/Save once atomic persistence is implemented.
 
@@ -89,6 +89,11 @@ for the Milestone 1 wall work, not an accepted schema change or implemented tool
 
 ## Current limits
 
-Only rectangular room addition and its undo/redo are implemented. No selection
-inspector, file persistence, polygon tools, layer management, or generation UI is
+Rectangle and polygon room addition with undo/redo are implemented. Polygon drafts
+use click-to-place corners, first-point closure (8 screen pixel tolerance), Finish,
+Remove last point and Cancel. At least three distinct vertices are required;
+backend validation rejects crossings, zero area and out-of-bounds geometry without
+changing history. Rejected drafts remain editable. Pan/zoom preserve draft points;
+tool/scope changes or Escape cancel the draft. Remembered tools never restore drafts.
+No selection inspector, file persistence, layer management, or generation UI is
 claimed by this layout. Those remain in their scheduled milestones.

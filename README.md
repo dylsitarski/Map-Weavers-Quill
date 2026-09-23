@@ -10,7 +10,7 @@ FastAPI shells, Python models with generated JSON Schema and TypeScript types,
 cross-runtime validation, coordinate transforms, and a deterministic offline
 image provider. Milestone 1 is **in progress**: the Konva viewport supports pan,
 pointer-anchored zoom, resize, grid visibility, snapping, rectangular room creation,
-and undo/redo of room additions. Rooms pass server-side polygon validation.
+polygon room creation, and undo/redo of room additions. Rooms pass server-side polygon validation.
 There is no project persistence or Foundry importer yet.
 
 ### Setup (Linux, Python 3.12 and Node 24)
@@ -82,8 +82,15 @@ add a room or change history. Dragging out of the drawing surface cancels a draf
 
 This is a mouse-based, in-memory session on a fixed 1200 by 800 map with a 50-unit
 grid. **Refreshing discards rooms.** Saving is not implemented. Next work:
-polygon drawing, selection/move/vertex editing, stable derived walls, constrained
+selection/move/vertex editing, stable derived walls, constrained
 doors, and atomic project persistence. This increment does not complete Milestone 1.
+
+Choose Room → Polygon room to place corners with clicks. Click the first point
+again (within 8 screen pixels, or at the same snapped coordinate) or choose Finish
+polygon after at least three points. Remove last point corrects a draft; Cancel
+polygon or Escape discards it. Rejected polygons remain available for correction.
+Space-pan and zoom preserve placed points; changing tools or closing the scope
+discards unfinished geometry. Polygon drafts support at most 2048 unique vertices.
 
 The schema now covers every planned entity category, including namespaced
 metadata, object transforms, sounds, regions, and generation provenance. The
