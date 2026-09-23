@@ -23,7 +23,7 @@ test('draw validated room, zoom without mutation, undo and redo', async ({
   await draw(page);
   const rooms = page.getByRole('list', { name: 'Rooms' });
   await expect(rooms.getByRole('listitem')).toHaveCount(1);
-  const geometry = await rooms.innerText();
+  const geometry = (await rooms.textContent()) ?? '';
   const zoom = await page.getByTestId('zoom').innerText();
   await page.mouse.wheel(0, -120);
   await expect(page.getByTestId('zoom')).not.toHaveText(zoom);
