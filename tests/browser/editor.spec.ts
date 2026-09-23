@@ -105,14 +105,16 @@ test('scope persists while drawing and remembers tools after closing', async ({
   // Focus is still on the scope button: Space must not activate it or draw.
   const beforePan = await page
     .locator('canvas')
-    .evaluate((canvas) => canvas.toDataURL());
+    .evaluate((canvas) => (canvas as HTMLCanvasElement).toDataURL());
   await page.keyboard.down('Space');
   await draw(page);
   await page.keyboard.up('Space');
   await expect(roomScope).toHaveAttribute('aria-expanded', 'true');
   await expect(rectangle).toHaveAttribute('aria-pressed', 'true');
   expect(
-    await page.locator('canvas').evaluate((canvas) => canvas.toDataURL()),
+    await page
+      .locator('canvas')
+      .evaluate((canvas) => (canvas as HTMLCanvasElement).toDataURL()),
   ).not.toEqual(beforePan);
   await expect(
     page.getByRole('list', { name: 'Rooms' }).getByRole('listitem'),
