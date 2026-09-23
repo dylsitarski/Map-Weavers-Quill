@@ -36,23 +36,30 @@ export function EditorPanels(p: Props) {
   const opener = useRef<HTMLButtonElement | null>(null);
   const scopeOpener = useRef<HTMLButtonElement | null>(null);
   const previousDismiss = useRef(p.dismissVersion);
+  const escapeState = useRef({
+    panel,
+    scope: p.scope,
+    closeScope: p.closeScope,
+  });
+  escapeState.current = { panel, scope: p.scope, closeScope: p.closeScope };
   useEffect(() => {
     if (previousDismiss.current !== p.dismissVersion) setPanel(null);
     previousDismiss.current = p.dismissVersion;
   }, [p.dismissVersion]);
   useEffect(() => {
     function closeOnEscape(e: KeyboardEvent) {
-      if (e.key === 'Escape' && panel) {
+      const current = escapeState.current;
+      if (e.key === 'Escape' && current.panel) {
         setPanel(null);
         opener.current?.focus();
-      } else if (e.key === 'Escape' && p.scope) {
-        p.closeScope();
+      } else if (e.key === 'Escape' && current.scope) {
+        current.closeScope();
         scopeOpener.current?.focus();
       }
     }
     window.addEventListener('keydown', closeOnEscape);
     return () => window.removeEventListener('keydown', closeOnEscape);
-  }, [panel, p.scope, p.closeScope]);
+  }, []);
   function open(name: string, button: HTMLButtonElement) {
     opener.current = button;
     setPanel(panel === name ? null : name);
