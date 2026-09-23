@@ -1,0 +1,255 @@
+import { useEffect, useRef, useState } from 'react';
+import type { Room } from '../../../packages/schema/project';
+
+type Props = {
+  status: string;
+  tool: 'pan' | 'room';
+  setTool: (tool: 'pan' | 'room') => void;
+  grid: boolean;
+  setGrid: (value: boolean) => void;
+  snap: boolean;
+  setSnap: (value: boolean) => void;
+  fit: () => void;
+  undo: () => void;
+  redo: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
+  busy: boolean;
+  rooms: Room[];
+  zoom: number;
+  error: string;
+  clearError: () => void;
+  notice: string;
+  dismissVersion: number;
+};
+export function EditorPanels(p: Props) {
+  const [panel, setPanel] = useState<string | null>(null);
+  const [scope, setScope] = useState('Room');
+  const [infoOpen, setInfoOpen] = useState(window.innerWidth >= 900);
+  const opener = useRef<HTMLButtonElement | null>(null);
+  const previousDismiss = useRef(p.dismissVersion);
+  useEffect(() => {
+    if (previousDismiss.current !== p.dismissVersion) setPanel(null);
+    previousDismiss.current = p.dismissVersion;
+  }, [p.dismissVersion]);
+  useEffect(() => {
+    function closeOnEscape(e: KeyboardEvent) {
+      if (e.key === 'Escape' && panel) {
+        setPanel(null);
+        opener.current?.focus();
+      }
+    }
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [panel]);
+  function open(name: string, button: HTMLButtonElement) {
+    opener.current = button;
+    setPanel(panel === name ? null : name);
+    if (window.innerWidth < 900) setInfoOpen(false);
+  }
+  return (
+    <>
+      <h1 className="brand" title="Map-Weaver’s Quill">
+        <span aria-hidden="true">MQ</span>
+        <span className="sr-only">Map-Weaver’s Quill</span>
+      </h1>
+      <nav className="topbar surface" aria-label="Global actions">
+        {['File', 'View', 'Settings', 'Help'].map((name) => (
+          <button
+            key={name}
+            type="button"
+            aria-expanded={panel === name}
+            aria-controls="global-panel"
+            onClick={(e) => open(name, e.currentTarget)}
+          >
+            {name}
+          </button>
+        ))}
+        <span className="separator" />
+        <button
+          type="button"
+          aria-pressed={p.tool === 'pan'}
+          disabled={p.busy}
+          onClick={() => p.setTool('pan')}
+        >
+          Pan
+        </button>
+        <button type="button" disabled={!p.canUndo || p.busy} onClick={p.undo}>
+          Undo
+        </button>
+        <button type="button" disabled={!p.canRedo || p.busy} onClick={p.redo}>
+          Redo
+        </button>
+      </nav>
+      {panel && ['File', 'View', 'Settings', 'Help'].includes(panel) && (
+        <section
+          id="global-panel"
+          className="global-panel surface"
+          aria-label={`${panel} options`}
+        >
+          <h2>{panel}</h2>
+          {panel === 'File' && (
+            <p>
+              Session only. Saving and opening projects are not available yet.
+              Refreshing clears rooms.
+            </p>
+          )}
+          {panel === 'View' && (
+            <>
+              <button type="button" onClick={p.fit}>
+                Fit map
+              </button>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={p.grid}
+                  onChange={(e) => p.setGrid(e.target.checked)}
+                />
+                Grid
+              </label>
+            </>
+          )}
+          {panel === 'Settings' && (
+            <>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={p.snap}
+                  onChange={(e) => p.setSnap(e.target.checked)}
+                />
+                Snap
+              </label>
+              <p>Grid spacing: 50 map units.</p>
+            </>
+          )}
+          {panel === 'Help' && (
+            <p>
+              Drag to draw a rectangle. Use Pan or hold Space to move the view.
+              Scroll to zoom. Escape cancels a draft or closes a menu.
+            </p>
+          )}
+        </section>
+      )}
+      <nav className="scope-rail surface" aria-label="Editing scopes">
+        {['Map', 'Room'].map((name) => (
+          <button
+            key={name}
+            type="button"
+            aria-pressed={scope === name}
+            aria-expanded={panel === name}
+            aria-controls="scope-panel"
+            onClick={(e) => {
+              setScope(name);
+              open(name, e.currentTarget);
+            }}
+          >
+            {name}
+          </button>
+        ))}
+        {['Region', 'Object', 'Light', 'Sound'].map((name) => (
+          <button
+            key={name}
+            type="button"
+            disabled
+            title={`${name} tools are planned for a later milestone`}
+          >
+            {name}
+          </button>
+        ))}
+      </nav>
+      {(panel === 'Map' || panel === 'Room') && (
+        <section
+          id="scope-panel"
+          className="scope-panel surface"
+          aria-label={`${panel} tools`}
+        >
+          <h2>{panel}</h2>
+          {panel === 'Map' ? (
+            <>
+              <p>1200 × 800 map units</p>
+              <p>
+                Origin: bottom-left
+                <br />
+                +y up · angles counter-clockwise
+              </p>
+              <button type="button" onClick={p.fit}>
+                Fit map
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                disabled={p.busy}
+                aria-pressed={p.tool === 'room'}
+                onClick={() => p.setTool('room')}
+              >
+                Rectangle room
+              </button>
+              <p>Drag opposite corners on the map.</p>
+            </>
+          )}
+        </section>
+      )}
+      <aside className="info-panel surface" aria-label="Persistent information">
+        <button
+          className="info-toggle"
+          type="button"
+          aria-expanded={infoOpen}
+          aria-controls="info-body"
+          onClick={() => {
+            setInfoOpen(!infoOpen);
+            if (window.innerWidth < 900) setPanel(null);
+          }}
+        >
+          Information {infoOpen ? '−' : '+'}
+        </button>
+        <div id="info-body" hidden={!infoOpen}>
+          <p className="session-note">Session only · not saved</p>
+          <p className="connection-status" role="status">
+            {p.status}
+          </p>
+          <h2>Map</h2>
+          <p>1200 × 800 · 50-unit grid</p>
+          <h2>Rooms ({p.rooms.length})</h2>
+          {p.rooms.length === 0 && <p>No rooms yet.</p>}
+          <ul aria-label="Rooms">
+            {p.rooms.map((room) => (
+              <li key={room.id}>
+                <strong>{room.label}</strong>
+                <br />
+                {room.polygon
+                  .map(
+                    (point) =>
+                      `(${Math.round(point.x)}, ${Math.round(point.y)})`,
+                  )
+                  .join(' ')}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </aside>
+      <div className="feedback">
+        {p.error && (
+          <div className="error surface">
+            <p role="alert">{p.error}</p>
+            <button
+              type="button"
+              onClick={p.clearError}
+              aria-label="Dismiss error"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+        <p className="notice surface" aria-live="polite">
+          {p.busy ? 'Validating room…' : p.notice}
+        </p>
+      </div>
+      <div className="view-status surface">
+        {p.tool === 'room' ? 'Rectangle room' : 'Pan'} ·{' '}
+        <span data-testid="zoom">{p.zoom}%</span>
+      </div>
+    </>
+  );
+}

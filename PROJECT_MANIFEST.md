@@ -535,6 +535,12 @@ Export profiles decide which layers are flattened and which remain metadata.
 
 ### 10.4 Accessibility and usability
 
+The accepted editor layout and future control placement are recorded in
+[`docs/INTERFACE.md`](docs/INTERFACE.md). The owner's scheme uses a full-window
+canvas, global top bar, left scope rail with adjacent tools, collapsible persistent
+information at upper-right, and temporary feedback at bottom-left. Panels MUST
+overlay the canvas without moving it. Page scrolling is disabled; wheel input zooms.
+
 - Core tools MUST have keyboard-accessible actions.
 - Color alone MUST NOT communicate selection, validation errors, or door state.
 - Destructive actions MUST be reversible through undo or confirmation.

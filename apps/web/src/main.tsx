@@ -25,11 +25,7 @@ export function App() {
   }, []);
   return (
     <main>
-      <h1 className="app-title">Map-Weaver’s Quill</h1>
-      <p className="connection-status" role="status">
-        {status}
-      </p>
-      <Editor />
+      <Editor status={status} />
     </main>
   );
 }

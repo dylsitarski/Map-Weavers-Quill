@@ -2,6 +2,7 @@ import { useEffect, useReducer, useRef, useState } from 'react';
 import { Layer, Line, Rect, Stage } from 'react-konva';
 import type { GeometryResult } from '../../../packages/schema/geometry';
 import type { Point } from '../../../packages/schema/project';
+import { EditorPanels } from './EditorPanels';
 import {
   emptyHistory,
   fitView,
@@ -14,7 +15,7 @@ import {
   zoomAt,
 } from './viewport';
 
-export function Editor() {
+export function Editor({ status }: { status: string }) {
   const container = useRef<HTMLDivElement>(null);
   const initialized = useRef(false);
   const pending = useRef(false);
@@ -29,6 +30,50 @@ export function Editor() {
   const pan = useRef<{ point: Point; view: View } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [dismissVersion, setDismissVersion] = useState(0);
+  const space = useRef(false);
+  useEffect(() => {
+    if (!notice) return;
+    const timer = setTimeout(() => setNotice(''), 3500);
+    return () => clearTimeout(timer);
+  }, [notice]);
+  useEffect(() => {
+    function down(e: KeyboardEvent) {
+      if (
+        e.target instanceof HTMLElement &&
+        (e.target.isContentEditable ||
+          ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(e.target.tagName))
+      )
+        return;
+      if (e.code === 'Space') {
+        e.preventDefault();
+        space.current = true;
+      }
+      if (e.key === 'Escape') {
+        setStart(null);
+        setEnd(null);
+        pan.current = null;
+      }
+    }
+    function up(e: KeyboardEvent) {
+      if (e.code === 'Space') space.current = false;
+    }
+    function blur() {
+      space.current = false;
+      pan.current = null;
+      setStart(null);
+      setEnd(null);
+    }
+    window.addEventListener('keydown', down);
+    window.addEventListener('keyup', up);
+    window.addEventListener('blur', blur);
+    return () => {
+      window.removeEventListener('keydown', down);
+      window.removeEventListener('keyup', up);
+      window.removeEventListener('blur', blur);
+    };
+  }, []);
   useEffect(() => {
     const node = container.current;
     if (!node) return;
@@ -49,7 +94,7 @@ export function Editor() {
   useEffect(() => {
     function wheel(event: WheelEvent) {
       event.preventDefault();
-      if (start || pan.current) return;
+      if (start || pan.current || event.deltaY === 0) return;
       const bounds = container.current?.getBoundingClientRect();
       if (!bounds) return;
       const point = {
@@ -118,6 +163,7 @@ export function Editor() {
           renderLayerId: null,
         },
       });
+      setNotice(`Room ${history.present.length + 1} added.`);
     } catch (failure) {
       setError(
         `${failure instanceof Error ? failure.message : 'Could not validate room.'} No room was added.`,
@@ -142,74 +188,17 @@ export function Editor() {
   }
   return (
     <section className="workshop" aria-label="Map editor">
-      <div className="toolbar">
-        <button
-          type="button"
-          aria-pressed={tool === 'room'}
-          disabled={busy}
-          onClick={() => setTool('room')}
-        >
-          Rectangle room
-        </button>
-        <button
-          type="button"
-          aria-pressed={tool === 'pan'}
-          disabled={busy}
-          onClick={() => setTool('pan')}
-        >
-          Pan
-        </button>
-        <button
-          type="button"
-          onClick={() => setView(fitView(size.width, size.height))}
-        >
-          Fit map
-        </button>
-        <label>
-          <input
-            type="checkbox"
-            checked={grid}
-            onChange={(e) => setGrid(e.target.checked)}
-          />{' '}
-          Grid
-        </label>
-        <label>
-          <input
-            type="checkbox"
-            checked={snap}
-            onChange={(e) => setSnap(e.target.checked)}
-          />{' '}
-          Snap
-        </label>
-        <button
-          type="button"
-          disabled={busy || !history.past.length}
-          onClick={() => dispatch({ type: 'undo' })}
-        >
-          Undo
-        </button>
-        <button
-          type="button"
-          disabled={busy || !history.future.length}
-          onClick={() => dispatch({ type: 'redo' })}
-        >
-          Redo
-        </button>
-        <span data-testid="zoom">{Math.round(view.scale * 100)}%</span>
-      </div>
-      <p className="hint">
-        Drag to draw a room. Choose Pan to move the view; scroll to zoom.
-        Session only—refreshing clears rooms.
-      </p>
       <div ref={container} className="canvas" data-testid="map-canvas">
         <Stage
           width={size.width}
           height={size.height}
           onMouseDown={(e) => {
+            setDismissVersion((value) => value + 1);
             if (busy || e.evt.button !== 0) return;
             const pointer = e.target.getStage()?.getPointerPosition();
             if (!pointer) return;
-            if (tool === 'pan') pan.current = { point: pointer, view };
+            if (tool === 'pan' || space.current)
+              pan.current = { point: pointer, view };
             else {
               setStart(world(pointer));
               setEnd(world(pointer));
@@ -278,23 +267,27 @@ export function Editor() {
           </Layer>
         </Stage>
       </div>
-      <p className="editor-error" role="alert" aria-atomic="true">
-        {error}
-      </p>
-      <div className="room-summary" aria-live="polite">
-        {busy ? 'Validating room…' : `${history.present.length} rooms`} · 1200 ×
-        800 · origin bottom-left
-      </div>
-      <ul aria-label="Rooms">
-        {history.present.map((room) => (
-          <li key={room.id}>
-            {room.label} ·{' '}
-            {room.polygon
-              .map((p) => `(${Math.round(p.x)}, ${Math.round(p.y)})`)
-              .join(' ')}
-          </li>
-        ))}
-      </ul>
+      <EditorPanels
+        status={status}
+        tool={tool}
+        setTool={setTool}
+        grid={grid}
+        setGrid={setGrid}
+        snap={snap}
+        setSnap={setSnap}
+        fit={() => setView(fitView(size.width, size.height))}
+        undo={() => dispatch({ type: 'undo' })}
+        redo={() => dispatch({ type: 'redo' })}
+        canUndo={!!history.past.length}
+        canRedo={!!history.future.length}
+        busy={busy}
+        rooms={history.present}
+        zoom={Math.round(view.scale * 100)}
+        error={error}
+        clearError={() => setError('')}
+        notice={notice}
+        dismissVersion={dismissVersion}
+      />
     </section>
   );
 }

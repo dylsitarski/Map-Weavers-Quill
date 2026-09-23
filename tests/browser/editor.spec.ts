@@ -32,6 +32,7 @@ test('draw validated room, zoom without mutation, undo and redo', async ({
   await draw(page);
   await expect(rooms).toHaveText(geometry);
   await page.setViewportSize({ width: 900, height: 700 });
+  await page.getByRole('button', { name: 'View', exact: true }).click();
   await page.getByRole('button', { name: 'Fit map', exact: true }).click();
   await expect(rooms).toHaveText(geometry);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
@@ -54,4 +55,43 @@ test('failed validation adds no room or history', async ({ page }) => {
   await expect(
     page.getByRole('button', { name: 'Undo', exact: true }),
   ).toBeDisabled();
+  const before = await page.getByTestId('map-canvas').boundingBox();
+  await page.getByRole('button', { name: 'Dismiss error' }).click();
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  expect(await page.getByTestId('map-canvas').boundingBox()).toEqual(before);
+});
+
+test('scope flyouts preserve canvas bounds and close on Escape or drawing', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const canvas = page.getByTestId('map-canvas');
+  const before = await canvas.boundingBox();
+  const roomScope = page.getByRole('button', { name: 'Room', exact: true });
+  await roomScope.click();
+  await expect(page.getByRole('region', { name: 'Room tools' })).toBeVisible();
+  expect(await canvas.boundingBox()).toEqual(before);
+  await page.keyboard.press('Escape');
+  await expect(roomScope).toBeFocused();
+  await expect(roomScope).toHaveAttribute('aria-expanded', 'false');
+  await roomScope.click();
+  await page
+    .getByRole('button', { name: 'Rectangle room', exact: true })
+    .click();
+  await draw(page);
+  await expect(roomScope).toHaveAttribute('aria-expanded', 'false');
+  await expect(
+    page.getByRole('list', { name: 'Rooms' }).getByRole('listitem'),
+  ).toHaveCount(1);
+  await page.keyboard.down('Space');
+  await draw(page);
+  await page.keyboard.up('Space');
+  await expect(
+    page.getByRole('list', { name: 'Rooms' }).getByRole('listitem'),
+  ).toHaveCount(1);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollHeight <= window.innerHeight,
+    ),
+  ).toBe(true);
 });
