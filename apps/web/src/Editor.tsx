@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { Circle, Layer, Line, Rect, Stage } from 'react-konva';
 import type { GeometryResult } from '../../../packages/schema/geometry';
-import type { Point, Polygon, Room } from '../../../packages/schema/project';
+import type {
+  Door,
+  Point,
+  Polygon,
+  Room,
+} from '../../../packages/schema/project';
+import { doorSegment, reconcileDoors, wallPosition } from './doorEditing';
 import { EditorPanels } from './EditorPanels';
 import { initialTools, toolsReducer } from './editorTools';
 import {
@@ -10,9 +16,10 @@ import {
   moveAnchorIndex,
   type RoomDrag,
 } from './roomEditing';
+import { emptySceneHistory, sceneReducer } from './sceneHistory';
 import { useDerivedWalls } from './useDerivedWalls';
 import {
-  emptyHistory,
+  type Command,
   fitView,
   historyReducer,
   mapSize,
@@ -37,8 +44,22 @@ export function Editor({ status }: { status: string }) {
   const [temporaryPan, setTemporaryPan] = useState(false);
   const [grid, setGrid] = useState(true);
   const [snap, setSnap] = useState(true);
-  const [history, dispatch] = useReducer(historyReducer, emptyHistory);
-  const wallState = useDerivedWalls(history.present);
+  const [sceneHistory, dispatchScene] = useReducer(
+    sceneReducer,
+    emptySceneHistory,
+  );
+  const scene = sceneHistory.present;
+  const history = { ...sceneHistory, present: scene.rooms };
+  const derived = useDerivedWalls(scene.doors.length ? [] : scene.rooms);
+  const wallState = scene.doors.length
+    ? { walls: scene.walls, loading: false, error: '', retry: derived.retry }
+    : derived;
+  const [doorId, setDoorId] = useState<string | null>(null);
+  const [doorWidth, setDoorWidth] = useState(50);
+  const selectedDoor =
+    tool === 'door'
+      ? (scene.doors.find((door) => door.id === doorId) ?? null)
+      : null;
   const [wallId, setWallId] = useState<string | null>(null);
   const selectedWall =
     tool === 'walls'
@@ -124,6 +145,7 @@ export function Editor({ status }: { status: string }) {
     cancelEdit();
     if (tool !== 'edit') setSelectedId(null);
     if (tool !== 'walls') setWallId(null);
+    if (tool !== 'door') setDoorId(null);
     pan.current = null;
   }, [tool, scope, cancelEdit]);
   useEffect(() => {
@@ -174,6 +196,91 @@ export function Editor({ status }: { status: string }) {
       return [q.x, q.y];
     });
   }
+  async function commitRoom(command: Command) {
+    const next = historyReducer(
+      { past: [], present: scene.rooms, future: [] },
+      command,
+    ).present;
+    if (next === scene.rooms) return;
+    const attachments = scene.doors.length
+      ? await reconcileDoors(scene.rooms, next, scene.doors)
+      : { doors: scene.doors, walls: scene.walls };
+    dispatchScene({
+      type: 'commit',
+      before: scene,
+      scene: {
+        rooms: next,
+        walls: attachments.walls,
+        doors: attachments.doors,
+      },
+    });
+  }
+  async function changeDoors(doors: Door[]) {
+    if (pending.current) return;
+    pending.current = true;
+    setBusy(true);
+    setError('');
+    try {
+      const attachments = await reconcileDoors(scene.rooms, scene.rooms, doors);
+      dispatchScene({
+        type: 'commit',
+        before: scene,
+        scene: {
+          rooms: scene.rooms,
+          walls: attachments.walls,
+          doors: attachments.doors,
+        },
+      });
+      setNotice('Door changes applied.');
+    } catch (failure) {
+      setError(
+        `${failure instanceof Error ? failure.message : 'Could not validate doors.'} Nothing was changed.`,
+      );
+    } finally {
+      pending.current = false;
+      setBusy(false);
+    }
+  }
+  function placeDoor(point: Point) {
+    const native = screenToWorld(point, view);
+    const openings = scene.doors.flatMap((door) => {
+      const wall = wallState.walls.find((wall) => wall.id === door.wallId);
+      if (!wall) return [];
+      const [start, end] = doorSegment(door, wall);
+      return [{ ...wall, id: door.id, start, end }];
+    });
+    const hit = nearestWall(openings, native, 10 / view.scale);
+    if (hit) {
+      setDoorId(hit.id);
+      return;
+    }
+    setDoorId(null);
+    if (wallState.loading || wallState.error) {
+      setError('Wait for valid walls before placing a door.');
+      return;
+    }
+    const wall = nearestWall(wallState.walls, native, 8 / view.scale);
+    if (!wall) return;
+    if (!Number.isFinite(doorWidth) || doorWidth <= 0) {
+      setError('Enter a positive door width.');
+      return;
+    }
+    const door: Door = {
+      id: crypto.randomUUID(),
+      kind: 'door',
+      revision: 0,
+      label: 'Door',
+      metadata: {},
+      wallId: wall.id,
+      position: wallPosition(wall, native, snap),
+      width: doorWidth,
+      state: 'closed',
+      secret: false,
+      doorType: 'door',
+    };
+    setDoorId(door.id);
+    void changeDoors([...scene.doors, door]);
+  }
   async function accept(
     proposal: Point[],
     before?: Room,
@@ -220,14 +327,14 @@ export function Editor({ status }: { status: string }) {
       if (result.valid !== true)
         throw new Error(result.error || 'Room geometry was rejected.');
       if (before) {
-        dispatch({
+        await commitRoom({
           type: 'update',
           before,
           room: { ...before, ...details, polygon },
         });
         setNotice('Room updated.');
       } else {
-        dispatch({
+        await commitRoom({
           type: 'add',
           room: {
             id: crypto.randomUUID(),
@@ -281,11 +388,23 @@ export function Editor({ status }: { status: string }) {
     cancelEdit();
     setSelectedId(id);
   }
-  function deleteRoom() {
+  async function deleteRoom() {
     if (!selected || pending.current) return;
     cancelEdit();
-    dispatch({ type: 'delete', id: selected.id });
-    setNotice('Room deleted. Undo restores it.');
+    pending.current = true;
+    setBusy(true);
+    setError('');
+    try {
+      await commitRoom({ type: 'delete', id: selected.id });
+      setNotice('Room deleted. Undo restores it.');
+    } catch (failure) {
+      setError(
+        `${failure instanceof Error ? failure.message : 'Could not delete room.'} Nothing was changed.`,
+      );
+    } finally {
+      pending.current = false;
+      setBusy(false);
+    }
   }
   function finishPolygon() {
     if (vertices.length >= 3) void accept(vertices);
@@ -318,6 +437,7 @@ export function Editor({ status }: { status: string }) {
     tool !== 'pan' &&
     tool !== 'edit' &&
     tool !== 'walls' &&
+    tool !== 'door' &&
     !temporaryPan &&
     !pan.current &&
     !busy
@@ -345,7 +465,14 @@ export function Editor({ status }: { status: string }) {
   }
   return (
     <section className="workshop" aria-label="Map editor">
-      <div ref={container} className="canvas" data-testid="map-canvas">
+      <div
+        ref={container}
+        className="canvas"
+        data-testid="map-canvas"
+        data-wall-count={wallState.walls.length}
+        data-walls-loading={wallState.loading}
+        data-door-count={scene.doors.length}
+      >
         <Stage
           width={size.width}
           height={size.height}
@@ -359,6 +486,7 @@ export function Editor({ status }: { status: string }) {
               pan.current = { point: pointer, view };
             else if (tool === 'polygon') addVertex(pointer);
             else if (tool === 'edit') beginEdit(pointer);
+            else if (tool === 'door') placeDoor(pointer);
             else if (tool === 'walls')
               setWallId(
                 nearestWall(
@@ -453,6 +581,28 @@ export function Editor({ status }: { status: string }) {
                 strokeWidth={selectedWall?.id === wall.id ? 5 : 2.5}
               />
             ))}
+            {scene.doors.map((door) => {
+              const wall = wallState.walls.find(
+                (wall) => wall.id === door.wallId,
+              );
+              if (!wall) return null;
+              const segment = points(doorSegment(door, wall));
+              return (
+                <Line
+                  key={door.id}
+                  points={segment}
+                  stroke={door.id === selectedDoor?.id ? '#efc766' : '#78472b'}
+                  strokeWidth={7}
+                  dash={
+                    door.state === 'open'
+                      ? [3, 5]
+                      : door.state === 'locked'
+                        ? [10, 3, 2, 3]
+                        : undefined
+                  }
+                />
+              );
+            })}
             {start && end && (
               <Line
                 points={points(rectangle(start, end))}
@@ -547,11 +697,11 @@ export function Editor({ status }: { status: string }) {
         fit={() => setView(fitView(size.width, size.height))}
         undo={() => {
           cancelEdit();
-          dispatch({ type: 'undo' });
+          if (!pending.current) dispatchScene({ type: 'undo' });
         }}
         redo={() => {
           cancelEdit();
-          dispatch({ type: 'redo' });
+          if (!pending.current) dispatchScene({ type: 'redo' });
         }}
         canUndo={!!history.past.length}
         canRedo={!!history.future.length}
@@ -562,21 +712,61 @@ export function Editor({ status }: { status: string }) {
         cancelPolygon={() => setVertices([])}
         rooms={history.present}
         selected={selected}
-        walls={wallState.walls}
         selectedWall={selectedWall}
-        selectWall={setWallId}
-        wallsLoading={wallState.loading}
+        selectedDoor={selectedDoor}
+        doorWidth={doorWidth}
+        setDoorWidth={setDoorWidth}
+        applyDoor={(door) => {
+          if (
+            !selectedDoor ||
+            JSON.stringify(door) === JSON.stringify(selectedDoor)
+          )
+            return;
+          if (
+            !Number.isFinite(door.width) ||
+            door.width <= 0 ||
+            !Number.isFinite(door.position) ||
+            door.position < 0 ||
+            door.position > 1
+          ) {
+            setError(
+              'Enter a positive width and a position between 0 and 100%.',
+            );
+            return;
+          }
+          void changeDoors(
+            scene.doors.map((current) =>
+              current.id === door.id
+                ? { ...door, revision: current.revision + 1 }
+                : current,
+            ),
+          );
+        }}
+        deleteDoor={() => {
+          if (selectedDoor)
+            void changeDoors(
+              scene.doors.filter((door) => door.id !== selectedDoor.id),
+            );
+        }}
         wallsError={wallState.error}
         retryWalls={wallState.retry}
         selectRoom={selectRoom}
         applyRoom={(points, label, prompt) => {
           if (selected) void accept(points, selected, { label, prompt });
         }}
-        deleteRoom={deleteRoom}
+        deleteRoom={() => void deleteRoom()}
         reorderRoom={(id, direction) => {
           if (pending.current) return;
           cancelEdit();
-          dispatch({ type: 'reorder', id, direction });
+          const rooms = historyReducer(
+            { past: [], present: scene.rooms, future: [] },
+            { type: 'reorder', id, direction },
+          ).present;
+          dispatchScene({
+            type: 'commit',
+            before: scene,
+            scene: { ...scene, rooms },
+          });
         }}
         zoom={Math.round(view.scale * 100)}
         error={error}

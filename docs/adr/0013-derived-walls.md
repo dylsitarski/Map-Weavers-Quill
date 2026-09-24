@@ -45,15 +45,15 @@ labels, prompts or room order. Hide stale results immediately; abort replaced
 requests and reject late responses. Timeout/API/validation failures preserve rooms
 and expose Retry walls. Empty room sets need no server request.
 
-Room → Inspect walls supports canvas selection at 8 screen pixels and a keyboard
-segment selector. Information displays endpoints, length, blocking flags and room
+Room → Inspect walls supports canvas selection at 8 screen pixels. At the owner’s
+request, the segment selector and wall count were removed; Inspect walls is last
+in the Room menu. Information displays endpoints, length, blocking flags and room
 provenance. Selection preserves the active right-panel tab. Space-pan and existing
 scope/tool toggle semantics still apply.
 
-Before door placement, implement transactional reconciliation of derived walls,
-wall overrides and door attachments when room geometry changes. These derived
-results are not yet persisted project entities. Do not attach doors to this cache
-without defining remapping, deletion and undo policies. Standalone wall drawing,
+ADR-0014 now implements transactional door reconciliation. Scenes with doors use
+the validated wall/door snapshot instead of this asynchronous display cache.
+Persistence and editable wall overrides remain unimplemented. Standalone wall drawing,
 pillar footprints and previewed room creation from wall circuits remain future work.
 
 Verification covers adjacent/partial shared boundaries, crossings, diagonal and

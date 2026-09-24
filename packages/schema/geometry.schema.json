@@ -1,5 +1,266 @@
 {
   "$defs": {
+    "Door": {
+      "additionalProperties": false,
+      "properties": {
+        "doorType": {
+          "enum": [
+            "door",
+            "window"
+          ],
+          "title": "Doortype",
+          "type": "string"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "door",
+          "title": "Kind",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "metadata": {
+          "additionalProperties": false,
+          "patternProperties": {
+            "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)+$": {
+              "$ref": "#/$defs/JsonValue"
+            }
+          },
+          "title": "Metadata",
+          "type": "object"
+        },
+        "position": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Position",
+          "type": "number"
+        },
+        "revision": {
+          "minimum": 0,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "secret": {
+          "title": "Secret",
+          "type": "boolean"
+        },
+        "state": {
+          "enum": [
+            "open",
+            "closed",
+            "locked"
+          ],
+          "title": "State",
+          "type": "string"
+        },
+        "wallId": {
+          "format": "uuid",
+          "title": "Wallid",
+          "type": "string"
+        },
+        "width": {
+          "exclusiveMinimum": 0,
+          "title": "Width",
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "label",
+        "metadata",
+        "kind",
+        "wallId",
+        "position",
+        "width",
+        "state",
+        "secret",
+        "doorType"
+      ],
+      "title": "Door",
+      "type": "object"
+    },
+    "DoorInput": {
+      "additionalProperties": false,
+      "properties": {
+        "doorType": {
+          "enum": [
+            "door",
+            "window"
+          ],
+          "title": "Doortype",
+          "type": "string"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "door",
+          "title": "Kind",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "metadata": {
+          "additionalProperties": false,
+          "patternProperties": {
+            "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)+$": {
+              "$ref": "#/$defs/JsonValue"
+            }
+          },
+          "title": "Metadata",
+          "type": "object"
+        },
+        "position": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Position",
+          "type": "number"
+        },
+        "revision": {
+          "minimum": 0,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "secret": {
+          "title": "Secret",
+          "type": "boolean"
+        },
+        "state": {
+          "enum": [
+            "open",
+            "closed",
+            "locked"
+          ],
+          "title": "State",
+          "type": "string"
+        },
+        "wallId": {
+          "format": "uuid",
+          "title": "Wallid",
+          "type": "string"
+        },
+        "width": {
+          "exclusiveMinimum": 0,
+          "title": "Width",
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "label",
+        "metadata",
+        "kind",
+        "wallId",
+        "position",
+        "width",
+        "state",
+        "secret",
+        "doorType"
+      ],
+      "title": "DoorInput",
+      "type": "object"
+    },
+    "DoorRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "beforeRooms": {
+          "items": {
+            "$ref": "#/$defs/RoomBoundary"
+          },
+          "maxItems": 128,
+          "title": "Beforerooms",
+          "type": "array"
+        },
+        "contractVersion": {
+          "const": "0.1.0",
+          "default": "0.1.0",
+          "title": "Contractversion",
+          "type": "string"
+        },
+        "doors": {
+          "items": {
+            "$ref": "#/$defs/DoorInput"
+          },
+          "maxItems": 1024,
+          "title": "Doors",
+          "type": "array"
+        },
+        "height": {
+          "exclusiveMinimum": 0,
+          "maximum": 1000000,
+          "title": "Height",
+          "type": "number"
+        },
+        "rooms": {
+          "items": {
+            "$ref": "#/$defs/RoomBoundary"
+          },
+          "maxItems": 128,
+          "title": "Rooms",
+          "type": "array"
+        },
+        "width": {
+          "exclusiveMinimum": 0,
+          "maximum": 1000000,
+          "title": "Width",
+          "type": "number"
+        }
+      },
+      "required": [
+        "width",
+        "height",
+        "beforeRooms",
+        "rooms",
+        "doors"
+      ],
+      "title": "DoorRequest",
+      "type": "object"
+    },
+    "DoorResult": {
+      "additionalProperties": false,
+      "properties": {
+        "contractVersion": {
+          "const": "0.1.0",
+          "default": "0.1.0",
+          "title": "Contractversion",
+          "type": "string"
+        },
+        "doors": {
+          "items": {
+            "$ref": "#/$defs/Door"
+          },
+          "maxItems": 1024,
+          "title": "Doors",
+          "type": "array"
+        },
+        "walls": {
+          "items": {
+            "$ref": "#/$defs/Wall"
+          },
+          "maxItems": 8192,
+          "title": "Walls",
+          "type": "array"
+        }
+      },
+      "required": [
+        "walls",
+        "doors"
+      ],
+      "title": "DoorResult",
+      "type": "object"
+    },
     "GeometryRequest": {
       "additionalProperties": false,
       "properties": {
@@ -249,6 +510,12 @@
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "properties": {
+    "doorRequest": {
+      "$ref": "#/$defs/DoorRequest"
+    },
+    "doorResult": {
+      "$ref": "#/$defs/DoorResult"
+    },
     "request": {
       "$ref": "#/$defs/GeometryRequest"
     },
@@ -266,7 +533,9 @@
     "request",
     "result",
     "wallRequest",
-    "wallResult"
+    "wallResult",
+    "doorRequest",
+    "doorResult"
   ],
   "title": "GeometryContracts",
   "type": "object"

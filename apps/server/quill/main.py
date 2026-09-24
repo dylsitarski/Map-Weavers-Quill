@@ -2,6 +2,7 @@
 
 from fastapi import FastAPI, HTTPException
 
+from quill.doors import DoorRequest, DoorResult, reconcile_doors
 from quill.geometry import GeometryRequest, GeometryResult, validate_geometry
 from quill.providers import MockProvider, ProviderDescriptor
 from quill.walls import WallDerivationRequest, WallDerivationResult, derive_walls
@@ -30,5 +31,13 @@ def geometry(request: GeometryRequest) -> GeometryResult:
 def walls(request: WallDerivationRequest) -> WallDerivationResult:
     try:
         return derive_walls(request)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@app.post("/api/geometry/doors", response_model=DoorResult)
+def doors(request: DoorRequest) -> DoorResult:
+    try:
+        return reconcile_doors(request)
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error

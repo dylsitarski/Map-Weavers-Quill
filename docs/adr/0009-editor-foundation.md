@@ -20,8 +20,9 @@ React reducer state is sufficient for this slice; Zustand adoption is deferred
 until shared editor state is needed. Neither viewport nor screen points enter a
 Room entity. Persisted project validation still needs cross-entity checks.
 
-Derived wall inspection is implemented in ADR-0013. Doors and atomic
-project persistence remain subsequent Milestone 1 work.
+Derived wall inspection is implemented in ADR-0013. Constrained doors and attachment
+reconciliation are implemented in ADR-0014. Atomic project persistence remains
+subsequent Milestone 1 work.
 
 Polygon drawing now uses the same stateless validation endpoint and add-room
 transaction as rectangles. Draft vertices remain in native coordinates while

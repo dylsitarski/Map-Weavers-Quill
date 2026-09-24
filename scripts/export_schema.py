@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 from pydantic import BaseModel
+from quill.doors import DoorRequest, DoorResult
 from quill.geometry import GeometryRequest, GeometryResult
 from quill.models import Project
 from quill.providers import (
@@ -30,6 +31,8 @@ class GeometryContracts(BaseModel):
     result: GeometryResult
     wallRequest: WallDerivationRequest
     wallResult: WallDerivationResult
+    doorRequest: DoorRequest
+    doorResult: DoorResult
 
 
 ROOT = Path(__file__).resolve().parents[1]

@@ -13,7 +13,7 @@ or dismissing panels must never resize or shift the canvas. No document scrollin
 | Top-left | Compact identity | MQ mark and accessible project title | Project name |
 | Top bar | Global actions | File/View/Settings/Help disclosures, always-visible Snap, Pan, Undo/Redo | New/Open/Save, save state, export |
 | Left rail | Editing scope (what) | Map and Room | Region, Object, Light, Sound |
-| Beside rail | Scope tools (how) | Rectangle, polygon, select/edit, inspect walls | Doors |
+| Beside rail | Scope tools (how) | Rectangle, polygon, select/edit, doors, inspect walls | Standalone walls |
 | Upper-right | Collapsible tabbed panel | Information selection inspector, Layers ordering, AI room prompt | Raster/object layers, provider/job controls |
 | Bottom-left | Temporary feedback | Validation progress, dismissible errors, fading success | Job notifications and contextual guidance |
 | Bottom-right | View status | Active tool and zoom | Cursor coordinates and grid scale |
@@ -52,7 +52,7 @@ or dismissing panels must never resize or shift the canvas. No document scrollin
 - Right tabs stay visible above the scrolling body. Information is reserved for
   selection details; Layers lists front-to-back room shapes with Raise/Lower and
   a fixed base background; AI holds the selected room prompt and future generation
-  controls. Form drafts survive tab switches. Selecting rooms or walls preserves the active
+  controls. Form drafts survive tab switches. Selecting rooms, walls or doors preserves the active
   tab. Information puts Apply/Reset/Delete above the fields and displays each
   vertex's x/y coordinates side by side.
 - General map facts live in View, session/persistence information in File, and
@@ -132,8 +132,11 @@ management, file persistence and generation execution are not
 claimed by this layout. Those remain in their scheduled milestones.
 
 Derived wall inspection is implemented under Room → Inspect walls. Canvas hits use
-an 8-screen-pixel tolerance; a segment selector provides keyboard access. Information
+an 8-screen-pixel tolerance. Inspect walls is the last scope-menu button; no wall
+dropdown or segment-count text appears in the menu. Information
 shows endpoints, length, blocking flags and contributing rooms. Walls are geometry
 overlays, not reorderable artwork layers. Loading hides stale segments; derivation
-failures retain rooms and provide Retry walls. No wall overrides or doors are editable
-yet. See ADR-0013 for identity and shared-boundary rules.
+failures retain rooms and provide Retry walls. Door placement/editing is available immediately above Inspect walls. Information
+contains door Apply/Reset/Delete, name, width, position, state and secret flag.
+Door selection preserves the active tab. Wall overrides remain unavailable.
+See ADR-0013/0014 for shared-boundary and attachment rules.

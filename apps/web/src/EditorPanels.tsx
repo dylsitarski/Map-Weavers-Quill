@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Point, Room, Wall } from '../../../packages/schema/project';
+import type { Door, Point, Room, Wall } from '../../../packages/schema/project';
+import { DoorInspector } from './DoorInspector';
 import type { Scope, Tool } from './editorTools';
 import { PromptPanel } from './PromptPanel';
 import { RoomInspector } from './RoomInspector';
@@ -27,10 +28,12 @@ type Props = {
   cancelPolygon: () => void;
   rooms: Room[];
   selected: Room | null;
-  walls: Wall[];
   selectedWall: Wall | null;
-  selectWall: (id: string | null) => void;
-  wallsLoading: boolean;
+  selectedDoor: Door | null;
+  applyDoor: (door: Door) => void;
+  deleteDoor: () => void;
+  doorWidth: number;
+  setDoorWidth: (width: number) => void;
   wallsError: string;
   retryWalls: () => void;
   selectRoom: (id: string) => void;
@@ -47,7 +50,7 @@ export function EditorPanels(p: Props) {
   const [panel, setPanel] = useState<string | null>(null);
   const [infoOpen, setInfoOpen] = useState(window.innerWidth >= 900);
   const [tab, setTab] = useState('Information');
-  const selectedId = p.selected?.id ?? p.selectedWall?.id;
+  const selectedId = p.selected?.id ?? p.selectedWall?.id ?? p.selectedDoor?.id;
   useEffect(() => {
     if (selectedId) {
       setInfoOpen(true);
@@ -222,44 +225,6 @@ export function EditorPanels(p: Props) {
               <button
                 type="button"
                 disabled={p.busy}
-                aria-pressed={p.tool === 'walls'}
-                onClick={() => p.setTool('walls')}
-              >
-                Inspect walls
-              </button>
-              <p data-testid="wall-count">
-                {p.wallsLoading
-                  ? 'Updating walls…'
-                  : `${p.walls.length} wall segments`}
-              </p>
-              {p.tool === 'walls' && (
-                <>
-                  <p>
-                    Click an edge, or choose a segment. Walls follow room
-                    boundaries.
-                  </p>
-                  <label>
-                    Wall segment
-                    <select
-                      aria-label="Wall segment"
-                      value={p.selectedWall?.id ?? ''}
-                      disabled={p.wallsLoading || !p.walls.length}
-                      onChange={(e) => p.selectWall(e.target.value || null)}
-                    >
-                      <option value="">Select a wall</option>
-                      {p.walls.map((wall, index) => (
-                        <option key={wall.id} value={wall.id}>
-                          Wall {index + 1}: ({wall.start.x}, {wall.start.y}) → (
-                          {wall.end.x}, {wall.end.y})
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </>
-              )}
-              <button
-                type="button"
-                disabled={p.busy}
                 aria-pressed={p.tool === 'edit'}
                 onClick={() => p.setTool('edit')}
               >
@@ -318,6 +283,40 @@ export function EditorPanels(p: Props) {
                   </button>
                 </>
               )}
+              <button
+                type="button"
+                disabled={p.busy}
+                aria-pressed={p.tool === 'door'}
+                onClick={() => p.setTool('door')}
+              >
+                Place/edit door
+              </button>
+              {p.tool === 'door' && (
+                <>
+                  <label>
+                    New door width
+                    <input
+                      type="number"
+                      min="0.01"
+                      step="any"
+                      value={Number.isFinite(p.doorWidth) ? p.doorWidth : ''}
+                      onChange={(e) => p.setDoorWidth(e.target.valueAsNumber)}
+                    />
+                  </label>
+                  <p>
+                    Click a wall to place a door, or an existing door to edit
+                    it. Snap uses 50-unit spacing along the wall.
+                  </p>
+                </>
+              )}
+              <button
+                type="button"
+                disabled={p.busy}
+                aria-pressed={p.tool === 'walls'}
+                onClick={() => p.setTool('walls')}
+              >
+                Inspect walls
+              </button>
             </>
           )}
         </section>
@@ -377,7 +376,15 @@ export function EditorPanels(p: Props) {
             aria-labelledby="tab-Information"
             hidden={tab !== 'Information'}
           >
-            {p.selectedWall ? (
+            {p.selectedDoor ? (
+              <DoorInspector
+                key={JSON.stringify(p.selectedDoor)}
+                door={p.selectedDoor}
+                busy={p.busy}
+                apply={p.applyDoor}
+                remove={p.deleteDoor}
+              />
+            ) : p.selectedWall ? (
               <section
                 aria-label="Wall inspector"
                 data-wall-id={p.selectedWall.id}
@@ -419,8 +426,9 @@ export function EditorPanels(p: Props) {
                     .join(', ')}
                 </p>
                 <p>
-                  Edit the source room to change its walls. Doors and standalone
-                  wall tools are not available yet.
+                  Edit the source room to change its walls. Use Place/edit door
+                  to add an opening. Standalone wall tools are not available
+                  yet.
                 </p>
               </section>
             ) : p.selected ? (
@@ -530,7 +538,7 @@ export function EditorPanels(p: Props) {
           </div>
         )}
         <p className="notice surface" aria-live="polite">
-          {p.busy ? 'Validating room…' : p.notice}
+          {p.busy ? 'Validating geometry…' : p.notice}
         </p>
       </div>
       <div className="view-status surface">
@@ -543,7 +551,9 @@ export function EditorPanels(p: Props) {
               ? 'Select/edit room'
               : p.tool === 'walls'
                 ? 'Inspect walls'
-                : 'Pan'}{' '}
+                : p.tool === 'door'
+                  ? 'Place/edit door'
+                  : 'Pan'}{' '}
         · <span data-testid="zoom">{p.zoom}%</span>
       </div>
     </>
