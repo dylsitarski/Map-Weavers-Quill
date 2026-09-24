@@ -82,6 +82,7 @@ button:hover:not(:disabled) {
   background: #3b5044;
 }
 button[aria-pressed="true"],
+button[aria-selected="true"],
 button[aria-expanded="true"] {
   background: #435849;
   border-color: #baaa7d;
@@ -163,9 +164,22 @@ label {
   z-index: 3;
   top: 12px;
   right: 12px;
-  width: 260px;
+  width: 300px;
   max-height: calc(100% - 72px);
-  overflow: auto;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+.panel-header [role="tablist"] {
+  display: flex;
+}
+[hidden] {
+  display: none;
 }
 .info-toggle {
   width: 100%;
@@ -173,6 +187,14 @@ label {
 }
 #info-body {
   padding: 4px 14px 14px;
+  overflow: auto;
+  min-height: 0;
+  overscroll-behavior: contain;
+}
+.scope-panel,
+.global-panel,
+textarea {
+  overscroll-behavior: contain;
 }
 #info-body h2 {
   margin-top: 16px;

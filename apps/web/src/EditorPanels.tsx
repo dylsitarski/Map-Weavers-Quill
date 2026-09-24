@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Point, Room } from '../../../packages/schema/project';
 import type { Scope, Tool } from './editorTools';
+import { PromptPanel } from './PromptPanel';
 import { RoomInspector } from './RoomInspector';
 
 type Props = {
@@ -29,6 +30,7 @@ type Props = {
   selectRoom: (id: string) => void;
   applyRoom: (points: Point[], label: string, prompt: string) => void;
   deleteRoom: () => void;
+  reorderRoom: (id: string, direction: 'up' | 'down') => void;
   zoom: number;
   error: string;
   clearError: () => void;
@@ -38,9 +40,14 @@ type Props = {
 export function EditorPanels(p: Props) {
   const [panel, setPanel] = useState<string | null>(null);
   const [infoOpen, setInfoOpen] = useState(window.innerWidth >= 900);
+  const [tab, setTab] = useState('Information');
+  const selectedId = p.selected?.id;
   useEffect(() => {
-    if (p.selected) setInfoOpen(true);
-  }, [p.selected]);
+    if (selectedId) {
+      setInfoOpen(true);
+      setTab('Information');
+    }
+  }, [selectedId]);
   const opener = useRef<HTMLButtonElement | null>(null);
   const scopeOpener = useRef<HTMLButtonElement | null>(null);
   const previousDismiss = useRef(p.dismissVersion);
@@ -80,6 +87,12 @@ export function EditorPanels(p: Props) {
         <span className="sr-only">Map-Weaver’s Quill</span>
       </h1>
       <nav className="topbar surface" aria-label="Global actions">
+        <span className="connection-status" title={p.status}>
+          <span aria-hidden="true">●</span>
+          <span className="sr-only" role="status">
+            {p.status}
+          </span>
+        </span>
         {['File', 'View', 'Settings', 'Help'].map((name) => (
           <button
             key={name}
@@ -130,6 +143,7 @@ export function EditorPanels(p: Props) {
           )}
           {panel === 'View' && (
             <>
+              <p>1200 × 800 map units · 50-unit grid</p>
               <button type="button" onClick={p.fit}>
                 Fit map
               </button>
@@ -145,11 +159,15 @@ export function EditorPanels(p: Props) {
           )}
           {panel === 'Settings' && <p>Grid spacing: 50 map units.</p>}
           {panel === 'Help' && (
-            <p>
-              Drag to draw a rectangle. Use Pan or hold Space to move the view.
-              Scroll to zoom. Escape cancels a draft or closes a menu. Use Enter
-              to activate focused buttons; Space temporarily pans.
-            </p>
+            <>
+              <p>{p.status}</p>
+              <p>
+                Drag to draw a rectangle. Use Pan or hold Space to move the
+                view. Scroll over the canvas to zoom, or over a scrollable panel
+                to scroll it. Escape cancels a draft or closes a menu. Use Enter
+                to activate focused buttons; Space temporarily pans.
+              </p>
+            </>
           )}
         </section>
       )}
@@ -261,58 +279,144 @@ export function EditorPanels(p: Props) {
           )}
         </section>
       )}
-      <aside className="info-panel surface" aria-label="Persistent information">
-        <button
-          className="info-toggle"
-          type="button"
-          aria-expanded={infoOpen}
-          aria-controls="info-body"
-          onClick={() => {
-            setInfoOpen(!infoOpen);
-            if (window.innerWidth < 900) setPanel(null);
-          }}
-        >
-          Information {infoOpen ? '−' : '+'}
-        </button>
-        <div id="info-body" hidden={!infoOpen}>
-          <p className="session-note">Session only · not saved</p>
-          <p className="connection-status" role="status">
-            {p.status}
-          </p>
-          <h2>Map</h2>
-          <p>1200 × 800 · 50-unit grid</p>
-          {p.selected && (
-            <RoomInspector
-              key={JSON.stringify(p.selected)}
-              room={p.selected}
-              busy={p.busy}
-              apply={p.applyRoom}
-              remove={p.deleteRoom}
-            />
-          )}
-          <h2>Rooms ({p.rooms.length})</h2>
-          {p.rooms.length === 0 && <p>No rooms yet.</p>}
-          <ul aria-label="Rooms">
-            {p.rooms.map((room) => (
-              <li key={room.id}>
-                <button
-                  type="button"
-                  disabled={p.busy}
-                  aria-pressed={p.selected?.id === room.id}
-                  onClick={() => p.selectRoom(room.id)}
-                >
-                  {room.label}
-                </button>
-                <br />
-                {room.polygon
-                  .map(
-                    (point) =>
-                      `(${Math.round(point.x)}, ${Math.round(point.y)})`,
-                  )
-                  .join(' ')}
-              </li>
+      <aside className="info-panel surface" aria-label="Inspector and layers">
+        <div className="panel-header">
+          <div role="tablist" aria-label="Right panel">
+            {['Information', 'Layers', 'AI'].map((name, index, tabs) => (
+              <button
+                key={name}
+                type="button"
+                role="tab"
+                id={`tab-${name}`}
+                aria-selected={tab === name}
+                aria-controls={`panel-${name}`}
+                tabIndex={tab === name ? 0 : -1}
+                onClick={() => {
+                  setTab(name);
+                  setInfoOpen(true);
+                }}
+                onKeyDown={(event) => {
+                  let next = index;
+                  if (event.key === 'ArrowRight')
+                    next = (index + 1) % tabs.length;
+                  else if (event.key === 'ArrowLeft')
+                    next = (index + tabs.length - 1) % tabs.length;
+                  else if (event.key === 'Home') next = 0;
+                  else if (event.key === 'End') next = tabs.length - 1;
+                  else return;
+                  event.preventDefault();
+                  event.stopPropagation();
+                  setTab(tabs[next]);
+                  setInfoOpen(true);
+                  document.getElementById(`tab-${tabs[next]}`)?.focus();
+                }}
+              >
+                {name}
+              </button>
             ))}
-          </ul>
+          </div>
+          <button
+            type="button"
+            aria-label={
+              infoOpen ? 'Collapse right panel' : 'Expand right panel'
+            }
+            aria-expanded={infoOpen}
+            aria-controls="info-body"
+            onClick={() => setInfoOpen(!infoOpen)}
+          >
+            {infoOpen ? '−' : '+'}
+          </button>
+        </div>
+        <div id="info-body" hidden={!infoOpen}>
+          <section
+            role="tabpanel"
+            id="panel-Information"
+            aria-labelledby="tab-Information"
+            hidden={tab !== 'Information'}
+          >
+            {p.selected ? (
+              <RoomInspector
+                key={JSON.stringify(p.selected)}
+                room={p.selected}
+                busy={p.busy}
+                apply={p.applyRoom}
+                remove={p.deleteRoom}
+              />
+            ) : (
+              <p>
+                {p.scope === 'Map'
+                  ? 'Base background selected. Generation controls will be available in AI.'
+                  : 'Select an item to inspect it.'}
+              </p>
+            )}
+          </section>
+          <section
+            role="tabpanel"
+            id="panel-Layers"
+            aria-labelledby="tab-Layers"
+            hidden={tab !== 'Layers'}
+          >
+            <p>Front to back. Select a room or change its drawing order.</p>
+            <ul aria-label="Room layers">
+              {[...p.rooms].reverse().map((room, index) => (
+                <li
+                  key={room.id}
+                  data-room-id={room.id}
+                  data-geometry={JSON.stringify(room.polygon)}
+                >
+                  <button
+                    type="button"
+                    disabled={p.busy}
+                    aria-pressed={p.selected?.id === room.id}
+                    onClick={() => p.selectRoom(room.id)}
+                  >
+                    {room.label}
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Raise ${room.label}`}
+                    disabled={p.busy || index === 0}
+                    onClick={() => p.reorderRoom(room.id, 'up')}
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Lower ${room.label}`}
+                    disabled={p.busy || index === p.rooms.length - 1}
+                    onClick={() => p.reorderRoom(room.id, 'down')}
+                  >
+                    ↓
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <p>Base background · fixed at bottom</p>
+          </section>
+          <section
+            role="tabpanel"
+            id="panel-AI"
+            aria-labelledby="tab-AI"
+            hidden={tab !== 'AI'}
+          >
+            {p.selected ? (
+              <PromptPanel
+                key={JSON.stringify(p.selected)}
+                room={p.selected}
+                busy={p.busy}
+                save={(prompt) => {
+                  if (p.selected)
+                    p.applyRoom(p.selected.polygon, p.selected.label, prompt);
+                }}
+              />
+            ) : (
+              <p>
+                {p.scope === 'Map'
+                  ? 'Target: base background. Background generation is not available yet.'
+                  : 'Select a room to edit its prompt, or Map to target the base background. AI generation is not available yet.'}
+              </p>
+            )}
+          </section>
         </div>
       </aside>
       <div className="feedback">

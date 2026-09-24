@@ -69,7 +69,11 @@ The accepted UI scheme and future feature placement are in [docs/INTERFACE.md](d
 The left rail selects the Map background or toggles persistent Room tools. Map
 targets the base environmental image without opening a panel; generation is planned.
 Global menus live along the top, and the
-Information panel at upper-right collapses. View contains Fit map and Grid;
+right panel at upper-right collapses and has Information, Layers and AI tabs.
+Information contains selection details only. Layers replaces the room list and
+offers Raise/Lower controls for undoable room drawing order (front to back).
+AI edits the selected room's prompt for future generation. File explains session
+storage; Help and the top-bar indicator show connectivity. View contains map size, Fit map and Grid;
 Snap is always visible on the top bar. Pan is the default. Closing a scope returns
 to Pan; reopening restores its last tool. Tool buttons toggle off to Pan.
 Space-drag temporarily pans, including with a tool button focused (Enter activates
@@ -81,11 +85,13 @@ Regions are semantic/gameplay areas, not generated visual assets. Visual feature
 belong to objects. Planned layer controls will allow room, object and effect artwork
 to be reordered above the base background, with undo and consistent save/export.
 Regeneration will preserve other layers and the target's stacking position.
-These composition controls are not implemented yet; see docs/adr/0010-scope-and-layer-semantics.md.
+Room-shape ordering works now; generated raster/object composition, saving and
+export remain unimplemented. See docs/adr/0012-snapping-and-sidebar.md.
 
 Run `make dev`, open the web interface, choose Room → Rectangle room, and drag inside the map.
-Choose Pan to drag the view, scroll to zoom, or use Fit map to recenter. Grid
-visibility and snapping are independent. The room list shows native coordinates.
+Choose Pan to drag the view, scroll over the canvas to zoom, or use Fit map to
+recenter. Scroll over a panel with a scrollbar to scroll its contents, including
+at the scroll limits; this never zooms the map. Grid visibility and snapping are independent.
 Undo/Redo applies to room additions, edits and deletion. Invalid geometry and API failures do not
 add a room or change history. Dragging out of the drawing surface cancels a draft.
 
@@ -101,15 +107,18 @@ polygon or Escape discards it. Rejected polygons remain available for correction
 Space-pan and zoom preserve placed points; changing tools or closing the scope
 discards unfinished geometry. Polygon drafts support at most 2048 unique vertices.
 
-Choose Room → Select/edit room and click a room, or choose its name in Information.
+Choose Room → Select/edit room and click a room, or choose its name in Layers.
 Drag inside to move; drag a corner handle to reshape. With Snap enabled, movement
-snaps the displacement (preserving the room's shape) and corner edits snap to the
-grid. The inspector provides name, prompt and native-coordinate fields, plus point
+snaps the vertex nearest the initial grab point to the actual grid and translates
+every vertex equally. The anchor stays fixed and is highlighted during the drag.
+This realigns off-grid rooms without deforming irregular polygons; other vertices
+may remain off-grid. Corner edits snap the individual corner to the grid.
+The Information inspector provides name and native-coordinate fields, plus point
 insertion/removal. Apply commits the whole inspector edit once; Reset discards form
 changes. Exact coordinate fields are not snapped. Delete room is undoable.
-The prompt is stored only; it does not call an AI provider.
+The AI tab's Apply prompt stores the prompt in session history; it does not call an AI provider.
 
-Overlapping rooms select last-drawn first; the room list can select covered rooms.
+Overlapping rooms select the topmost room in drawing order; Layers can select covered rooms.
 Escape, leaving the canvas or changing tools cancels an unsubmitted drag. Validation
 failure leaves the original room intact; rejected inspector values remain editable.
 Selection itself creates no undo entry. Inspector drafts reset after switching

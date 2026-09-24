@@ -14,7 +14,7 @@ or dismissing panels must never resize or shift the canvas. No document scrollin
 | Top bar | Global actions | File/View/Settings/Help disclosures, always-visible Snap, Pan, Undo/Redo | New/Open/Save, save state, export |
 | Left rail | Editing scope (what) | Map and Room | Region, Object, Light, Sound |
 | Beside rail | Scope tools (how) | Rectangle, polygon, select/edit | Walls/doors |
-| Upper-right | Collapsible persistent information | Map facts, selectable room list, room inspector, connection status | Layers, provider/job panels |
+| Upper-right | Collapsible tabbed panel | Information selection inspector, Layers ordering, AI room prompt | Raster/object layers, provider/job controls |
 | Bottom-left | Temporary feedback | Validation progress, dismissible errors, fading success | Job notifications and contextual guidance |
 | Bottom-right | View status | Active tool and zoom | Cursor coordinates and grid scale |
 
@@ -46,9 +46,17 @@ or dismissing panels must never resize or shift the canvas. No document scrollin
   drawing position inside the map; hide it when snapping is off, the pointer leaves
   the canvas, validation is pending, or Pan/temporary pan is active. It uses the
   exact same native-to-screen conversion as the proposed room corner.
-- Wheel input zooms the map, including over overlays. Long information panels use
-  bounded regions with draggable scrollbars and keyboard scrolling; the page
-  itself never scrolls. Horizontal-only wheel input does not change zoom.
+- Wheel input over a scrollable panel or textarea scrolls that surface, including
+  at its limits; it must not leak into canvas zoom. Elsewhere the wheel zooms the
+  map. The page never scrolls. Horizontal-only wheel input does not change zoom.
+- Right tabs stay visible above the scrolling body. Information is reserved for
+  selection details; Layers lists front-to-back room shapes with Raise/Lower and
+  a fixed base background; AI holds the selected room prompt and future generation
+  controls. Form drafts survive tab switches. Selecting a different room opens
+  Information; editing/reordering the same room does not switch tabs.
+- General map facts live in View, session/persistence information in File, and
+  connectivity in Help with a compact top-bar indicator. The separate room list
+  is replaced by selectable layer entries.
 - On narrow windows, opening a scope or dropdown collapses persistent info.
   Reopening info must not close the scope or change its tool.
 - Buttons use visible labels or accessible names and tooltips. Expanded/pressed
@@ -62,12 +70,12 @@ or dismissing panels must never resize or shift the canvas. No document scrollin
 
 ## Future feature placement
 
-Milestone 1: Select/edit and the room list feed the right inspector (name, prompt,
+Milestone 1: Select/edit and Layers feed the right inspector (name,
 geometry). Dragging a room moves it; corner handles reshape it. Numeric edits,
 inserting/removing vertices and Delete room are available in the inspector.
 Apply validates before committing one history entry. Selection opens Information;
 clicking empty canvas deselects. Only one room is selected. Covered rooms remain
-selectable in the list. Walls and doors initially live
+selectable in Layers. Room prompts live in AI. Walls and doors initially live
 under Room. File gains real New/Open/Save once atomic persistence is implemented.
 
 Milestone 2: Right panel gains layers and generation jobs. Progress, cancel,
@@ -118,5 +126,6 @@ Selection, moving, vertex editing, name/prompt inspection and deletion are imple
 with undo/redo. Rejected geometry leaves the existing room unchanged. Leaving a drag,
 Escape or tool changes cancel its preview. Inspector drafts reset on selection or
 committed room changes; exact coordinate entry bypasses grid snapping.
-No file persistence, layer management, or generation UI is
+Room-shape ordering and the AI prompt editor are implemented. Raster/object layer
+management, file persistence and generation execution are not
 claimed by this layout. Those remain in their scheduled milestones.

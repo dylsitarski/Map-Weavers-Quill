@@ -33,7 +33,7 @@ test('concave hit testing includes boundaries and excludes the notch', () => {
   assert.equal(containsPoint(polygon, { x: 70, y: 70 }), false);
   assert.equal(containsPoint(polygon, { x: 40, y: 60 }), true);
 });
-test('moving snaps the delta without deforming off-grid rooms; a handle changes one vertex', () => {
+test('moving snaps an off-grid anchor to the actual grid without deforming the room', () => {
   const moved = dragPolygon(
     { room, origin: { x: 25, y: 40 }, vertex: null },
     { x: 85, y: 130 },
@@ -41,7 +41,7 @@ test('moving snaps the delta without deforming off-grid rooms; a handle changes 
   );
   assert.deepEqual(
     moved,
-    room.polygon.map((p) => ({ x: p.x + 50, y: p.y + 100 })),
+    room.polygon.map((p) => ({ x: p.x + 37, y: p.y + 73 })),
   );
   const reshaped = dragPolygon(
     { room, origin: room.polygon[0], vertex: 0 },
@@ -51,6 +51,60 @@ test('moving snaps the delta without deforming off-grid rooms; a handle changes 
   assert.deepEqual(reshaped[0], { x: 50, y: 50 });
   assert.deepEqual(reshaped.slice(1), room.polygon.slice(1));
   assert.deepEqual(room.polygon[0], { x: 13, y: 27 });
+});
+
+test('an irregular room keeps its shape and fixed nearest-grab anchor when snapping resumes', () => {
+  const irregular: Room = {
+    ...room,
+    polygon: [
+      { x: 13, y: 27 },
+      { x: 126, y: 32 },
+      { x: 93, y: 147 },
+    ],
+  };
+  const origin = { x: 100, y: 50 };
+  const free = dragPolygon(
+    { room: irregular, origin, vertex: null },
+    { x: 107, y: 59 },
+    false,
+  );
+  const moved = { ...irregular, polygon: free as Room['polygon'] };
+  const points = dragPolygon(
+    { room: moved, origin: { x: 107, y: 59 }, vertex: null },
+    { x: 190, y: 172 },
+    true,
+  );
+  // Vertex 2 was nearest the initial grab and stays the anchor even as the pointer travels.
+  assert.equal(points[1].x % 50, 0);
+  assert.equal(points[1].y % 50, 0);
+  for (let i = 0; i < points.length; i++) {
+    assert.equal(points[i].x - points[1].x, free[i].x - free[1].x);
+    assert.equal(points[i].y - points[1].y, free[i].y - free[1].y);
+  }
+});
+
+test('reordering changes drawing order only and is undoable', () => {
+  const other = { ...room, id: 'second' };
+  let state = historyReducer(
+    historyReducer(emptyHistory, { type: 'add', room }),
+    { type: 'add', room: other },
+  );
+  const before = state;
+  state = historyReducer(state, {
+    type: 'reorder',
+    id: room.id,
+    direction: 'up',
+  });
+  assert.deepEqual(state.present, [other, room]);
+  assert.equal(state.present[1], room);
+  assert.equal(
+    historyReducer(state, { type: 'reorder', id: room.id, direction: 'up' }),
+    state,
+  );
+  state = historyReducer(state, { type: 'undo' });
+  assert.deepEqual(state.present, before.present);
+  state = historyReducer(state, { type: 'redo' });
+  assert.deepEqual(state.present, [other, room]);
 });
 test('mixed edit/delete history restores full room data and rejects stale edits', () => {
   let state = historyReducer(emptyHistory, { type: 'add', room });

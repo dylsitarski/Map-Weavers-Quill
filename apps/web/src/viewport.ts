@@ -50,9 +50,18 @@ export type Command =
   | { type: 'add'; room: Room }
   | { type: 'update'; before: Room; room: Room }
   | { type: 'delete'; id: string }
+  | { type: 'reorder'; id: string; direction: 'up' | 'down' }
   | { type: 'undo' | 'redo' };
 export const emptyHistory: History = { past: [], present: [], future: [] };
 export function historyReducer(state: History, command: Command): History {
+  if (command.type === 'reorder') {
+    const index = state.present.findIndex((room) => room.id === command.id);
+    const target = index + (command.direction === 'up' ? 1 : -1);
+    if (index < 0 || target < 0 || target >= state.present.length) return state;
+    const present = [...state.present];
+    [present[index], present[target]] = [present[target], present[index]];
+    return { past: [...state.past, state.present], present, future: [] };
+  }
   if (command.type === 'update') {
     if (
       !state.present.includes(command.before) ||

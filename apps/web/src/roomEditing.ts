@@ -24,6 +24,19 @@ export function containsPoint(polygon: Point[], point: Point): boolean {
   return inside;
 }
 export type RoomDrag = { room: Room; origin: Point; vertex: number | null };
+// Choose once from the original gesture geometry; never switch anchors mid-drag.
+export function moveAnchorIndex(drag: RoomDrag): number {
+  let nearest = 0;
+  drag.room.polygon.forEach((p, i) => {
+    const current = drag.room.polygon[nearest];
+    if (
+      Math.hypot(p.x - drag.origin.x, p.y - drag.origin.y) <
+      Math.hypot(current.x - drag.origin.x, current.y - drag.origin.y)
+    )
+      nearest = i;
+  });
+  return nearest;
+}
 export function dragPolygon(
   drag: RoomDrag,
   point: Point,
@@ -35,7 +48,8 @@ export function dragPolygon(
     return drag.room.polygon.map((p, i) =>
       i === drag.vertex ? { x: quantize(point.x), y: quantize(point.y) } : p,
     );
-  const dx = quantize(point.x - drag.origin.x),
-    dy = quantize(point.y - drag.origin.y);
+  const anchor = drag.room.polygon[moveAnchorIndex(drag)];
+  const dx = quantize(anchor.x + point.x - drag.origin.x) - anchor.x,
+    dy = quantize(anchor.y + point.y - drag.origin.y) - anchor.y;
   return drag.room.polygon.map((p) => ({ x: p.x + dx, y: p.y + dy }));
 }

@@ -4,7 +4,12 @@ import type { GeometryResult } from '../../../packages/schema/geometry';
 import type { Point, Polygon, Room } from '../../../packages/schema/project';
 import { EditorPanels } from './EditorPanels';
 import { initialTools, toolsReducer } from './editorTools';
-import { containsPoint, dragPolygon, type RoomDrag } from './roomEditing';
+import {
+  containsPoint,
+  dragPolygon,
+  moveAnchorIndex,
+  type RoomDrag,
+} from './roomEditing';
 import {
   emptyHistory,
   fitView,
@@ -16,6 +21,7 @@ import {
   worldToScreen,
   zoomAt,
 } from './viewport';
+import { overScrollablePanel } from './wheelRouting';
 
 export function Editor({ status }: { status: string }) {
   const container = useRef<HTMLDivElement>(null);
@@ -130,6 +136,7 @@ export function Editor({ status }: { status: string }) {
   }, []);
   useEffect(() => {
     function wheel(event: WheelEvent) {
+      if (overScrollablePanel(event.target)) return;
       event.preventDefault();
       if (start || pan.current || editDrag.current || event.deltaY === 0)
         return;
@@ -446,7 +453,13 @@ export function Editor({ status }: { status: string }) {
                       key={`handle-${i}`}
                       x={screen.x}
                       y={screen.y}
-                      radius={5}
+                      radius={
+                        snap &&
+                        editDrag.current?.vertex === null &&
+                        moveAnchorIndex(editDrag.current) === i
+                          ? 8
+                          : 5
+                      }
                       fill="#fff0be"
                       stroke="#875c18"
                       strokeWidth={1.5}
@@ -528,6 +541,11 @@ export function Editor({ status }: { status: string }) {
           if (selected) void accept(points, selected, { label, prompt });
         }}
         deleteRoom={deleteRoom}
+        reorderRoom={(id, direction) => {
+          if (pending.current) return;
+          cancelEdit();
+          dispatch({ type: 'reorder', id, direction });
+        }}
         zoom={Math.round(view.scale * 100)}
         error={error}
         clearError={() => setError('')}

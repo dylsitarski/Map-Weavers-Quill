@@ -536,8 +536,9 @@ and be respected by preview and flattened export. Regeneration MUST preserve the
 target layer's order, visibility and opacity while replacing its image revision.
 Reordering MUST NOT alter geometry, collision, region membership or gameplay rules.
 Opaque pixels hide lower layers; revealing them requires transparency or a mask.
-The existing raster `zIndex` field represents order; interactive reordering and
-compositing are not implemented yet. See ADR-0010 for scope semantics and planned checks.
+The existing raster `zIndex` field represents raster order. Interactive room-shape
+ordering is implemented in the Layers tab; managed raster/object compositing and
+persistence remain planned. See ADR-0010 and ADR-0012 for boundaries and planned checks.
 
 ### 10.2.1 Scope semantics
 
@@ -576,7 +577,9 @@ The accepted editor layout and future control placement are recorded in
 [`docs/INTERFACE.md`](docs/INTERFACE.md). The owner's scheme uses a full-window
 canvas, global top bar, left scope rail with adjacent tools, collapsible persistent
 information at upper-right, and temporary feedback at bottom-left. Panels MUST
-overlay the canvas without moving it. Page scrolling is disabled; wheel input zooms.
+overlay the canvas without moving it. Page scrolling is disabled; wheel input zooms
+except over scrollable panels/textareas, where it scrolls without changing map zoom.
+The right panel has Information (selection), Layers (ordering), and AI (prompts) tabs.
 
 - Core tools MUST have keyboard-accessible actions.
 - Color alone MUST NOT communicate selection, validation errors, or door state.

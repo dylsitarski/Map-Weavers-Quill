@@ -13,7 +13,6 @@ export function RoomInspector({
   remove: () => void;
 }) {
   const [label, setLabel] = useState(room.label);
-  const [prompt, setPrompt] = useState(room.prompt);
   const [points, setPoints] = useState<Point[]>(room.polygon);
   return (
     <form
@@ -21,7 +20,7 @@ export function RoomInspector({
       onSubmit={(event) => {
         event.preventDefault();
         if (points.every((p) => Number.isFinite(p.x) && Number.isFinite(p.y)))
-          apply(points, label, prompt);
+          apply(points, label, room.prompt);
       }}
     >
       <h2>Selected room</h2>
@@ -30,14 +29,7 @@ export function RoomInspector({
           Name
           <input value={label} onChange={(e) => setLabel(e.target.value)} />
         </label>
-        <label>
-          Room prompt
-          <textarea
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-          />
-        </label>
-        <p>Prompt stored for future generation. Coordinates: +y up.</p>
+        <p>Coordinates: +y up. Edit the room prompt in the AI tab.</p>
         {points.map((point, index) => (
           // biome-ignore lint/suspicious/noArrayIndexKey: Fully controlled inputs represent ordered vertex slots, with no row-local state.
           <div className="vertex-fields" key={`vertex-${index}`}>
@@ -95,7 +87,6 @@ export function RoomInspector({
           type="button"
           onClick={() => {
             setLabel(room.label);
-            setPrompt(room.prompt);
             setPoints(room.polygon);
           }}
         >

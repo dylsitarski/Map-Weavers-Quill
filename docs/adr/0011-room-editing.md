@@ -3,17 +3,19 @@
 Status: Implemented, Milestone 1 in progress. Existing JSON/API contracts unchanged.
 
 Select/edit is an exclusive Room tool. Native polygon hit tests include boundaries;
-the last drawn room wins overlap hits. The room list provides access to covered
+the topmost room in drawing order wins overlap hits. Layers provides access to covered
 rooms. Selected rooms have dashed outlines and corner handles plus a named inspector.
 Selection is transient and never enters document history.
 
-Dragging the interior proposes a translation. Snap quantizes displacement, not each
-vertex, preserving off-grid geometry. Handles snap the edited point to grid positions.
+Dragging the interior proposes a translation. As clarified by ADR-0012, Snap aligns
+the vertex nearest the initial grab to the actual grid and translates all vertices
+equally. Handles snap the edited point to grid positions.
 Both use the existing native/view conversions and fixed screen-pixel hit tolerances.
 Leaving the canvas, blur, Escape or tool/scope changes cancel unsubmitted drags.
 Space begins a pan gesture instead of editing. Zoom is paused during an edit drag.
 
-The inspector supports label, future-generation prompt, exact vertex coordinates,
+Information supports label and exact vertex coordinates; AI edits the future-generation
+prompt. The geometry inspector supports
 midpoint insertion and vertex removal (minimum three, maximum 2048). Inputs are a
 local draft until Apply. All proposed geometry passes the existing stateless backend
 validator. Errors retain original room/history; inspector drafts remain available
