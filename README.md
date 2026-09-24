@@ -11,7 +11,7 @@ cross-runtime validation, coordinate transforms, and a deterministic offline
 image provider. Milestone 1 is **in progress**: the Konva viewport supports pan,
 pointer-anchored zoom, resize, grid visibility, snapping, rectangular room creation,
 polygon room creation, selection/move/vertex editing, a room inspector, deletion,
-and undo/redo of room changes. Geometry changes pass server-side polygon validation.
+undo/redo of room changes, and derived wall inspection. Geometry changes pass server-side polygon validation.
 There is no project persistence or Foundry importer yet.
 
 ### Setup (Linux, Python 3.12 and Node 24)
@@ -28,7 +28,7 @@ make check
 `make dev` starts the web shell at http://127.0.0.1:5173 and API at
 http://127.0.0.1:8000. Ctrl-C stops both. This launcher currently targets Linux.
 The API exposes `/health`, `/api/health`, `/api/providers`, and
-`POST /api/geometry/validate`. Visit `/docs` for API documentation; `/` returns 404.
+`POST /api/geometry/validate`, and `POST /api/geometry/walls`. Visit `/docs` for API documentation; `/` returns 404.
 
 `make schema` regenerates all schemas and TypeScript declarations. `make test`
 runs Python/TypeScript tests and checks generated files for drift. `make check`
@@ -97,8 +97,17 @@ add a room or change history. Dragging out of the drawing surface cancels a draf
 
 This is a mouse-based, in-memory session on a fixed 1200 by 800 map with a 50-unit
 grid. **Refreshing discards rooms.** Saving is not implemented. Next work:
-stable derived walls, constrained
-doors, and atomic project persistence. This increment does not complete Milestone 1.
+constrained doors, wall dependency reconciliation, and atomic project persistence. This increment does not complete Milestone 1.
+
+Choose Room → Inspect walls to select a derived segment on the canvas or from the
+segment selector. Information shows its endpoints, length, blocking flags and
+contributing rooms; selection preserves your current right-panel tab. Shared
+boundaries produce one segment, and intersections split segments. Unchanged
+endpoints preserve IDs across room reordering and undo/redo. Wall derivation is
+asynchronous; outdated results are hidden and failures offer Retry walls without
+changing rooms. Limits: 128 rooms, 2048 total input vertices, 8192 output segments.
+Walls are a read-only derived view, not persisted entities yet. Standalone wall
+drawing and door attachment are not implemented. See ADR-0013.
 
 Choose Room → Polygon room to place corners with clicks. Click the first point
 again (within 8 screen pixels, or at the same snapped coordinate) or choose Finish

@@ -65,6 +65,7 @@
       "title": "GeometryResult",
       "type": "object"
     },
+    "JsonValue": {},
     "Point": {
       "additionalProperties": false,
       "properties": {
@@ -83,6 +84,167 @@
       ],
       "title": "Point",
       "type": "object"
+    },
+    "RoomBoundary": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "polygon": {
+          "items": {
+            "$ref": "#/$defs/Point"
+          },
+          "maxItems": 2048,
+          "minItems": 3,
+          "title": "Polygon",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "polygon"
+      ],
+      "title": "RoomBoundary",
+      "type": "object"
+    },
+    "Wall": {
+      "additionalProperties": false,
+      "properties": {
+        "end": {
+          "$ref": "#/$defs/Point"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "wall",
+          "title": "Kind",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "metadata": {
+          "additionalProperties": false,
+          "patternProperties": {
+            "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)+$": {
+              "$ref": "#/$defs/JsonValue"
+            }
+          },
+          "title": "Metadata",
+          "type": "object"
+        },
+        "movement": {
+          "title": "Movement",
+          "type": "boolean"
+        },
+        "revision": {
+          "minimum": 0,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "sight": {
+          "title": "Sight",
+          "type": "boolean"
+        },
+        "sourceRoomId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Sourceroomid"
+        },
+        "start": {
+          "$ref": "#/$defs/Point"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "label",
+        "metadata",
+        "kind",
+        "start",
+        "end",
+        "movement",
+        "sight",
+        "sourceRoomId"
+      ],
+      "title": "Wall",
+      "type": "object"
+    },
+    "WallDerivationRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "contractVersion": {
+          "const": "0.1.0",
+          "default": "0.1.0",
+          "title": "Contractversion",
+          "type": "string"
+        },
+        "height": {
+          "exclusiveMinimum": 0,
+          "maximum": 1000000,
+          "title": "Height",
+          "type": "number"
+        },
+        "rooms": {
+          "items": {
+            "$ref": "#/$defs/RoomBoundary"
+          },
+          "maxItems": 128,
+          "title": "Rooms",
+          "type": "array"
+        },
+        "width": {
+          "exclusiveMinimum": 0,
+          "maximum": 1000000,
+          "title": "Width",
+          "type": "number"
+        }
+      },
+      "required": [
+        "width",
+        "height",
+        "rooms"
+      ],
+      "title": "WallDerivationRequest",
+      "type": "object"
+    },
+    "WallDerivationResult": {
+      "additionalProperties": false,
+      "properties": {
+        "contractVersion": {
+          "const": "0.1.0",
+          "default": "0.1.0",
+          "title": "Contractversion",
+          "type": "string"
+        },
+        "walls": {
+          "items": {
+            "$ref": "#/$defs/Wall"
+          },
+          "maxItems": 8192,
+          "title": "Walls",
+          "type": "array"
+        }
+      },
+      "required": [
+        "walls"
+      ],
+      "title": "WallDerivationResult",
+      "type": "object"
     }
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -92,11 +254,19 @@
     },
     "result": {
       "$ref": "#/$defs/GeometryResult"
+    },
+    "wallRequest": {
+      "$ref": "#/$defs/WallDerivationRequest"
+    },
+    "wallResult": {
+      "$ref": "#/$defs/WallDerivationResult"
     }
   },
   "required": [
     "request",
-    "result"
+    "result",
+    "wallRequest",
+    "wallResult"
   ],
   "title": "GeometryContracts",
   "type": "object"

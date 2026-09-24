@@ -135,6 +135,10 @@ input:focus-visible {
   left: 94px;
   top: 70px;
 }
+.scope-panel select {
+  width: 100%;
+  min-width: 0;
+}
 .global-panel {
   z-index: 6;
   left: 76px;
@@ -158,6 +162,9 @@ label {
 }
 .topbar label {
   padding: 0 6px;
+}
+.scope-panel label {
+  display: grid;
 }
 .info-panel {
   position: absolute;

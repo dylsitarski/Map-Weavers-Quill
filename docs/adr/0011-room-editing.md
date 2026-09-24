@@ -28,8 +28,9 @@ Pending validation disables history mutations, deletion and new edits. Deletion 
 one undoable command. Undo/redo restores complete snapshots, including revisions;
 future generation must also use the planned project-level revision/stale checks.
 
-No wall/door dependents exist in this editor yet. Their update/delete policies must
-be implemented before those entities are editable; this room-only delete path is
+Derived walls now recompute from current room geometry, including deletion and
+undo/redo (ADR-0013). No persisted wall overrides or doors exist yet. Their
+update/delete policies must be implemented before those entities are editable; this room-only delete path is
 not a general project dependency resolver. Persistence and cross-entity validation
 remain future Milestone 1 work.
 

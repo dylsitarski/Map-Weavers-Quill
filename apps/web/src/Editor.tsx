@@ -10,6 +10,7 @@ import {
   moveAnchorIndex,
   type RoomDrag,
 } from './roomEditing';
+import { useDerivedWalls } from './useDerivedWalls';
 import {
   emptyHistory,
   fitView,
@@ -21,6 +22,7 @@ import {
   worldToScreen,
   zoomAt,
 } from './viewport';
+import { nearestWall } from './wallSelection';
 import { overScrollablePanel } from './wheelRouting';
 
 export function Editor({ status }: { status: string }) {
@@ -36,6 +38,12 @@ export function Editor({ status }: { status: string }) {
   const [grid, setGrid] = useState(true);
   const [snap, setSnap] = useState(true);
   const [history, dispatch] = useReducer(historyReducer, emptyHistory);
+  const wallState = useDerivedWalls(history.present);
+  const [wallId, setWallId] = useState<string | null>(null);
+  const selectedWall =
+    tool === 'walls'
+      ? (wallState.walls.find((wall) => wall.id === wallId) ?? null)
+      : null;
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected =
     tool === 'edit'
@@ -115,6 +123,7 @@ export function Editor({ status }: { status: string }) {
     setVertices([]);
     cancelEdit();
     if (tool !== 'edit') setSelectedId(null);
+    if (tool !== 'walls') setWallId(null);
     pan.current = null;
   }, [tool, scope, cancelEdit]);
   useEffect(() => {
@@ -308,6 +317,7 @@ export function Editor({ status }: { status: string }) {
     snap &&
     tool !== 'pan' &&
     tool !== 'edit' &&
+    tool !== 'walls' &&
     !temporaryPan &&
     !pan.current &&
     !busy
@@ -349,6 +359,14 @@ export function Editor({ status }: { status: string }) {
               pan.current = { point: pointer, view };
             else if (tool === 'polygon') addVertex(pointer);
             else if (tool === 'edit') beginEdit(pointer);
+            else if (tool === 'walls')
+              setWallId(
+                nearestWall(
+                  wallState.walls,
+                  screenToWorld(pointer, view),
+                  8 / view.scale,
+                )?.id ?? null,
+              );
             else {
               setStart(world(pointer));
               setEnd(world(pointer));
@@ -425,6 +443,14 @@ export function Editor({ status }: { status: string }) {
                 fill="#6f927c99"
                 stroke="#234d39"
                 strokeWidth={2}
+              />
+            ))}
+            {wallState.walls.map((wall) => (
+              <Line
+                key={wall.id}
+                points={points([wall.start, wall.end])}
+                stroke={selectedWall?.id === wall.id ? '#efc766' : '#25362b'}
+                strokeWidth={selectedWall?.id === wall.id ? 5 : 2.5}
               />
             ))}
             {start && end && (
@@ -536,6 +562,12 @@ export function Editor({ status }: { status: string }) {
         cancelPolygon={() => setVertices([])}
         rooms={history.present}
         selected={selected}
+        walls={wallState.walls}
+        selectedWall={selectedWall}
+        selectWall={setWallId}
+        wallsLoading={wallState.loading}
+        wallsError={wallState.error}
+        retryWalls={wallState.retry}
         selectRoom={selectRoom}
         applyRoom={(points, label, prompt) => {
           if (selected) void accept(points, selected, { label, prompt });

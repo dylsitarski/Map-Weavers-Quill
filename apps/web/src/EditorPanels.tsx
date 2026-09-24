@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Point, Room } from '../../../packages/schema/project';
+import type { Point, Room, Wall } from '../../../packages/schema/project';
 import type { Scope, Tool } from './editorTools';
 import { PromptPanel } from './PromptPanel';
 import { RoomInspector } from './RoomInspector';
@@ -27,6 +27,12 @@ type Props = {
   cancelPolygon: () => void;
   rooms: Room[];
   selected: Room | null;
+  walls: Wall[];
+  selectedWall: Wall | null;
+  selectWall: (id: string | null) => void;
+  wallsLoading: boolean;
+  wallsError: string;
+  retryWalls: () => void;
   selectRoom: (id: string) => void;
   applyRoom: (points: Point[], label: string, prompt: string) => void;
   deleteRoom: () => void;
@@ -41,7 +47,7 @@ export function EditorPanels(p: Props) {
   const [panel, setPanel] = useState<string | null>(null);
   const [infoOpen, setInfoOpen] = useState(window.innerWidth >= 900);
   const [tab, setTab] = useState('Information');
-  const selectedId = p.selected?.id;
+  const selectedId = p.selected?.id ?? p.selectedWall?.id;
   useEffect(() => {
     if (selectedId) {
       setInfoOpen(true);
@@ -216,6 +222,44 @@ export function EditorPanels(p: Props) {
               <button
                 type="button"
                 disabled={p.busy}
+                aria-pressed={p.tool === 'walls'}
+                onClick={() => p.setTool('walls')}
+              >
+                Inspect walls
+              </button>
+              <p data-testid="wall-count">
+                {p.wallsLoading
+                  ? 'Updating walls…'
+                  : `${p.walls.length} wall segments`}
+              </p>
+              {p.tool === 'walls' && (
+                <>
+                  <p>
+                    Click an edge, or choose a segment. Walls follow room
+                    boundaries.
+                  </p>
+                  <label>
+                    Wall segment
+                    <select
+                      aria-label="Wall segment"
+                      value={p.selectedWall?.id ?? ''}
+                      disabled={p.wallsLoading || !p.walls.length}
+                      onChange={(e) => p.selectWall(e.target.value || null)}
+                    >
+                      <option value="">Select a wall</option>
+                      {p.walls.map((wall, index) => (
+                        <option key={wall.id} value={wall.id}>
+                          Wall {index + 1}: ({wall.start.x}, {wall.start.y}) → (
+                          {wall.end.x}, {wall.end.y})
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </>
+              )}
+              <button
+                type="button"
+                disabled={p.busy}
                 aria-pressed={p.tool === 'edit'}
                 onClick={() => p.setTool('edit')}
               >
@@ -333,7 +377,53 @@ export function EditorPanels(p: Props) {
             aria-labelledby="tab-Information"
             hidden={tab !== 'Information'}
           >
-            {p.selected ? (
+            {p.selectedWall ? (
+              <section
+                aria-label="Wall inspector"
+                data-wall-id={p.selectedWall.id}
+              >
+                <h2>Selected wall</h2>
+                <p>
+                  Start: ({p.selectedWall.start.x}, {p.selectedWall.start.y})
+                </p>
+                <p>
+                  End: ({p.selectedWall.end.x}, {p.selectedWall.end.y})
+                </p>
+                <p>
+                  Length:{' '}
+                  {Math.hypot(
+                    p.selectedWall.end.x - p.selectedWall.start.x,
+                    p.selectedWall.end.y - p.selectedWall.start.y,
+                  ).toFixed(2)}{' '}
+                  map units
+                </p>
+                <p>
+                  Blocks movement: {p.selectedWall.movement ? 'Yes' : 'No'} ·
+                  Blocks sight: {p.selectedWall.sight ? 'Yes' : 'No'}
+                </p>
+                <p>
+                  Derived from:{' '}
+                  {p.rooms
+                    .filter((room) => {
+                      const source = p.selectedWall?.metadata['quill.geometry'];
+                      return (
+                        source &&
+                        typeof source === 'object' &&
+                        !Array.isArray(source) &&
+                        'sourceRoomIds' in source &&
+                        Array.isArray(source.sourceRoomIds) &&
+                        source.sourceRoomIds.includes(room.id)
+                      );
+                    })
+                    .map((room) => room.label)
+                    .join(', ')}
+                </p>
+                <p>
+                  Edit the source room to change its walls. Doors and standalone
+                  wall tools are not available yet.
+                </p>
+              </section>
+            ) : p.selected ? (
               <RoomInspector
                 key={JSON.stringify(p.selected)}
                 room={p.selected}
@@ -419,6 +509,14 @@ export function EditorPanels(p: Props) {
         </div>
       </aside>
       <div className="feedback">
+        {p.wallsError && (
+          <div className="error surface">
+            <p role="alert">{p.wallsError}</p>
+            <button type="button" onClick={p.retryWalls}>
+              Retry walls
+            </button>
+          </div>
+        )}
         {p.error && (
           <div className="error surface">
             <p role="alert">{p.error}</p>
@@ -443,7 +541,9 @@ export function EditorPanels(p: Props) {
             ? 'Polygon room'
             : p.tool === 'edit'
               ? 'Select/edit room'
-              : 'Pan'}{' '}
+              : p.tool === 'walls'
+                ? 'Inspect walls'
+                : 'Pan'}{' '}
         · <span data-testid="zoom">{p.zoom}%</span>
       </div>
     </>

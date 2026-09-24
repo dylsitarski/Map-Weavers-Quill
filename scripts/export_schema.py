@@ -14,6 +14,7 @@ from quill.providers import (
     ProviderDescriptor,
     ProviderError,
 )
+from quill.walls import WallDerivationRequest, WallDerivationResult
 
 
 class ProviderContracts(BaseModel):
@@ -27,6 +28,8 @@ class ProviderContracts(BaseModel):
 class GeometryContracts(BaseModel):
     request: GeometryRequest
     result: GeometryResult
+    wallRequest: WallDerivationRequest
+    wallResult: WallDerivationResult
 
 
 ROOT = Path(__file__).resolve().parents[1]
