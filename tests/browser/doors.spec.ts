@@ -145,3 +145,48 @@ test('failed door validation preserves the scene and allows retry', async ({
     inspector.getByRole('spinbutton', { name: 'Width', exact: true }),
   ).toHaveValue('50');
 });
+
+test('midpoint doors slide on their parent wall, clamp at endpoints and undo once', async ({
+  page,
+}) => {
+  await setup(page);
+  const inspector = page.getByRole('region', { name: 'Door inspector' });
+  const wall = await inspector.getAttribute('data-wall-id');
+  await expect(inspector).toHaveAttribute('data-position', '0.625');
+  await page.mouse.move(682, 339);
+  await page.mouse.down();
+  await page.mouse.move(730, 381, { steps: 5 });
+  await page.mouse.up();
+  await expect(inspector).toHaveAttribute('data-position', '0.375');
+  await expect(inspector).toHaveAttribute('data-wall-id', wall ?? '');
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(inspector).toHaveAttribute('data-position', '0.625');
+  await page.getByRole('button', { name: 'Redo', exact: true }).click();
+  await expect(inspector).toHaveAttribute('data-position', '0.375');
+  await page.mouse.move(682, 381);
+  await page.mouse.down();
+  await page.mouse.move(682, 500, { steps: 5 });
+  await page.mouse.up();
+  await expect(inspector).toHaveAttribute('data-position', '0.125');
+  await expect(
+    inspector.getByRole('spinbutton', { name: 'Width', exact: true }),
+  ).toHaveValue('50');
+  // Unsnapped sliding is continuous and keeps the same parent.
+  await page.getByRole('checkbox', { name: 'Snap', exact: true }).uncheck();
+  await page.mouse.move(682, 423);
+  await page.mouse.down();
+  await page.mouse.move(700, 413, { steps: 4 });
+  await page.mouse.up();
+  await expect
+    .poll(async () => Number(await inspector.getAttribute('data-position')))
+    .toBeGreaterThan(0.18);
+  const position = await inspector.getAttribute('data-position');
+  await expect(inspector).toHaveAttribute('data-wall-id', wall ?? '');
+  // Leaving the canvas cancels the preview, rather than committing it.
+  await page.mouse.move(682, 413);
+  await page.mouse.down();
+  await page.mouse.move(682, 350);
+  await page.mouse.move(-1, 350);
+  await page.mouse.up();
+  await expect(inspector).toHaveAttribute('data-position', position ?? '');
+});

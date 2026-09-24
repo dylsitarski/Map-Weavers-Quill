@@ -109,10 +109,15 @@ Walls remain read-only; door-bearing scenes keep reconciled walls and doors in
 one undoable snapshot. Standalone wall drawing is not implemented. See ADR-0013/0014.
 
 Choose Room → Place/edit door, set a width, and click a wall. Snap projects the
-center to 50-unit spacing along that wall; with Snap off, placement is continuous.
+center to grid-cell midpoints (25, 75, 125, …); with Snap off, placement is continuous.
+For diagonal walls the dominant coordinate snaps, while the center stays on the wall.
 The full opening must fit on one segment and cannot overlap another opening.
-Click an existing door to edit its name, width, position, open/closed/locked state
-and secret flag in Information. Apply, Reset and Delete are at the top. Door
+Drag an existing door to slide it along its attached wall, or click to edit its
+name, width, position, open/closed/locked state
+and secret flag in Information. The default width remains 50 units: openings may
+meet wall endpoints exactly. Dragging clamps the full opening to the wall; each
+release is one validated, undoable edit. Leaving the canvas, Escape, blur or a tool
+change cancels the preview. Apply, Reset and Delete are at the top. Door
 selection preserves the current tab. Open doors use dashes; locked doors use a
 long/short dash pattern. These are editor geometry/state, not Foundry gameplay yet.
 Whole-room translations carry doors. Wall splits away from openings remap their

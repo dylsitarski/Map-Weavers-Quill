@@ -7,7 +7,13 @@ import type {
   Polygon,
   Room,
 } from '../../../packages/schema/project';
-import { doorSegment, reconcileDoors, wallPosition } from './doorEditing';
+import {
+  type DoorDrag,
+  doorSegment,
+  reconcileDoors,
+  slideDoor,
+  wallPosition,
+} from './doorEditing';
 import { EditorPanels } from './EditorPanels';
 import { initialTools, toolsReducer } from './editorTools';
 import {
@@ -70,9 +76,13 @@ export function Editor({ status }: { status: string }) {
     tool === 'edit'
       ? (history.present.find((room) => room.id === selectedId) ?? null)
       : null;
+  const doorDrag = useRef<DoorDrag | null>(null);
+  const [doorPreview, setDoorPreview] = useState<Door | null>(null);
   const editDrag = useRef<RoomDrag | null>(null);
   const [editPreview, setEditPreview] = useState<Point[] | null>(null);
   const cancelEdit = useCallback(() => {
+    doorDrag.current = null;
+    setDoorPreview(null);
     editDrag.current = null;
     setEditPreview(null);
   }, []);
@@ -169,7 +179,13 @@ export function Editor({ status }: { status: string }) {
     function wheel(event: WheelEvent) {
       if (overScrollablePanel(event.target)) return;
       event.preventDefault();
-      if (start || pan.current || editDrag.current || event.deltaY === 0)
+      if (
+        start ||
+        pan.current ||
+        editDrag.current ||
+        doorDrag.current ||
+        event.deltaY === 0
+      )
         return;
       const bounds = container.current?.getBoundingClientRect();
       if (!bounds) return;
@@ -252,6 +268,9 @@ export function Editor({ status }: { status: string }) {
     const hit = nearestWall(openings, native, 10 / view.scale);
     if (hit) {
       setDoorId(hit.id);
+      const door = scene.doors.find((door) => door.id === hit.id);
+      const wall = wallState.walls.find((wall) => wall.id === door?.wallId);
+      if (door && wall) doorDrag.current = { door, wall, origin: native };
       return;
     }
     setDoorId(null);
@@ -272,7 +291,7 @@ export function Editor({ status }: { status: string }) {
       label: 'Door',
       metadata: {},
       wallId: wall.id,
-      position: wallPosition(wall, native, snap),
+      position: wallPosition(wall, native, snap, doorWidth),
       width: doorWidth,
       state: 'closed',
       secret: false,
@@ -510,7 +529,18 @@ export function Editor({ status }: { status: string }) {
                 x: pan.current.view.x + pointer.x - pan.current.point.x,
                 y: pan.current.view.y + pointer.y - pan.current.point.y,
               });
-            else if (editDrag.current)
+            else if (doorDrag.current) {
+              const native = screenToWorld(pointer, view);
+              if (
+                Math.hypot(
+                  native.x - doorDrag.current.origin.x,
+                  native.y - doorDrag.current.origin.y,
+                ) *
+                  view.scale >
+                2
+              )
+                setDoorPreview(slideDoor(doorDrag.current, native, snap));
+            } else if (editDrag.current)
               setEditPreview(
                 dragPolygon(
                   editDrag.current,
@@ -523,6 +553,25 @@ export function Editor({ status }: { status: string }) {
           onMouseUp={(e) => {
             pan.current = null;
             const pointer = e.target.getStage()?.getPointerPosition();
+            if (doorDrag.current && pointer) {
+              const drag = doorDrag.current;
+              const native = screenToWorld(pointer, view);
+              if (
+                Math.hypot(native.x - drag.origin.x, native.y - drag.origin.y) *
+                  view.scale >
+                2
+              ) {
+                const proposed = slideDoor(drag, native, snap);
+                if (Math.abs(proposed.position - drag.door.position) > 1e-10)
+                  void changeDoors(
+                    scene.doors.map((door) =>
+                      door.id === proposed.id
+                        ? { ...proposed, revision: door.revision + 1 }
+                        : door,
+                    ),
+                  );
+              }
+            }
             if (editDrag.current && pointer) {
               const drag = editDrag.current;
               const native = screenToWorld(pointer, view);
@@ -586,7 +635,12 @@ export function Editor({ status }: { status: string }) {
                 (wall) => wall.id === door.wallId,
               );
               if (!wall) return null;
-              const segment = points(doorSegment(door, wall));
+              const segment = points(
+                doorSegment(
+                  doorPreview?.id === door.id ? doorPreview : door,
+                  wall,
+                ),
+              );
               return (
                 <Line
                   key={door.id}

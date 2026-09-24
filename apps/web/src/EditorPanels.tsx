@@ -305,7 +305,8 @@ export function EditorPanels(p: Props) {
                   </label>
                   <p>
                     Click a wall to place a door, or an existing door to edit
-                    it. Snap uses 50-unit spacing along the wall.
+                    it. Drag a door along its wall. Snap aligns to grid-cell
+                    midpoints.
                   </p>
                 </>
               )}

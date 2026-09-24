@@ -52,10 +52,19 @@ Once doors exist, render their validated snapshot walls instead of a display cac
 This does not yet provide native project persistence or wall overrides.
 
 Room → Place/edit door projects a canvas click onto a wall within 8 screen pixels;
-an existing opening has selection precedence within 10 pixels. Snap rounds center
-distance to 50-unit steps measured from canonical wall start, including diagonals;
-with Snap off projection is continuous. Do not silently shrink or shift an opening
-to make it fit. Information exposes Apply/Reset/Delete, label, width, exact position,
+an existing opening has selection precedence within 10 pixels. Snap aligns centers to map-grid midpoints (25 + 50k), anchored globally rather
+than to wall start. On diagonals snap the dominant x/y coordinate (x wins ties),
+solving the other coordinate on the wall. Choose the nearest midpoint where the
+full width fits; if none fits, backend validation rejects the proposal. With Snap
+off, projection is continuous and clamps to the full-width bounds. Default width
+stays 50: endpoint equality is valid, so no artificial gap or shrink is needed.
+
+Click-drag an existing door to slide along its parent only. Preserve the initial
+grab offset, project pointer displacement onto the wall, then apply the same snap
+and fit rules. Preview without mutating history; on release beyond a two-pixel
+threshold, validate and commit once. Rejected overlaps preserve the original.
+Click-only/no-op releases add no history. Escape, blur, canvas exit or tool/scope
+changes cancel the preview. Wheel zoom is suspended during the drag. Information exposes Apply/Reset/Delete, label, width, exact position,
 state and secret. Selecting preserves the active tab. Space temporarily pans.
 Open/locked patterns differ; these are editor states, not a gameplay simulator.
 Inspect walls remains last, with visual selection only and no wall count/dropdown.

@@ -140,3 +140,9 @@ failures retain rooms and provide Retry walls. Door placement/editing is availab
 contains door Apply/Reset/Delete, name, width, position, state and secret flag.
 Door selection preserves the active tab. Wall overrides remain unavailable.
 See ADR-0013/0014 for shared-boundary and attachment rules.
+
+Doors snap to globally anchored grid-cell midpoints. On diagonals the dominant
+coordinate snaps and the center remains on the wall. A 50-unit opening can meet a
+wall endpoint exactly. Click-drag slides only along its attached wall, with a live
+preview and one validated undo entry on release; leaving the canvas, blur, Escape
+or tool changes cancel. Inspector positions remain exact, independent of Snap.
