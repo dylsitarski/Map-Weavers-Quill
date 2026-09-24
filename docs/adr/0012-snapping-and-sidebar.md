@@ -19,7 +19,8 @@ existing drag threshold and backend validation; invalid proposals are rejected.
 Information shows selection details, Layers shows front-to-back room shapes and
 AI contains the room prompt editor. Tab headers remain fixed and support arrow,
 Home/End navigation. Bodies stay mounted so switching tabs retains form drafts.
-New room selections open Information; updates to the same selection retain the tab.
+Room selections and updates preserve the active tab. Inspector actions sit above
+the fields; vertex coordinates use compact side-by-side x/y inputs.
 File contains session/save limitations, View contains map facts, Help contains
 connection details and the top bar has a compact live connection indicator.
 

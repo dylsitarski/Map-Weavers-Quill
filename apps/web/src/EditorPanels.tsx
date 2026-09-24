@@ -45,7 +45,6 @@ export function EditorPanels(p: Props) {
   useEffect(() => {
     if (selectedId) {
       setInfoOpen(true);
-      setTab('Information');
     }
   }, [selectedId]);
   const opener = useRef<HTMLButtonElement | null>(null);

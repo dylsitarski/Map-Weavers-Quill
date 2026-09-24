@@ -228,8 +228,27 @@ textarea {
 }
 .vertex-fields {
   border-top: 1px solid #60736480;
-  margin-top: 8px;
-  padding-top: 8px;
+  margin-top: 5px;
+  padding-top: 5px;
+  font-size: 0.75rem;
+}
+.vertex-coordinates {
+  display: flex;
+  gap: 10px;
+}
+.info-panel .vertex-coordinates label {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  padding: 3px 0;
+}
+.vertex-fields button {
+  padding: 3px 7px;
+  font-size: 0.75rem;
+}
+.inspector-actions {
+  display: flex;
+  gap: 4px;
 }
 .connection-status {
   color: #b5c6b8;

@@ -52,8 +52,9 @@ or dismissing panels must never resize or shift the canvas. No document scrollin
 - Right tabs stay visible above the scrolling body. Information is reserved for
   selection details; Layers lists front-to-back room shapes with Raise/Lower and
   a fixed base background; AI holds the selected room prompt and future generation
-  controls. Form drafts survive tab switches. Selecting a different room opens
-  Information; editing/reordering the same room does not switch tabs.
+  controls. Form drafts survive tab switches. Selecting rooms preserves the active
+  tab. Information puts Apply/Reset/Delete above the fields and displays each
+  vertex's x/y coordinates side by side.
 - General map facts live in View, session/persistence information in File, and
   connectivity in Help with a compact top-bar indicator. The separate room list
   is replaced by selectable layer entries.
@@ -73,7 +74,7 @@ or dismissing panels must never resize or shift the canvas. No document scrollin
 Milestone 1: Select/edit and Layers feed the right inspector (name,
 geometry). Dragging a room moves it; corner handles reshape it. Numeric edits,
 inserting/removing vertices and Delete room are available in the inspector.
-Apply validates before committing one history entry. Selection opens Information;
+Apply validates before committing one history entry. Selection preserves the active tab;
 clicking empty canvas deselects. Only one room is selected. Covered rooms remain
 selectable in Layers. Room prompts live in AI. Walls and doors initially live
 under Room. File gains real New/Open/Save once atomic persistence is implemented.

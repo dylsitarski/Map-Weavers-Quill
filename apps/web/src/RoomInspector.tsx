@@ -25,6 +25,24 @@ export function RoomInspector({
     >
       <h2>Selected room</h2>
       <fieldset disabled={busy}>
+        <div className="inspector-actions">
+          <button type="submit" aria-label="Apply room changes">
+            Apply
+          </button>
+          <button
+            type="button"
+            aria-label="Reset changes"
+            onClick={() => {
+              setLabel(room.label);
+              setPoints(room.polygon);
+            }}
+          >
+            Reset
+          </button>
+          <button type="button" aria-label="Delete room" onClick={remove}>
+            Delete
+          </button>
+        </div>
         <label>
           Name
           <input value={label} onChange={(e) => setLabel(e.target.value)} />
@@ -34,29 +52,31 @@ export function RoomInspector({
           // biome-ignore lint/suspicious/noArrayIndexKey: Fully controlled inputs represent ordered vertex slots, with no row-local state.
           <div className="vertex-fields" key={`vertex-${index}`}>
             <span>Vertex {index + 1}</span>
-            {(['x', 'y'] as const).map((axis) => (
-              <label key={axis}>
-                {axis}
-                <input
-                  type="number"
-                  step="any"
-                  required
-                  min={0}
-                  max={axis === 'x' ? 1200 : 800}
-                  aria-label={`Vertex ${index + 1} ${axis}`}
-                  value={Number.isFinite(point[axis]) ? point[axis] : ''}
-                  onChange={(e) =>
-                    setPoints(
-                      points.map((p, i) =>
-                        i === index
-                          ? { ...p, [axis]: e.target.valueAsNumber }
-                          : p,
-                      ),
-                    )
-                  }
-                />
-              </label>
-            ))}
+            <div className="vertex-coordinates">
+              {(['x', 'y'] as const).map((axis) => (
+                <label key={axis}>
+                  {axis}
+                  <input
+                    type="number"
+                    step="any"
+                    required
+                    min={0}
+                    max={axis === 'x' ? 1200 : 800}
+                    aria-label={`Vertex ${index + 1} ${axis}`}
+                    value={Number.isFinite(point[axis]) ? point[axis] : ''}
+                    onChange={(e) =>
+                      setPoints(
+                        points.map((p, i) =>
+                          i === index
+                            ? { ...p, [axis]: e.target.valueAsNumber }
+                            : p,
+                        ),
+                      )
+                    }
+                  />
+                </label>
+              ))}
+            </div>
             <button
               type="button"
               disabled={points.length <= 3}
@@ -82,19 +102,6 @@ export function RoomInspector({
             </button>
           </div>
         ))}
-        <button type="submit">Apply room changes</button>
-        <button
-          type="button"
-          onClick={() => {
-            setLabel(room.label);
-            setPoints(room.polygon);
-          }}
-        >
-          Reset changes
-        </button>
-        <button type="button" onClick={remove}>
-          Delete room
-        </button>
       </fieldset>
     </form>
   );

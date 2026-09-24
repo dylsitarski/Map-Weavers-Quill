@@ -16,10 +16,17 @@ async function setup(page: Page) {
   await expect(page.locator('[data-room-id]')).toHaveCount(1);
 }
 async function edit(page: Page) {
+  const activeTab = await page
+    .getByRole('tab', { selected: true })
+    .textContent();
   await page
     .getByRole('button', { name: 'Select/edit room', exact: true })
     .click();
   await page.mouse.click(550, 350);
+  await expect(page.getByRole('tab', { selected: true })).toHaveText(
+    activeTab ?? '',
+  );
+  await page.getByRole('tab', { name: 'Information', exact: true }).click();
   await expect(
     page.getByRole('textbox', { name: 'Name', exact: true }),
   ).toBeVisible();
@@ -30,6 +37,12 @@ test('scrolling inspector never zooms; tabs remain fixed and retain form drafts'
 }) => {
   await setup(page);
   await edit(page);
+  // Compact rows fit a small room; use enough vertices to exercise overflow.
+  for (let i = 0; i < 5; i++) {
+    await page
+      .getByRole('button', { name: 'Insert after vertex 1', exact: true })
+      .click();
+  }
   const zoom = await page.getByTestId('zoom').textContent();
   const body = page.locator('#info-body');
   const tabs = page.getByRole('tablist', { name: 'Right panel' });
@@ -91,11 +104,21 @@ test('layer ordering updates stacking and is undoable without changing geometry'
   ).toBeVisible();
   await page.getByRole('button', { name: 'Room 2', exact: true }).click();
   await expect(
-    page.getByRole('tab', { name: 'Information', exact: true }),
+    page.getByRole('tab', { name: 'Layers', exact: true }),
   ).toHaveAttribute('aria-selected', 'true');
+  await page.getByRole('tab', { name: 'Information', exact: true }).click();
   await expect(
     page.getByRole('textbox', { name: 'Name', exact: true }),
   ).toHaveValue('Room 2');
+  await page.getByRole('tab', { name: 'AI', exact: true }).click();
+  await page.mouse.click(850, 550);
+  await page.mouse.click(550, 350);
+  await expect(
+    page.getByRole('tab', { name: 'AI', exact: true }),
+  ).toHaveAttribute('aria-selected', 'true');
+  await expect(
+    page.getByRole('textbox', { name: 'Room prompt', exact: true }),
+  ).toBeVisible();
 });
 
 test('reenabling snap realigns an off-grid room without deforming it', async ({
