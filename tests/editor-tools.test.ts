@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { initialTools, toolsReducer } from '../apps/web/src/editorTools';
 
-test('whole-map context suspends room tools and restores their remembered choice', () => {
+test('map background selection suspends room tools and restores their remembered choice', () => {
   let state = toolsReducer(initialTools, { type: 'scope', scope: 'Room' });
   state = toolsReducer(state, { type: 'tool', tool: 'polygon' });
   state = toolsReducer(state, { type: 'scope', scope: 'Map' });

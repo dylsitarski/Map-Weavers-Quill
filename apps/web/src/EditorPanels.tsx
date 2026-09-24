@@ -155,7 +155,7 @@ export function EditorPanels(p: Props) {
             aria-controls={name === 'Room' ? 'scope-panel' : undefined}
             title={
               name === 'Map'
-                ? 'Select the whole map. AI prompting is planned.'
+                ? 'Select the base background. AI generation is planned.'
                 : undefined
             }
             onClick={(e) => {
@@ -295,7 +295,7 @@ export function EditorPanels(p: Props) {
         </p>
       </div>
       <div className="view-status surface">
-        {p.scope === 'Map' && 'Whole map selected · '}
+        {p.scope === 'Map' && 'Map background selected · '}
         {p.tool === 'room'
           ? 'Rectangle room'
           : p.tool === 'polygon'

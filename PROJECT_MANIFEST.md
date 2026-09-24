@@ -112,7 +112,7 @@ The project is intended for a **public, freely distributed, noncommercial releas
 ## 4. Product principles
 
 1. **Deterministic architecture, generative appearance.** Room boundaries, walls, doors, light origins, and gameplay regions are stored as geometry. AI may decorate them but MUST NOT silently move them.
-2. **Localized generation.** A normal edit regenerates only the selected region or asset. Whole-map regeneration is an explicit user action.
+2. **Localized generation.** A normal edit regenerates only the selected mask or asset. Map-scope regeneration explicitly targets the base background, preserving independent visual layers and scene geometry.
 3. **Provider independence.** Product logic depends on declared capabilities, not model or vendor names.
 4. **Local-first ownership.** Projects and generated assets are stored locally by default. Remote calls occur only through a configured provider.
 5. **Non-destructive editing.** Generated rooms, objects, effects, metadata, and overlays remain separable where practical.
@@ -327,7 +327,7 @@ Minimum entity definitions:
 | Door | parent wall reference, position or segment, width, door type, state, secret flag |
 | Object | anchor, footprint, rotation, description, optional raster asset, gameplay properties |
 | Light | origin, bright/dim radii, color, intensity, optional animation identifier |
-| Region | polygon(s), semantic type, visual style, optional Foundry behavior mapping |
+| Region | polygon(s), semantic type, editor overlay style, optional Foundry behavior mapping; no generated imagery |
 | Sound | origin or region, radius, asset reference, volume |
 | Raster layer | asset hash, bounds, z-index, opacity, blend mode, visibility |
 | Generation record | provider, capability, inputs, prompt, parameters, status, hashes, timestamps |
@@ -512,7 +512,7 @@ Every generation request MUST capture the project revision and affected entity r
 
 ### 10.2 Layer order
 
-The visual stack SHOULD use this conceptual order:
+The visual stack SHOULD start with this default order (not permanent ordering by entity type):
 
 1. base environmental raster;
 2. room render layers;
@@ -524,6 +524,43 @@ The visual stack SHOULD use this conceptual order:
 8. optional grid.
 
 Export profiles decide which layers are flattened and which remain metadata.
+
+The base environmental raster MUST remain beneath the artwork. Room, object and
+effect raster layers MUST be user-reorderable relative to one another, including
+objects below rooms. Editor guides, region outlines and selection controls remain
+separate overlays above artwork; they MUST NOT become generated image content.
+Wall/door collision and visibility behavior are geometry, independent of visual order.
+
+Layer reordering MUST be an undoable document operation, persist across save/open,
+and be respected by preview and flattened export. Regeneration MUST preserve the
+target layer's order, visibility and opacity while replacing its image revision.
+Reordering MUST NOT alter geometry, collision, region membership or gameplay rules.
+Opaque pixels hide lower layers; revealing them requires transparency or a mask.
+The existing raster `zIndex` field represents order; interactive reordering and
+compositing are not implemented yet. See ADR-0010 for scope semantics and planned checks.
+
+### 10.2.1 Scope semantics
+
+- **Map:** selects the base background as the target for future generation or
+  regeneration across map bounds. It does not target the flattened scene or all
+  entities. Other layers may supply context but MUST NOT be replaced by this action.
+- **Room:** bounded architectural geometry and an associated masked render layer;
+  imagery may be regenerated without silently changing boundaries or separate assets.
+- **Object:** independent visual asset and optional gameplay properties. Use objects
+  for visual features such as rugs, vegetation and hazard imagery; place their
+  layers as needed relative to rooms and other objects.
+- **Region:** semantic/gameplay area such as a hazard, difficult terrain or annotation.
+  Its visual style controls editor visualization, not AI-generated artwork. A visual
+  object and a region may describe the same place, but neither automatically creates
+  the other and their geometry is not automatically linked.
+- **Light:** source parameters and exportable lighting behavior; a visible fixture
+  is a separate object. Background regeneration preserves light entities.
+- **Sound:** audio source/area, asset and playback properties; no raster layer required.
+
+Scopes identify editing targets; layers determine visual composition. Selecting a
+scope does not invoke AI. Future generation still follows preview, accept/reject,
+revision checks and undo. The current Map button selects the future background
+target only; there is no background-generation operation yet.
 
 ### 10.3 Undo and redo
 
@@ -732,7 +769,7 @@ Exit criteria:
 
 Tasks:
 
-1. Implement content-addressed assets and raster-layer entities.
+1. Implement content-addressed assets and raster-layer entities, a base-background target, and undoable ordering of available artwork layers.
 2. Implement context crop, polygon mask rasterization, and protected-area compositing.
 3. Add generation jobs, states, cancellation, and stale-result handling.
 4. Add room prompt and style inspector.
@@ -745,6 +782,7 @@ Exit criteria:
 - Generating Room A does not modify a single pixel outside Room A's mask.
 - A generation can be rejected without changing the document.
 - Accepted output is undoable and survives reload.
+- Background regeneration preserves independent layers; reordering survives undo/redo, save/open and flattened export without changing gameplay geometry.
 - A result created against stale geometry cannot auto-apply.
 
 ### Milestone 3: First real image provider

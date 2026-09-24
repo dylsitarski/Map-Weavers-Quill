@@ -65,8 +65,8 @@ cross-entity relationship validation belong to Milestone 1, before persistence.
 ## Milestone 1 first increment
 
 The accepted UI scheme and future feature placement are in [docs/INTERFACE.md](docs/INTERFACE.md).
-The left rail selects Map context or toggles persistent Room tools. Map selects
-the whole map without opening a panel; AI prompting for that context is planned.
+The left rail selects the Map background or toggles persistent Room tools. Map
+targets the base environmental image without opening a panel; generation is planned.
 Global menus live along the top, and the
 Information panel at upper-right collapses. View contains Fit map and Grid;
 Snap is always visible on the top bar. Pan is the default. Closing a scope returns
@@ -75,6 +75,12 @@ Space-drag temporarily pans, including with a tool button focused (Enter activat
 focused buttons). A small point previews the snapped drawing position. Escape closes menus or
 cancels a draft. Errors remain at bottom-left until dismissed; confirmations fade.
 Panels overlay the canvas without changing its size. Future scopes are disabled.
+
+Regions are semantic/gameplay areas, not generated visual assets. Visual features
+belong to objects. Planned layer controls will allow room, object and effect artwork
+to be reordered above the base background, with undo and consistent save/export.
+Regeneration will preserve other layers and the target's stacking position.
+These composition controls are not implemented yet; see docs/adr/0010-scope-and-layer-semantics.md.
 
 Run `make dev`, open the web interface, choose Room → Rectangle room, and drag inside the map.
 Choose Pan to drag the view, scroll to zoom, or use Fit map to recenter. Grid

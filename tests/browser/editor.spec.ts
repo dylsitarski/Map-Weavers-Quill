@@ -7,7 +7,7 @@ async function activateRectangle(page: Page) {
     .click();
 }
 
-test('Map toggles whole-map context without opening a panel', async ({
+test('Map toggles background selection without opening a panel', async ({
   page,
 }) => {
   await page.goto('/');
@@ -17,7 +17,7 @@ test('Map toggles whole-map context without opening a panel', async ({
   await expect(map).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('#scope-panel')).toHaveCount(0);
   await expect(
-    page.getByText('Whole map selected', { exact: false }),
+    page.getByText('Map background selected', { exact: false }),
   ).toBeVisible();
   await expect(
     page.getByRole('button', { name: 'Pan', exact: true }),

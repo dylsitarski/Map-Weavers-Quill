@@ -29,14 +29,15 @@ or dismissing panels must never resize or shift the canvas. No document scrollin
 - Canvas clicks dismiss global dropdowns only. Scope tools remain available while
   drawing and while interacting with other controls. Escape cancels drafts and
   closes the global dropdown first, otherwise the scope (preserving its memory).
-- Map selects the entire map as editor context and has no expanded panel. It
+- Map selects the base background as the future generation target and has no expanded panel. It
   returns to Pan, suspends room tools, and toggles off when pressed again. The
-  status overlay confirms Whole map selected. Dimensions live in Info and Fit
+  status overlay confirms Map background selected. Dimensions live in Info and Fit
   map in View. Selecting Map does not select every room for bulk editing.
-- Future AI prompts may use this whole-map context. Prompt submission and generation
-  are not implemented yet. Context selection alone must never trigger generation
-  or authorize overwriting all map content; future proposals still need explicit
-  editable bounds and the normal preview/accept workflow.
+- Future Map generation replaces the base environmental image across map bounds,
+  preserving rooms, objects, other layers and metadata. Selecting Map alone does
+  not invoke AI. Prompt submission and generation are not implemented yet.
+  Context images and the layer being regenerated are distinct; proposals still
+  follow preview/accept and undo.
 - Pan is globally available. Space-drag temporarily pans, except when typing in
   form fields; releasing Space restores the previous tool without changing scope
   or remembered tools. Space is reserved for pan even with a button focused; Enter
@@ -68,6 +69,14 @@ under Room. File gains real New/Open/Save once atomic persistence is implemented
 Milestone 2: Right panel gains layers and generation jobs. Progress, cancel,
 preview, accept/reject and stale-result feedback must be visible. Applying a result
 is one undoable command. Do not auto-hide actionable job failures.
+
+Layer controls must allow room/object/effect artwork to be reordered, including
+objects below rooms, with the base background anchored underneath. Preserve order,
+visibility and opacity when regenerating a layer. Reorder actions enter document
+history and survive save/open and export. Editor overlays remain above artwork.
+Regions remain semantic/gameplay areas; their shading is an editing aid, not a
+generated layer. Visual features belong to objects, optionally accompanied by a
+separate gameplay region. See ADR-0010 and manifest section 10.2.1 for all scopes.
 
 Milestones 3–5: Settings gains providers and capability status. File gains Foundry
 export with a compatibility summary. Provider secrets stay on the server.
