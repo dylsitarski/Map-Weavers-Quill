@@ -65,7 +65,9 @@ cross-entity relationship validation belong to Milestone 1, before persistence.
 ## Milestone 1 first increment
 
 The accepted UI scheme and future feature placement are in [docs/INTERFACE.md](docs/INTERFACE.md).
-The left rail toggles persistent Room tools, global menus live along the top, and the
+The left rail selects Map context or toggles persistent Room tools. Map selects
+the whole map without opening a panel; AI prompting for that context is planned.
+Global menus live along the top, and the
 Information panel at upper-right collapses. View contains Fit map and Grid;
 Snap is always visible on the top bar. Pan is the default. Closing a scope returns
 to Pan; reopening restores its last tool. Tool buttons toggle off to Pan.

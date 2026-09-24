@@ -146,13 +146,18 @@ export function EditorPanels(p: Props) {
         </section>
       )}
       <nav className="scope-rail surface" aria-label="Editing scopes">
-        {(['Room'] as const).map((name) => (
+        {(['Map', 'Room'] as const).map((name) => (
           <button
             key={name}
             type="button"
             aria-pressed={p.scope === name}
-            aria-expanded={p.scope === name}
-            aria-controls="scope-panel"
+            aria-expanded={name === 'Room' ? p.scope === name : undefined}
+            aria-controls={name === 'Room' ? 'scope-panel' : undefined}
+            title={
+              name === 'Map'
+                ? 'Select the whole map. AI prompting is planned.'
+                : undefined
+            }
             onClick={(e) => {
               scopeOpener.current = e.currentTarget;
               p.toggleScope(name);
@@ -174,7 +179,7 @@ export function EditorPanels(p: Props) {
           </button>
         ))}
       </nav>
-      {p.scope && (
+      {p.scope === 'Room' && (
         <section
           id="scope-panel"
           className="scope-panel surface"
@@ -290,6 +295,7 @@ export function EditorPanels(p: Props) {
         </p>
       </div>
       <div className="view-status surface">
+        {p.scope === 'Map' && 'Whole map selected · '}
         {p.tool === 'room'
           ? 'Rectangle room'
           : p.tool === 'polygon'

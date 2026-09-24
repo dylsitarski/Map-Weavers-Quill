@@ -1,4 +1,4 @@
-export type Scope = 'Room';
+export type Scope = 'Map' | 'Room';
 export type Tool = 'pan' | 'room' | 'polygon';
 export type ToolState = {
   scope: Scope | null;
@@ -25,7 +25,7 @@ export function toolsReducer(state: ToolState, action: ToolAction): ToolState {
       tool: scope ? (state.remembered[scope] ?? 'pan') : 'pan',
     };
   }
-  if (!state.scope) return state;
+  if (state.scope !== 'Room') return state;
   const tool = state.tool === action.tool ? 'pan' : action.tool;
   return {
     ...state,

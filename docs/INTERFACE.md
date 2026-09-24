@@ -12,7 +12,7 @@ or dismissing panels must never resize or shift the canvas. No document scrollin
 |---|---|---|---|
 | Top-left | Compact identity | MQ mark and accessible project title | Project name |
 | Top bar | Global actions | File/View/Settings/Help disclosures, always-visible Snap, Pan, Undo/Redo | New/Open/Save, save state, export |
-| Left rail | Editing scope (what) | Room | Region, Object, Light, Sound |
+| Left rail | Editing scope (what) | Map and Room | Region, Object, Light, Sound |
 | Beside rail | Scope tools (how) | Rectangle and polygon tools | Selection, move, vertices, walls/doors |
 | Upper-right | Collapsible persistent information | Map facts, room list, connection status | Selection inspector, layers, provider/job panels |
 | Bottom-left | Temporary feedback | Validation progress, dismissible errors, fading success | Job notifications and contextual guidance |
@@ -29,8 +29,14 @@ or dismissing panels must never resize or shift the canvas. No document scrollin
 - Canvas clicks dismiss global dropdowns only. Scope tools remain available while
   drawing and while interacting with other controls. Escape cancels drafts and
   closes the global dropdown first, otherwise the scope (preserving its memory).
-- Remove Map scope until it has actual editing tools; dimensions live in Info and
-  Fit map in View. Do not introduce a redundant or empty Map panel.
+- Map selects the entire map as editor context and has no expanded panel. It
+  returns to Pan, suspends room tools, and toggles off when pressed again. The
+  status overlay confirms Whole map selected. Dimensions live in Info and Fit
+  map in View. Selecting Map does not select every room for bulk editing.
+- Future AI prompts may use this whole-map context. Prompt submission and generation
+  are not implemented yet. Context selection alone must never trigger generation
+  or authorize overwriting all map content; future proposals still need explicit
+  editable bounds and the normal preview/accept workflow.
 - Pan is globally available. Space-drag temporarily pans, except when typing in
   form fields; releasing Space restores the previous tool without changing scope
   or remembered tools. Space is reserved for pan even with a button focused; Enter

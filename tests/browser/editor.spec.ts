@@ -7,6 +7,33 @@ async function activateRectangle(page: Page) {
     .click();
 }
 
+test('Map toggles whole-map context without opening a panel', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await activateRectangle(page);
+  const map = page.getByRole('button', { name: 'Map', exact: true });
+  await map.click();
+  await expect(map).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#scope-panel')).toHaveCount(0);
+  await expect(
+    page.getByText('Whole map selected', { exact: false }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Pan', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true');
+  await draw(page);
+  await expect(
+    page.getByRole('list', { name: 'Rooms' }).getByRole('listitem'),
+  ).toHaveCount(0);
+  await map.click();
+  await expect(map).toHaveAttribute('aria-pressed', 'false');
+  await page.getByRole('button', { name: 'Room', exact: true }).click();
+  await expect(
+    page.getByRole('button', { name: 'Rectangle room', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true');
+});
+
 async function draw(page: Page) {
   const box = await page.getByTestId('map-canvas').boundingBox();
   if (!box) throw new Error('No drawing surface');
@@ -140,7 +167,7 @@ test('snap point matches the submitted corner and hides when snapping or drawing
   ).toBeVisible();
   await expect(
     page.getByRole('button', { name: 'Map', exact: true }),
-  ).toHaveCount(0);
+  ).toBeVisible();
   await activateRectangle(page);
   await page.mouse.move(613, 377);
   const marker = page.getByTestId('snap-point');
