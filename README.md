@@ -10,7 +10,8 @@ FastAPI shells, Python models with generated JSON Schema and TypeScript types,
 cross-runtime validation, coordinate transforms, and a deterministic offline
 image provider. Milestone 1 is **in progress**: the Konva viewport supports pan,
 pointer-anchored zoom, resize, grid visibility, snapping, rectangular room creation,
-polygon room creation, and undo/redo of room additions. Rooms pass server-side polygon validation.
+polygon room creation, selection/move/vertex editing, a room inspector, deletion,
+and undo/redo of room changes. Geometry changes pass server-side polygon validation.
 There is no project persistence or Foundry importer yet.
 
 ### Setup (Linux, Python 3.12 and Node 24)
@@ -85,12 +86,12 @@ These composition controls are not implemented yet; see docs/adr/0010-scope-and-
 Run `make dev`, open the web interface, choose Room → Rectangle room, and drag inside the map.
 Choose Pan to drag the view, scroll to zoom, or use Fit map to recenter. Grid
 visibility and snapping are independent. The room list shows native coordinates.
-Undo/Redo applies to room additions. Invalid geometry and API failures do not
+Undo/Redo applies to room additions, edits and deletion. Invalid geometry and API failures do not
 add a room or change history. Dragging out of the drawing surface cancels a draft.
 
 This is a mouse-based, in-memory session on a fixed 1200 by 800 map with a 50-unit
 grid. **Refreshing discards rooms.** Saving is not implemented. Next work:
-selection/move/vertex editing, stable derived walls, constrained
+stable derived walls, constrained
 doors, and atomic project persistence. This increment does not complete Milestone 1.
 
 Choose Room → Polygon room to place corners with clicks. Click the first point
@@ -99,6 +100,20 @@ polygon after at least three points. Remove last point corrects a draft; Cancel
 polygon or Escape discards it. Rejected polygons remain available for correction.
 Space-pan and zoom preserve placed points; changing tools or closing the scope
 discards unfinished geometry. Polygon drafts support at most 2048 unique vertices.
+
+Choose Room → Select/edit room and click a room, or choose its name in Information.
+Drag inside to move; drag a corner handle to reshape. With Snap enabled, movement
+snaps the displacement (preserving the room's shape) and corner edits snap to the
+grid. The inspector provides name, prompt and native-coordinate fields, plus point
+insertion/removal. Apply commits the whole inspector edit once; Reset discards form
+changes. Exact coordinate fields are not snapped. Delete room is undoable.
+The prompt is stored only; it does not call an AI provider.
+
+Overlapping rooms select last-drawn first; the room list can select covered rooms.
+Escape, leaving the canvas or changing tools cancels an unsubmitted drag. Validation
+failure leaves the original room intact; rejected inspector values remain editable.
+Selection itself creates no undo entry. Inspector drafts reset after switching
+selection or after a committed edit/undo/redo. Only one room is selected at a time.
 
 The schema now covers every planned entity category, including namespaced
 metadata, object transforms, sounds, regions, and generation provenance. The

@@ -1,9 +1,10 @@
-import { useEffect, useReducer, useRef, useState } from 'react';
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { Circle, Layer, Line, Rect, Stage } from 'react-konva';
 import type { GeometryResult } from '../../../packages/schema/geometry';
-import type { Point, Polygon } from '../../../packages/schema/project';
+import type { Point, Polygon, Room } from '../../../packages/schema/project';
 import { EditorPanels } from './EditorPanels';
 import { initialTools, toolsReducer } from './editorTools';
+import { containsPoint, dragPolygon, type RoomDrag } from './roomEditing';
 import {
   emptyHistory,
   fitView,
@@ -29,6 +30,17 @@ export function Editor({ status }: { status: string }) {
   const [grid, setGrid] = useState(true);
   const [snap, setSnap] = useState(true);
   const [history, dispatch] = useReducer(historyReducer, emptyHistory);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const selected =
+    tool === 'edit'
+      ? (history.present.find((room) => room.id === selectedId) ?? null)
+      : null;
+  const editDrag = useRef<RoomDrag | null>(null);
+  const [editPreview, setEditPreview] = useState<Point[] | null>(null);
+  const cancelEdit = useCallback(() => {
+    editDrag.current = null;
+    setEditPreview(null);
+  }, []);
   const [start, setStart] = useState<Point | null>(null);
   const [end, setEnd] = useState<Point | null>(null);
   const [vertices, setVertices] = useState<Point[]>([]);
@@ -57,6 +69,7 @@ export function Editor({ status }: { status: string }) {
         setTemporaryPan(true);
       }
       if (e.key === 'Escape') {
+        cancelEdit();
         setVertices([]);
         setStart(null);
         setEnd(null);
@@ -71,6 +84,7 @@ export function Editor({ status }: { status: string }) {
       }
     }
     function blur() {
+      cancelEdit();
       space.current = false;
       setTemporaryPan(false);
       pan.current = null;
@@ -85,7 +99,7 @@ export function Editor({ status }: { status: string }) {
       window.removeEventListener('keyup', up);
       window.removeEventListener('blur', blur);
     };
-  }, []);
+  }, [cancelEdit]);
   useEffect(() => {
     // A scope/tool transition cancels a draft without changing document history.
     void tool;
@@ -93,8 +107,10 @@ export function Editor({ status }: { status: string }) {
     setStart(null);
     setEnd(null);
     setVertices([]);
+    cancelEdit();
+    if (tool !== 'edit') setSelectedId(null);
     pan.current = null;
-  }, [tool, scope]);
+  }, [tool, scope, cancelEdit]);
   useEffect(() => {
     const node = container.current;
     if (!node) return;
@@ -115,7 +131,8 @@ export function Editor({ status }: { status: string }) {
   useEffect(() => {
     function wheel(event: WheelEvent) {
       event.preventDefault();
-      if (start || pan.current || event.deltaY === 0) return;
+      if (start || pan.current || editDrag.current || event.deltaY === 0)
+        return;
       const bounds = container.current?.getBoundingClientRect();
       if (!bounds) return;
       const point = {
@@ -141,8 +158,19 @@ export function Editor({ status }: { status: string }) {
       return [q.x, q.y];
     });
   }
-  async function accept(proposal: Point[]) {
+  async function accept(
+    proposal: Point[],
+    before?: Room,
+    details?: { label: string; prompt: string },
+  ) {
     if (pending.current || proposal.length < 3) return;
+    if (
+      before &&
+      JSON.stringify(proposal) === JSON.stringify(before.polygon) &&
+      (!details ||
+        (details.label === before.label && details.prompt === before.prompt))
+    )
+      return;
     const polygon: Polygon = [
       proposal[0],
       proposal[1],
@@ -175,25 +203,34 @@ export function Editor({ status }: { status: string }) {
       }
       if (result.valid !== true)
         throw new Error(result.error || 'Room geometry was rejected.');
-      dispatch({
-        type: 'add',
-        room: {
-          id: crypto.randomUUID(),
-          kind: 'room',
-          revision: 0,
-          label: `Room ${history.present.length + 1}`,
-          polygon,
-          prompt: '',
-          metadata: {},
-          styleOverrides: {},
-          renderLayerId: null,
-        },
-      });
-      setNotice(`Room ${history.present.length + 1} added.`);
-      setVertices([]);
+      if (before) {
+        dispatch({
+          type: 'update',
+          before,
+          room: { ...before, ...details, polygon },
+        });
+        setNotice('Room updated.');
+      } else {
+        dispatch({
+          type: 'add',
+          room: {
+            id: crypto.randomUUID(),
+            kind: 'room',
+            revision: 0,
+            label: `Room ${history.present.length + 1}`,
+            polygon,
+            prompt: '',
+            metadata: {},
+            styleOverrides: {},
+            renderLayerId: null,
+          },
+        });
+        setNotice(`Room ${history.present.length + 1} added.`);
+        setVertices([]);
+      }
     } catch (failure) {
       setError(
-        `${failure instanceof Error ? failure.message : 'Could not validate room.'} No room was added.`,
+        `${failure instanceof Error ? failure.message : 'Could not validate room.'} ${before ? 'The room was not changed. Adjust the edit and try again.' : 'No room was added.'}`,
       );
     } finally {
       pending.current = false;
@@ -201,6 +238,39 @@ export function Editor({ status }: { status: string }) {
     }
   }
   const gridLines = [];
+  function beginEdit(point: Point) {
+    const native = screenToWorld(point, view);
+    const vertex =
+      selected?.polygon.findIndex((p) => {
+        const screen = worldToScreen(p, view);
+        return Math.hypot(screen.x - point.x, screen.y - point.y) <= 8;
+      }) ?? -1;
+    const room =
+      vertex >= 0
+        ? selected
+        : [...history.present]
+            .reverse()
+            .find((r) => containsPoint(r.polygon, native));
+    setSelectedId(room?.id ?? null);
+    if (room)
+      editDrag.current = {
+        room,
+        origin: native,
+        vertex: vertex >= 0 ? vertex : null,
+      };
+  }
+  function selectRoom(id: string) {
+    if (busy) return;
+    changeTools({ type: 'selectRoom' });
+    cancelEdit();
+    setSelectedId(id);
+  }
+  function deleteRoom() {
+    if (!selected || pending.current) return;
+    cancelEdit();
+    dispatch({ type: 'delete', id: selected.id });
+    setNotice('Room deleted. Undo restores it.');
+  }
   function finishPolygon() {
     if (vertices.length >= 3) void accept(vertices);
   }
@@ -227,7 +297,13 @@ export function Editor({ status }: { status: string }) {
     setVertices([...vertices, value]);
   }
   const snapWorld =
-    pointer && snap && tool !== 'pan' && !temporaryPan && !pan.current && !busy
+    pointer &&
+    snap &&
+    tool !== 'pan' &&
+    tool !== 'edit' &&
+    !temporaryPan &&
+    !pan.current &&
+    !busy
       ? world(pointer)
       : null;
   const snapPoint =
@@ -265,6 +341,7 @@ export function Editor({ status }: { status: string }) {
             if (tool === 'pan' || space.current)
               pan.current = { point: pointer, view };
             else if (tool === 'polygon') addVertex(pointer);
+            else if (tool === 'edit') beginEdit(pointer);
             else {
               setStart(world(pointer));
               setEnd(world(pointer));
@@ -280,16 +357,36 @@ export function Editor({ status }: { status: string }) {
                 x: pan.current.view.x + pointer.x - pan.current.point.x,
                 y: pan.current.view.y + pointer.y - pan.current.point.y,
               });
+            else if (editDrag.current)
+              setEditPreview(
+                dragPolygon(
+                  editDrag.current,
+                  screenToWorld(pointer, view),
+                  snap,
+                ),
+              );
             else if (start) setEnd(world(pointer));
           }}
           onMouseUp={(e) => {
             pan.current = null;
             const pointer = e.target.getStage()?.getPointerPosition();
+            if (editDrag.current && pointer) {
+              const drag = editDrag.current;
+              const native = screenToWorld(pointer, view);
+              if (
+                Math.hypot(native.x - drag.origin.x, native.y - drag.origin.y) *
+                  view.scale >
+                2
+              )
+                void accept(dragPolygon(drag, native, snap), drag.room);
+            }
+            cancelEdit();
             if (start && pointer) void accept(rectangle(start, world(pointer)));
             setStart(null);
             setEnd(null);
           }}
           onMouseLeave={() => {
+            cancelEdit();
             setPointer(null);
             pan.current = null;
             setStart(null);
@@ -331,6 +428,32 @@ export function Editor({ status }: { status: string }) {
                 stroke="#875c18"
                 dash={[6, 4]}
               />
+            )}
+            {selected && (
+              <>
+                <Line
+                  points={points(editPreview ?? selected.polygon)}
+                  closed
+                  stroke="#efc766"
+                  strokeWidth={3}
+                  dash={[6, 3]}
+                />
+                {(editPreview ?? selected.polygon).map((p, i) => {
+                  const screen = worldToScreen(p, view);
+                  return (
+                    <Circle
+                      // biome-ignore lint/suspicious/noArrayIndexKey: Stateless handles track vertex slots during dragging.
+                      key={`handle-${i}`}
+                      x={screen.x}
+                      y={screen.y}
+                      radius={5}
+                      fill="#fff0be"
+                      stroke="#875c18"
+                      strokeWidth={1.5}
+                    />
+                  );
+                })}
+              </>
             )}
             {vertices.length > 0 && (
               <>
@@ -383,8 +506,14 @@ export function Editor({ status }: { status: string }) {
         snap={snap}
         setSnap={setSnap}
         fit={() => setView(fitView(size.width, size.height))}
-        undo={() => dispatch({ type: 'undo' })}
-        redo={() => dispatch({ type: 'redo' })}
+        undo={() => {
+          cancelEdit();
+          dispatch({ type: 'undo' });
+        }}
+        redo={() => {
+          cancelEdit();
+          dispatch({ type: 'redo' });
+        }}
         canUndo={!!history.past.length}
         canRedo={!!history.future.length}
         busy={busy}
@@ -393,6 +522,12 @@ export function Editor({ status }: { status: string }) {
         removeVertex={() => setVertices(vertices.slice(0, -1))}
         cancelPolygon={() => setVertices([])}
         rooms={history.present}
+        selected={selected}
+        selectRoom={selectRoom}
+        applyRoom={(points, label, prompt) => {
+          if (selected) void accept(points, selected, { label, prompt });
+        }}
+        deleteRoom={deleteRoom}
         zoom={Math.round(view.scale * 100)}
         error={error}
         clearError={() => setError('')}

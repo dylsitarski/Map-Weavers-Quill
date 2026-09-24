@@ -1,0 +1,110 @@
+import { useState } from 'react';
+import type { Point, Room } from '../../../packages/schema/project';
+
+export function RoomInspector({
+  room,
+  busy,
+  apply,
+  remove,
+}: {
+  room: Room;
+  busy: boolean;
+  apply: (points: Point[], label: string, prompt: string) => void;
+  remove: () => void;
+}) {
+  const [label, setLabel] = useState(room.label);
+  const [prompt, setPrompt] = useState(room.prompt);
+  const [points, setPoints] = useState<Point[]>(room.polygon);
+  return (
+    <form
+      aria-label="Room inspector"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (points.every((p) => Number.isFinite(p.x) && Number.isFinite(p.y)))
+          apply(points, label, prompt);
+      }}
+    >
+      <h2>Selected room</h2>
+      <fieldset disabled={busy}>
+        <label>
+          Name
+          <input value={label} onChange={(e) => setLabel(e.target.value)} />
+        </label>
+        <label>
+          Room prompt
+          <textarea
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+          />
+        </label>
+        <p>Prompt stored for future generation. Coordinates: +y up.</p>
+        {points.map((point, index) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: Fully controlled inputs represent ordered vertex slots, with no row-local state.
+          <div className="vertex-fields" key={`vertex-${index}`}>
+            <span>Vertex {index + 1}</span>
+            {(['x', 'y'] as const).map((axis) => (
+              <label key={axis}>
+                {axis}
+                <input
+                  type="number"
+                  step="any"
+                  required
+                  min={0}
+                  max={axis === 'x' ? 1200 : 800}
+                  aria-label={`Vertex ${index + 1} ${axis}`}
+                  value={Number.isFinite(point[axis]) ? point[axis] : ''}
+                  onChange={(e) =>
+                    setPoints(
+                      points.map((p, i) =>
+                        i === index
+                          ? { ...p, [axis]: e.target.valueAsNumber }
+                          : p,
+                      ),
+                    )
+                  }
+                />
+              </label>
+            ))}
+            <button
+              type="button"
+              disabled={points.length <= 3}
+              aria-label={`Remove vertex ${index + 1}`}
+              onClick={() => setPoints(points.filter((_, i) => i !== index))}
+            >
+              Remove
+            </button>
+            <button
+              type="button"
+              disabled={points.length >= 2048}
+              aria-label={`Insert after vertex ${index + 1}`}
+              onClick={() => {
+                const next = points[(index + 1) % points.length];
+                setPoints([
+                  ...points.slice(0, index + 1),
+                  { x: (point.x + next.x) / 2, y: (point.y + next.y) / 2 },
+                  ...points.slice(index + 1),
+                ]);
+              }}
+            >
+              Insert after
+            </button>
+          </div>
+        ))}
+        <button type="submit">Apply room changes</button>
+        <button
+          type="button"
+          onClick={() => {
+            setLabel(room.label);
+            setPrompt(room.prompt);
+            setPoints(room.polygon);
+          }}
+        >
+          Reset changes
+        </button>
+        <button type="button" onClick={remove}>
+          Delete room
+        </button>
+      </fieldset>
+    </form>
+  );
+}

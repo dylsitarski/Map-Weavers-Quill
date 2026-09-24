@@ -13,8 +13,8 @@ or dismissing panels must never resize or shift the canvas. No document scrollin
 | Top-left | Compact identity | MQ mark and accessible project title | Project name |
 | Top bar | Global actions | File/View/Settings/Help disclosures, always-visible Snap, Pan, Undo/Redo | New/Open/Save, save state, export |
 | Left rail | Editing scope (what) | Map and Room | Region, Object, Light, Sound |
-| Beside rail | Scope tools (how) | Rectangle and polygon tools | Selection, move, vertices, walls/doors |
-| Upper-right | Collapsible persistent information | Map facts, room list, connection status | Selection inspector, layers, provider/job panels |
+| Beside rail | Scope tools (how) | Rectangle, polygon, select/edit | Walls/doors |
+| Upper-right | Collapsible persistent information | Map facts, selectable room list, room inspector, connection status | Layers, provider/job panels |
 | Bottom-left | Temporary feedback | Validation progress, dismissible errors, fading success | Job notifications and contextual guidance |
 | Bottom-right | View status | Active tool and zoom | Cursor coordinates and grid scale |
 
@@ -62,8 +62,12 @@ or dismissing panels must never resize or shift the canvas. No document scrollin
 
 ## Future feature placement
 
-Milestone 1: Room flyout adds select/edit tools. Map click selection
-feeds the right inspector (name, prompt, geometry). Walls and doors initially live
+Milestone 1: Select/edit and the room list feed the right inspector (name, prompt,
+geometry). Dragging a room moves it; corner handles reshape it. Numeric edits,
+inserting/removing vertices and Delete room are available in the inspector.
+Apply validates before committing one history entry. Selection opens Information;
+clicking empty canvas deselects. Only one room is selected. Covered rooms remain
+selectable in the list. Walls and doors initially live
 under Room. File gains real New/Open/Save once atomic persistence is implemented.
 
 Milestone 2: Right panel gains layers and generation jobs. Progress, cancel,
@@ -110,5 +114,9 @@ Remove last point and Cancel. At least three distinct vertices are required;
 backend validation rejects crossings, zero area and out-of-bounds geometry without
 changing history. Rejected drafts remain editable. Pan/zoom preserve draft points;
 tool/scope changes or Escape cancel the draft. Remembered tools never restore drafts.
-No selection inspector, file persistence, layer management, or generation UI is
+Selection, moving, vertex editing, name/prompt inspection and deletion are implemented
+with undo/redo. Rejected geometry leaves the existing room unchanged. Leaving a drag,
+Escape or tool changes cancel its preview. Inspector drafts reset on selection or
+committed room changes; exact coordinate entry bypasses grid snapping.
+No file persistence, layer management, or generation UI is
 claimed by this layout. Those remain in their scheduled milestones.

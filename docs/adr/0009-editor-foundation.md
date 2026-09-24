@@ -20,10 +20,14 @@ React reducer state is sufficient for this slice; Zustand adoption is deferred
 until shared editor state is needed. Neither viewport nor screen points enter a
 Room entity. Persisted project validation still needs cross-entity checks.
 
-Selection/move/vertex editing, derived walls, doors and atomic
+Derived walls, doors and atomic
 project persistence remain subsequent Milestone 1 work.
 
 Polygon drawing now uses the same stateless validation endpoint and add-room
 transaction as rectangles. Draft vertices remain in native coordinates while
 panning/zooming. Closing with the first point does not duplicate that point in
 the stored polygon. Failed submissions preserve the draft for correction.
+
+Room selection, move, vertex editing, name/prompt inspection and deletion are now
+implemented; see ADR-0011 for transaction and interaction semantics. Saving remains
+unimplemented.

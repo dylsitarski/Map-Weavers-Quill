@@ -180,6 +180,35 @@ label {
 .session-note {
   color: #e6c57c;
 }
+.info-panel fieldset {
+  border: 0;
+  padding: 0;
+  min-width: 0;
+}
+.info-panel label {
+  display: grid;
+  gap: 4px;
+}
+.info-panel input,
+.info-panel textarea {
+  width: 100%;
+  min-width: 0;
+  font: inherit;
+  color: inherit;
+  background: #111e19;
+  border: 1px solid #607364;
+  border-radius: 4px;
+  padding: 5px;
+}
+.info-panel textarea {
+  min-height: 70px;
+  resize: vertical;
+}
+.vertex-fields {
+  border-top: 1px solid #60736480;
+  margin-top: 8px;
+  padding-top: 8px;
+}
 .connection-status {
   color: #b5c6b8;
   font-size: 0.72rem;

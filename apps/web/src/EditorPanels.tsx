@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Room } from '../../../packages/schema/project';
+import type { Point, Room } from '../../../packages/schema/project';
 import type { Scope, Tool } from './editorTools';
+import { RoomInspector } from './RoomInspector';
 
 type Props = {
   status: string;
@@ -24,6 +25,10 @@ type Props = {
   removeVertex: () => void;
   cancelPolygon: () => void;
   rooms: Room[];
+  selected: Room | null;
+  selectRoom: (id: string) => void;
+  applyRoom: (points: Point[], label: string, prompt: string) => void;
+  deleteRoom: () => void;
   zoom: number;
   error: string;
   clearError: () => void;
@@ -33,6 +38,9 @@ type Props = {
 export function EditorPanels(p: Props) {
   const [panel, setPanel] = useState<string | null>(null);
   const [infoOpen, setInfoOpen] = useState(window.innerWidth >= 900);
+  useEffect(() => {
+    if (p.selected) setInfoOpen(true);
+  }, [p.selected]);
   const opener = useRef<HTMLButtonElement | null>(null);
   const scopeOpener = useRef<HTMLButtonElement | null>(null);
   const previousDismiss = useRef(p.dismissVersion);
@@ -191,6 +199,20 @@ export function EditorPanels(p: Props) {
               <button
                 type="button"
                 disabled={p.busy}
+                aria-pressed={p.tool === 'edit'}
+                onClick={() => p.setTool('edit')}
+              >
+                Select/edit room
+              </button>
+              {p.tool === 'edit' && (
+                <p>
+                  Click a room to select it. Drag inside to move; drag a corner
+                  to reshape. Use Information for exact edits.
+                </p>
+              )}
+              <button
+                type="button"
+                disabled={p.busy}
                 aria-pressed={p.tool === 'room'}
                 onClick={() => p.setTool('room')}
               >
@@ -259,12 +281,28 @@ export function EditorPanels(p: Props) {
           </p>
           <h2>Map</h2>
           <p>1200 × 800 · 50-unit grid</p>
+          {p.selected && (
+            <RoomInspector
+              key={JSON.stringify(p.selected)}
+              room={p.selected}
+              busy={p.busy}
+              apply={p.applyRoom}
+              remove={p.deleteRoom}
+            />
+          )}
           <h2>Rooms ({p.rooms.length})</h2>
           {p.rooms.length === 0 && <p>No rooms yet.</p>}
           <ul aria-label="Rooms">
             {p.rooms.map((room) => (
               <li key={room.id}>
-                <strong>{room.label}</strong>
+                <button
+                  type="button"
+                  disabled={p.busy}
+                  aria-pressed={p.selected?.id === room.id}
+                  onClick={() => p.selectRoom(room.id)}
+                >
+                  {room.label}
+                </button>
                 <br />
                 {room.polygon
                   .map(
@@ -300,7 +338,9 @@ export function EditorPanels(p: Props) {
           ? 'Rectangle room'
           : p.tool === 'polygon'
             ? 'Polygon room'
-            : 'Pan'}{' '}
+            : p.tool === 'edit'
+              ? 'Select/edit room'
+              : 'Pan'}{' '}
         · <span data-testid="zoom">{p.zoom}%</span>
       </div>
     </>

@@ -46,9 +46,39 @@ export function rectangle(a: Point, b: Point): [Point, Point, Point, Point] {
   ];
 }
 export type History = { past: Room[][]; present: Room[]; future: Room[][] };
-export type Command = { type: 'add'; room: Room } | { type: 'undo' | 'redo' };
+export type Command =
+  | { type: 'add'; room: Room }
+  | { type: 'update'; before: Room; room: Room }
+  | { type: 'delete'; id: string }
+  | { type: 'undo' | 'redo' };
 export const emptyHistory: History = { past: [], present: [], future: [] };
 export function historyReducer(state: History, command: Command): History {
+  if (command.type === 'update') {
+    if (
+      !state.present.includes(command.before) ||
+      command.room.id !== command.before.id
+    )
+      return state;
+    if (JSON.stringify(command.before) === JSON.stringify(command.room))
+      return state;
+    return {
+      past: [...state.past, state.present],
+      present: state.present.map((room) =>
+        room === command.before
+          ? { ...command.room, revision: room.revision + 1 }
+          : room,
+      ),
+      future: [],
+    };
+  }
+  if (command.type === 'delete') {
+    if (!state.present.some((room) => room.id === command.id)) return state;
+    return {
+      past: [...state.past, state.present],
+      present: state.present.filter((room) => room.id !== command.id),
+      future: [],
+    };
+  }
   if (command.type === 'add')
     return {
       past: [...state.past, state.present],

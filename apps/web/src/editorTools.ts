@@ -1,5 +1,5 @@
 export type Scope = 'Map' | 'Room';
-export type Tool = 'pan' | 'room' | 'polygon';
+export type Tool = 'pan' | 'room' | 'polygon' | 'edit';
 export type ToolState = {
   scope: Scope | null;
   tool: Tool;
@@ -11,11 +11,18 @@ export const initialTools: ToolState = {
   remembered: {},
 };
 export type ToolAction =
+  | { type: 'selectRoom' }
   | { type: 'scope'; scope: Scope }
   | { type: 'close' }
   | { type: 'tool'; tool: Tool };
 
 export function toolsReducer(state: ToolState, action: ToolAction): ToolState {
+  if (action.type === 'selectRoom')
+    return {
+      scope: 'Room',
+      tool: 'edit',
+      remembered: { ...state.remembered, Room: 'edit' },
+    };
   if (action.type === 'close') return { ...state, scope: null, tool: 'pan' };
   if (action.type === 'scope') {
     const scope = state.scope === action.scope ? null : action.scope;
