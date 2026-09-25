@@ -1,6 +1,6 @@
 # Milestone 2 acceptance review
 
-The core mock raster workflow is implemented. The final browser recovery checks are
+The Milestone 2 local mock raster workflow is implemented. Recovery and style checks are
 part of Ubuntu CI; real AI image quality and Windows 11 remain unverified.
 
 | Exit criterion | Evidence |
@@ -12,14 +12,14 @@ part of Ubuntu CI; real AI image quality and Windows 11 remain unverified.
 | Stale geometry cannot auto-apply | in-session stale-preview tests and recovery.spec.ts mismatch refusal |
 | Durable jobs and cancellation | test_jobs.py covers success, duplicate IDs, cancellation races, failure and restart recovery |
 | Recover an unaccepted preview after reload | recovery.spec.ts covers background and room retrieval without regeneration |
+| Room prompt and style inspector | test_room_images.py and room-images.spec.ts cover inheritance, prompt/provenance, undo, stale results and persistence |
 
 Limits: 480 × 320 mock rasters, one API worker per data directory, synchronous mock
 computation may finish after cancellation, no automatic unsaved-document restoration,
-no garbage collection/general job-history UI, and no real provider. Per-room prompts
-are editable. A dedicated style-override inspector is not yet implemented; styleOverrides
-remain preserved schema data. This outstanding planned task keeps the full milestone
-open even though the listed core raster exit criteria have test coverage.
+no garbage collection/general job-history UI, and no real provider. Room environment,
+render style and palette inherit map defaults until overridden (ADR-0021).
 
-Next implementation task: define and expose the minimal provider-neutral room style
-controls, with applied changes captured in generation inputs/provenance, before moving
-to the first real provider. Do not label the mock output as rendered fantasy artwork.
+Next implementation task: Milestone 3's first real-provider integration. Confirm the
+provider/model, local runtime and available hardware before choosing its deployment;
+then extend health/configuration and test one room through the existing safe workflow.
+Map-level style editing and provider-specific prompt tuning remain in that milestone.

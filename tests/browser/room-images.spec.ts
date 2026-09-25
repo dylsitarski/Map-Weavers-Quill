@@ -19,9 +19,9 @@ async function setup(page: Page) {
   await page
     .getByRole('textbox', { name: 'Room prompt', exact: true })
     .fill('Stone tiles');
-  await page.getByRole('button', { name: 'Apply prompt' }).click();
+  await page.getByRole('button', { name: 'Apply prompt and style' }).click();
   await expect(
-    page.getByRole('button', { name: 'Apply prompt' }),
+    page.getByRole('button', { name: 'Apply prompt and style' }),
   ).toBeDisabled();
 }
 async function generate(page: Page) {
@@ -255,4 +255,64 @@ test('artwork order survives undo/redo and native save/open without reordering r
     .click();
   await page.getByRole('tab', { name: 'Layers', exact: true }).click();
   await expect(rows.first()).toHaveAttribute('data-artwork-id', back ?? '');
+});
+
+test('room style edits undo, preserve art, invalidate previews and survive save/open', async ({
+  page,
+}) => {
+  await setup(page);
+  const palette = page.getByRole('textbox', { name: 'Palette', exact: true });
+  await palette.fill('icy blue');
+  await page
+    .getByRole('textbox', { name: 'Render style', exact: true })
+    .fill('ink drawing');
+  await page.getByRole('button', { name: 'Apply prompt and style' }).click();
+  await expect(
+    page.getByRole('button', { name: 'Apply prompt and style' }),
+  ).toBeDisabled();
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(palette).toHaveValue('');
+  await page.getByRole('button', { name: 'Redo', exact: true }).click();
+  await expect(palette).toHaveValue('icy blue');
+  await generate(page);
+  await page.getByRole('button', { name: 'Accept room artwork' }).click();
+  await generate(page);
+  await palette.fill('warm gold');
+  await page.getByRole('button', { name: 'Apply prompt and style' }).click();
+  await expect(page.getByRole('alert')).toContainText('project changed');
+  await expect(
+    page.getByRole('button', { name: 'Accept room artwork' }),
+  ).toBeDisabled();
+  await expect(page.getByTestId('map-canvas')).toHaveAttribute(
+    'data-room-art-count',
+    '1',
+  );
+  await page.getByRole('button', { name: 'File', exact: true }).click();
+  const name = `Style ${crypto.randomUUID()}`;
+  await page.getByRole('textbox', { name: 'Project name' }).fill(name);
+  await page.getByRole('button', { name: 'Save project', exact: true }).click();
+  await expect(page.getByTestId('save-status')).toHaveText(
+    'Saved · revision 1',
+  );
+  await page.reload();
+  await page.getByRole('button', { name: 'File', exact: true }).click();
+  await page
+    .getByRole('button', { name: `${name} · revision 1`, exact: true })
+    .click();
+  await page.getByRole('button', { name: 'Room', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Select/edit room', exact: true })
+    .click();
+  await page.mouse.click(550, 350);
+  await page.getByRole('tab', { name: 'AI', exact: true }).click();
+  await expect(palette).toHaveValue('warm gold');
+  await expect(
+    page.getByRole('textbox', { name: 'Render style', exact: true }),
+  ).toHaveValue('ink drawing');
+  await palette.fill('');
+  await page.getByRole('button', { name: 'Apply prompt and style' }).click();
+  await expect(palette).toHaveValue('');
+  await expect(
+    page.getByRole('button', { name: 'Apply prompt and style' }),
+  ).toBeDisabled();
 });

@@ -1,6 +1,7 @@
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import type {
   Door,
+  MapStyle,
   Point,
   RasterLayer,
   Room,
@@ -14,6 +15,7 @@ import { RoomInspector } from './RoomInspector';
 
 type Props = {
   status: string;
+  mapStyle: MapStyle;
   fileControls: ReactNode;
   backgroundControls: ReactNode;
   roomGenerationControls: ReactNode;
@@ -53,7 +55,12 @@ type Props = {
   wallsError: string;
   retryWalls: () => void;
   selectRoom: (id: string) => void;
-  applyRoom: (points: Point[], label: string, prompt: string) => void;
+  applyRoom: (
+    points: Point[],
+    label: string,
+    prompt: string,
+    styleOverrides?: Room['styleOverrides'],
+  ) => void;
   deleteRoom: () => void;
   zoom: number;
   error: string;
@@ -485,11 +492,17 @@ export function EditorPanels(p: Props) {
               <>
                 <PromptPanel
                   key={JSON.stringify(p.selected)}
+                  mapStyle={p.mapStyle}
                   room={p.selected}
                   busy={p.busy}
-                  save={(prompt) => {
+                  save={(prompt, styleOverrides) => {
                     if (p.selected)
-                      p.applyRoom(p.selected.polygon, p.selected.label, prompt);
+                      p.applyRoom(
+                        p.selected.polygon,
+                        p.selected.label,
+                        prompt,
+                        styleOverrides,
+                      );
                   }}
                 />
                 {p.roomGenerationControls}

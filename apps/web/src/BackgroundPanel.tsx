@@ -330,8 +330,12 @@ export function BackgroundPanel(p: {
       {proposal && (
         <>
           <p>
-            Preview: {proposal.result.generation.prompt} · seed{' '}
-            {String(proposal.result.generation.parameters.seed)}
+            Preview:{' '}
+            {String(
+              proposal.result.generation.parameters.roomPrompt ??
+                proposal.result.generation.prompt,
+            )}{' '}
+            · seed {String(proposal.result.generation.parameters.seed)}
           </p>
           {stale && (
             <p role="alert">

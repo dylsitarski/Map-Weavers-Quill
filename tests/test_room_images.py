@@ -119,3 +119,37 @@ class RoomImageTests(unittest.TestCase):
                 ).status_code,
                 403,
             )
+
+    def test_style_inheritance_prompt_provenance_and_limits(self):
+        target = self.project.rooms[0]
+        first = generate_room(RoomImageRequest(project=self.project, roomId=target.id, seed=0))
+        self.assertEqual(
+            first.generation.parameters["effectiveStyle"]["palette"], self.project.map.style.palette
+        )
+        target.styleOverrides = {"palette": "icy blue", "renderStyle": "ink drawing"}
+        changed = generate_room(RoomImageRequest(project=self.project, roomId=target.id, seed=0))
+        self.assertEqual(
+            changed.generation.parameters["effectiveStyle"],
+            {
+                "environment": self.project.map.style.environment,
+                "palette": "icy blue",
+                "renderStyle": "ink drawing",
+            },
+        )
+        self.assertEqual(changed.generation.parameters["styleOverrides"], target.styleOverrides)
+        self.assertEqual(changed.generation.parameters["roomPrompt"], target.prompt)
+        self.assertIn('"palette": "icy blue"', changed.generation.prompt)
+        self.assertIn("Baked lighting: neutral", changed.generation.prompt)
+        self.assertNotEqual(first.layer.assetHash, changed.layer.assetHash)
+        self.assertEqual(
+            changed.layer.assetHash,
+            generate_room(
+                RoomImageRequest(project=self.project, roomId=target.id, seed=0)
+            ).layer.assetHash,
+        )
+        target.styleOverrides = {"palette": "x" * 513}
+        with self.assertRaisesRegex(ValueError, "512"):
+            generate_room(RoomImageRequest(project=self.project, roomId=target.id, seed=0))
+        target.styleOverrides = {"unimplemented": "value"}
+        with self.assertRaisesRegex(ValueError, "Unsupported"):
+            generate_room(RoomImageRequest(project=self.project, roomId=target.id, seed=0))

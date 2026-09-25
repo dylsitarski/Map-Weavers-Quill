@@ -13,6 +13,7 @@ from quill.models import Bounds, Contract, GenerationRecord, Point, Project, Ras
 from quill.projects import project_store, validate_project
 from quill.providers import InpaintRequest, MockProvider
 from quill.raster import HEIGHT, WIDTH, image, masked_layer, png, polygon_mask
+from quill.styles import room_style_prompt
 
 
 class RoomImageRequest(Contract):
@@ -35,6 +36,7 @@ def generate_room(request: RoomImageRequest) -> BackgroundResult:
         raise ValueError("Select a room that still exists.")
     if len(room.prompt) > 4000:
         raise ValueError("Room generation prompts support at most 4000 characters.")
+    prompt, effective_style = room_style_prompt(room, project.map.style)
     mask = polygon_mask(room.polygon)
     box = mask.getbbox()
     if box is None:
@@ -49,7 +51,7 @@ def generate_room(request: RoomImageRequest) -> BackgroundResult:
         provider.inpaint(
             InpaintRequest(
                 requestId=str(uuid4()),
-                prompt=room.prompt,
+                prompt=prompt,
                 seed=request.seed,
                 width=crop[2] - crop[0],
                 height=crop[3] - crop[1],
@@ -86,10 +88,20 @@ def generate_room(request: RoomImageRequest) -> BackgroundResult:
             metadata={"quill.generation": {"target": "room", "roomId": str(room.id)}},
             providerId="mock",
             capability="inpainting",
-            prompt=room.prompt,
+            prompt=prompt,
             inputHashes=[source_hash, mask_hash],
             outputHash=output_hash,
-            parameters={"seed": request.seed, "crop": list(crop), "width": WIDTH, "height": HEIGHT},
+            parameters={
+                "seed": request.seed,
+                "crop": list(crop),
+                "width": WIDTH,
+                "height": HEIGHT,
+                "promptTemplate": "room-style-v1",
+                "roomPrompt": room.prompt,
+                "styleOverrides": dict(room.styleOverrides),
+                "effectiveStyle": {key: value for key, value in effective_style.items()},
+                "mapStyle": project.map.style.model_dump(mode="json"),
+            },
             status="succeeded",
             baseRevision=project.revision,
         ),

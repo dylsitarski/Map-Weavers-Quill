@@ -268,5 +268,9 @@ Changed/lost unsaved work blocks recovery. Accept/Reject or Discard clears the r
 record. Real-provider interruption and a general job-history browser remain future work.
 Use one API worker per data directory. See docs/adr/0019-durable-generation-jobs.md.
 
-The Milestone 2 acceptance review is in docs/MILESTONE_2_ACCEPTANCE.md. Core raster
-criteria have regression coverage; a dedicated room style inspector is still pending.
+The Milestone 2 acceptance review is in docs/MILESTONE_2_ACCEPTANCE.md. Milestone 2 is complete for the local mock profile, including room style controls.
+
+Room AI style fields (Environment, Render style, Palette) override map defaults when
+nonblank. Apply prompt and style is undoable, preserves existing art, and invalidates
+pending previews. Generate again to use the new style. The assembled provider prompt
+and resolved style are saved in generation provenance. Output remains a mock pattern.

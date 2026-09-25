@@ -192,3 +192,7 @@ green fill; wall outlines and selection/editing guides remain.
 After reload, reopen the saved map, choose its Map or room target, and use AI → Recover
 preview. A document mismatch blocks recovery with an explanation and Discard action.
 Nothing is auto-accepted. Browser storage failure is reported without blocking generation.
+
+Room AI includes Environment, Render style and Palette. Blank values inherit the map
+default shown as a placeholder. Apply prompt and style commits one undoable edit;
+existing artwork stays until the user generates and accepts a replacement.

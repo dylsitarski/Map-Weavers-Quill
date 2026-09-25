@@ -443,14 +443,21 @@ export function Editor({ status }: { status: string }) {
   async function accept(
     proposal: Point[],
     before?: Room,
-    details?: { label: string; prompt: string },
+    details?: {
+      label: string;
+      prompt: string;
+      styleOverrides?: Room['styleOverrides'];
+    },
   ) {
     if (pending.current || proposal.length < 3) return;
     if (
       before &&
       JSON.stringify(proposal) === JSON.stringify(before.polygon) &&
       (!details ||
-        (details.label === before.label && details.prompt === before.prompt))
+        (details.label === before.label &&
+          details.prompt === before.prompt &&
+          JSON.stringify(details.styleOverrides ?? before.styleOverrides) ===
+            JSON.stringify(before.styleOverrides)))
     )
       return;
     const polygon: Polygon = [
@@ -939,6 +946,7 @@ export function Editor({ status }: { status: string }) {
         ))}
       </div>
       <EditorPanels
+        mapStyle={currentProject.map.style}
         status={status}
         backgroundControls={
           <BackgroundPanel
@@ -1147,8 +1155,13 @@ export function Editor({ status }: { status: string }) {
         wallsError={wallState.error}
         retryWalls={wallState.retry}
         selectRoom={selectRoom}
-        applyRoom={(points, label, prompt) => {
-          if (selected) void accept(points, selected, { label, prompt });
+        applyRoom={(points, label, prompt, styleOverrides) => {
+          if (selected)
+            void accept(points, selected, {
+              label,
+              prompt,
+              ...(styleOverrides ? { styleOverrides } : {}),
+            });
         }}
         deleteRoom={() => void deleteRoom()}
         zoom={Math.round(view.scale * 100)}

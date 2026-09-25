@@ -62,9 +62,9 @@ test('move, reshape, inspect and delete are undoable room edits', async ({
   await page
     .getByRole('textbox', { name: 'Room prompt', exact: true })
     .fill('Stone floor');
-  await page.getByRole('button', { name: 'Apply prompt' }).click();
+  await page.getByRole('button', { name: 'Apply prompt and style' }).click();
   await expect(
-    page.getByRole('button', { name: 'Apply prompt' }),
+    page.getByRole('button', { name: 'Apply prompt and style' }),
   ).toBeDisabled();
   await page.getByRole('tab', { name: 'Information', exact: true }).click();
   await page.getByRole('button', { name: 'Delete room', exact: true }).click();
