@@ -1,6 +1,6 @@
 # ADR-0009: First deterministic editor slice
 
-Status: Accepted, Milestone 1 in progress.
+Status: Implemented; Milestone 1 acceptance is verified in ADR-0015.
 
 Use the planned React/Konva viewport. Named TypeScript transforms convert native
 bottom-left world points to viewport pixels and back. Zoom anchors to the pointer;
@@ -21,8 +21,8 @@ until shared editor state is needed. Neither viewport nor screen points enter a
 Room entity. Persisted project validation still needs cross-entity checks.
 
 Derived wall inspection is implemented in ADR-0013. Constrained doors and attachment
-reconciliation are implemented in ADR-0014. Atomic project persistence remains
-subsequent Milestone 1 work.
+reconciliation are implemented in ADR-0014. Atomic project persistence is
+implemented in ADR-0015.
 
 Polygon drawing now uses the same stateless validation endpoint and add-room
 transaction as rectangles. Draft vertices remain in native coordinates while
@@ -30,5 +30,4 @@ panning/zooming. Closing with the first point does not duplicate that point in
 the stored polygon. Failed submissions preserve the draft for correction.
 
 Room selection, move, vertex editing, name/prompt inspection and deletion are now
-implemented; see ADR-0011 for transaction and interaction semantics. Saving remains
-unimplemented.
+implemented; see ADR-0011 for transaction and interaction semantics. Saving is implemented in ADR-0015.

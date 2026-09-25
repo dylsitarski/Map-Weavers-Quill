@@ -1,6 +1,6 @@
 # ADR-0013: Deterministic derived walls and inspection
 
-Status: Implemented; Milestone 1 remains in progress.
+Status: Implemented; Milestone 1 acceptance is verified in ADR-0015.
 
 ## Contract and topology
 
@@ -53,7 +53,7 @@ scope/tool toggle semantics still apply.
 
 ADR-0014 now implements transactional door reconciliation. Scenes with doors use
 the validated wall/door snapshot instead of this asynchronous display cache.
-Persistence and editable wall overrides remain unimplemented. Standalone wall drawing,
+Persistence is implemented in ADR-0015; editable wall overrides remain unimplemented. Standalone wall drawing,
 pillar footprints and previewed room creation from wall circuits remain future work.
 
 Verification covers adjacent/partial shared boundaries, crossings, diagonal and

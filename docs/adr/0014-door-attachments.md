@@ -1,6 +1,6 @@
 # ADR-0014: Constrained doors and atomic geometry snapshots
 
-Status: Implemented; Milestone 1 persistence remains unfinished.
+Status: Implemented; Milestone 1 persistence is verified in ADR-0015.
 
 ## Contract
 
@@ -73,7 +73,6 @@ Inspect walls remains last, with visual selection only and no wall count/dropdow
 
 Tests cover translated/diagonal/shared attachments, compatible/incompatible splits,
 fit, overlap, deletion policy, malformed API input, 50 atomic undo/redo transactions,
-UI placement/editing, failure recovery and tab preservation. Remaining Milestone 1
-work: native New/Open/Save, atomic disk snapshots, and full-project relationship
-validation. Standalone walls, arbitrary edge remapping and wall override editing
+UI placement/editing, failure recovery and tab preservation. ADR-0015 now implements and verifies New/Open/Save, atomic snapshots and
+relationship validation for the current editor profile. Standalone walls, arbitrary edge remapping and wall override editing
 are not claimed by this increment.

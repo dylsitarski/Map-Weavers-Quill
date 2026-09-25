@@ -1,6 +1,6 @@
 # ADR-0015: Local project snapshots and File workflow
 
-Status: Implemented; hosted acceptance verification follows the code commit.
+Status: Implemented and verified. [Ubuntu CI](https://github.com/dylsitarski/Map-Weavers-Quill/actions/runs/36094044452) passed on code commit `200338f`; Milestone 1 is complete for the supported editor profile.
 
 ## Storage and API
 

@@ -8,7 +8,7 @@ Windows 11 follows. See [PROJECT_MANIFEST.md](PROJECT_MANIFEST.md).
 Milestone 0 is **complete**. The repository includes React and
 FastAPI shells, Python models with generated JSON Schema and TypeScript types,
 cross-runtime validation, coordinate transforms, and a deterministic offline
-image provider. Milestone 1 is **in progress**: the Konva viewport supports pan,
+image provider. Milestone 1 is **complete for the current editor scope**: the Konva viewport supports pan,
 pointer-anchored zoom, resize, grid visibility, snapping, rectangular room creation,
 polygon room creation, selection/move/vertex editing, a room inspector, deletion,
 undo/redo of room changes, derived wall inspection, and constrained door placement/editing. Geometry changes pass server-side polygon validation.
@@ -61,8 +61,8 @@ from hosted Ubuntu CI. Windows 11 and Foundry compatibility are not yet tested.
 Provider contracts now include version tags, capability vocabulary, reference
 images, negative prompts, neutral parameters, namespaced extensions and normalized
 errors. The mock rejects unsupported options and cancellation explicitly. All
-seven initial architecture decisions are recorded. Geometry topology and
-cross-entity relationship validation belong to Milestone 1, before persistence.
+seven initial architecture decisions are recorded. Geometry topology and cross-entity validation for the supported editor profile
+are implemented and run before persistence (ADR-0015).
 
 ## Milestone 1 first increment
 
@@ -97,7 +97,7 @@ add a room or change history. Dragging out of the drawing surface cancels a draf
 
 This is a mouse-based, in-memory session on a fixed 1200 by 800 map with a 50-unit
 grid. **Unsaved changes are lost on refresh.** Saved projects remain available in File → Open saved project.
-Persistence validates the currently editable profile before saving or opening. This increment does not complete Milestone 1.
+Persistence validates the currently editable profile before saving or opening. The Milestone 1 acceptance suite passes on Ubuntu.
 
 Choose Room → Inspect walls to select a derived segment on the canvas. Information shows its endpoints, length, blocking flags and
 contributing rooms; selection preserves your current right-panel tab. Shared
@@ -157,6 +157,16 @@ The current schema validates structural data, not polygon simplicity or door
 attachment geometry. These limitations are explicit; do not use it as a complete
 editor validation boundary yet.
 
+
+## Milestone 1 verification
+
+[Ubuntu CI passed](https://github.com/dylsitarski/Map-Weavers-Quill/actions/runs/36094044452) on code commit `200338f`: 40 Python tests,
+27 TypeScript tests, browser tests, generated-file drift checks, typing, linting,
+production build and dependency audits. Browser acceptance creates two connected
+rooms and a door, saves/reloads/reopens, and compares native geometry and canvas
+pixels. Tests also cover 50 scene commands through undo/redo, concurrent saves,
+rollback and forced process exit before commit. The current map/profile limits
+are listed below; Windows 11 and Foundry remain unverified.
 
 ## Local project files
 

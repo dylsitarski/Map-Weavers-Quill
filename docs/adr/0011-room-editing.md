@@ -1,6 +1,6 @@
 # ADR-0011: Validated room editing
 
-Status: Implemented, Milestone 1 in progress. Existing JSON/API contracts unchanged.
+Status: Implemented; Milestone 1 acceptance is verified in ADR-0015. This editing increment did not change JSON/API contracts.
 
 Select/edit is an exclusive Room tool. Native polygon hit tests include boundaries;
 the topmost room in drawing order wins overlap hits. Layers provides access to covered
@@ -31,8 +31,8 @@ future generation must also use the planned project-level revision/stale checks.
 Derived walls now recompute from current room geometry, including deletion and
 undo/redo (ADR-0013). ADR-0014 validates door attachments before room edits/deletion and commits rooms,
 walls and doors together. Orphaning doors is rejected; this is not a general
-dependency resolver for future entity types or wall overrides. Persistence and
-full-project cross-entity validation remain future Milestone 1 work.
+dependency resolver for future entity types or wall overrides. ADR-0015 now implements persistence and cross-entity validation for the supported
+editor profile; future entity types remain rejected until their validators exist.
 
 Verification covers concave hit tests, shape-preserving snapped movement, independent
 vertex edits, 50 edit transactions plus deletion through undo/redo, stale rejection,
