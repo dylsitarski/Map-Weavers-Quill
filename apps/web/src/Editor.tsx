@@ -5,6 +5,7 @@ import type {
   Door,
   Point,
   Polygon,
+  Project,
   Room,
 } from '../../../packages/schema/project';
 import {
@@ -16,6 +17,13 @@ import {
 } from './doorEditing';
 import { EditorPanels } from './EditorPanels';
 import { initialTools, toolsReducer } from './editorTools';
+import { ProjectMenu } from './ProjectMenu';
+import {
+  newProject,
+  openProject,
+  projectFingerprint,
+  saveProject,
+} from './projectFiles';
 import {
   containsPoint,
   dragPolygon,
@@ -48,6 +56,10 @@ export function Editor({ status }: { status: string }) {
   const { tool, scope } = tools;
   const [pointer, setPointer] = useState<Point | null>(null);
   const [temporaryPan, setTemporaryPan] = useState(false);
+  const [project, setProject] = useState(newProject);
+  const [savedFingerprint, setSavedFingerprint] = useState(() =>
+    projectFingerprint(project),
+  );
   const [grid, setGrid] = useState(true);
   const [snap, setSnap] = useState(true);
   const [sceneHistory, dispatchScene] = useReducer(
@@ -95,6 +107,90 @@ export function Editor({ status }: { status: string }) {
   const [notice, setNotice] = useState('');
   const [dismissVersion, setDismissVersion] = useState(0);
   const space = useRef(false);
+  const currentProject: Project = {
+    ...project,
+    rooms: scene.rooms,
+    doors: scene.doors,
+    walls: scene.doors.length ? scene.walls : [],
+    map: { ...project.map, grid: { ...project.map.grid, visible: grid, snap } },
+  };
+  const fingerprint = projectFingerprint(currentProject);
+  const dirty = fingerprint !== savedFingerprint;
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [dirty]);
+  function replaceProject(next: Project) {
+    cancelEdit();
+    setVertices([]);
+    setStart(null);
+    setEnd(null);
+    pan.current = null;
+    setDoorId(null);
+    setWallId(null);
+    setSelectedId(null);
+    changeTools({ type: 'close' });
+    dispatchScene({
+      type: 'load',
+      scene: { rooms: next.rooms, walls: next.walls, doors: next.doors },
+    });
+    setProject(next);
+    setGrid(next.map.grid.visible);
+    setSnap(next.map.grid.snap);
+    setSavedFingerprint(projectFingerprint(next));
+    setView(fitView(size.width, size.height));
+    setError('');
+  }
+  function createProject() {
+    if (
+      pending.current ||
+      (dirty &&
+        !window.confirm('Discard unsaved changes and create a new project?'))
+    )
+      return;
+    replaceProject(newProject());
+    setNotice('New project. Save when ready.');
+  }
+  async function fileAction(id?: string) {
+    if (pending.current) return;
+    if (
+      id &&
+      dirty &&
+      !window.confirm('Discard unsaved changes and open this project?')
+    )
+      return;
+    pending.current = true;
+    setBusy(true);
+    setError('');
+    cancelEdit();
+    try {
+      if (id) {
+        const loaded = await openProject(id);
+        if (loaded.projectId !== id)
+          throw new Error('The server returned a different project.');
+        replaceProject(loaded);
+        setNotice('Project opened.');
+      } else {
+        const saved = await saveProject(currentProject);
+        setProject(saved);
+        setSavedFingerprint(projectFingerprint(saved));
+        setNotice('Project saved on this computer.');
+      }
+    } catch (failure) {
+      setError(
+        `${failure instanceof Error ? failure.message : 'Project operation failed.'} Current work is still in the editor.`,
+      );
+    } finally {
+      pending.current = false;
+      setBusy(false);
+    }
+  }
+
   useEffect(() => {
     if (!notice) return;
     const timer = setTimeout(() => setNotice(''), 3500);
@@ -739,6 +835,18 @@ export function Editor({ status }: { status: string }) {
       </div>
       <EditorPanels
         status={status}
+        fileControls={
+          <ProjectMenu
+            name={project.name}
+            revision={project.revision}
+            dirty={dirty}
+            busy={busy}
+            rename={(name) => setProject((current) => ({ ...current, name }))}
+            save={() => void fileAction()}
+            create={createProject}
+            open={(id) => void fileAction(id)}
+          />
+        }
         tool={tool}
         setTool={(tool) => changeTools({ type: 'tool', tool })}
         scope={scope}

@@ -11,7 +11,7 @@ or dismissing panels must never resize or shift the canvas. No document scrollin
 | Position | Purpose | Implemented now | Planned additions |
 |---|---|---|---|
 | Top-left | Compact identity | MQ mark and accessible project title | Project name |
-| Top bar | Global actions | File/View/Settings/Help disclosures, always-visible Snap, Pan, Undo/Redo | New/Open/Save, save state, export |
+| Top bar | Global actions | File/View/Settings/Help disclosures, always-visible Snap, Pan, Undo/Redo, New/Open/Save, save state | Export |
 | Left rail | Editing scope (what) | Map and Room | Region, Object, Light, Sound |
 | Beside rail | Scope tools (how) | Rectangle, polygon, select/edit, doors, inspect walls | Standalone walls |
 | Upper-right | Collapsible tabbed panel | Information selection inspector, Layers ordering, AI room prompt | Raster/object layers, provider/job controls |
@@ -65,8 +65,8 @@ or dismissing panels must never resize or shift the canvas. No document scrollin
 - Temporary confirmations fade. Errors requiring attention stay until dismissed
   or another attempt begins. Feedback overlays never move the map.
 - Panel/view/selection changes do not enter document undo history.
-- Session-only storage is stated explicitly until saving exists. Never show a
-  false Saved indicator. Unavailable features are described in docs; limited
+- File shows Not saved, Unsaved changes or Saved with its revision. Only a validated
+  successful save can show Saved; failures and stale-revision conflicts retain work. Unavailable features are described in docs; limited
   disabled scope entries may indicate expansion without pretending to work.
 
 ## Future feature placement
@@ -77,7 +77,7 @@ inserting/removing vertices and Delete room are available in the inspector.
 Apply validates before committing one history entry. Selection preserves the active tab;
 clicking empty canvas deselects. Only one room is selected. Covered rooms remain
 selectable in Layers. Room prompts live in AI. Walls and doors initially live
-under Room. File gains real New/Open/Save once atomic persistence is implemented.
+under Room. File provides New/Open/Save with local atomic snapshots (ADR-0015).
 
 Milestone 2: Right panel gains layers and generation jobs. Progress, cancel,
 preview, accept/reject and stale-result feedback must be visible. Applying a result
@@ -128,8 +128,9 @@ with undo/redo. Rejected geometry leaves the existing room unchanged. Leaving a 
 Escape or tool changes cancel its preview. Inspector drafts reset on selection or
 committed room changes; exact coordinate entry bypasses grid snapping.
 Room-shape ordering and the AI prompt editor are implemented. Raster/object layer
-management, file persistence and generation execution are not
-claimed by this layout. Those remain in their scheduled milestones.
+management and generation execution are not claimed by this layout. Those remain in their scheduled milestones. File persistence now covers the current
+rooms/walls/doors profile. Apply inspector drafts before saving. New/Open confirms
+discarding unsaved committed edits and resets undo history; saving preserves it.
 
 Derived wall inspection is implemented under Room → Inspect walls. Canvas hits use
 an 8-screen-pixel tolerance. Inspect walls is the last scope-menu button; no wall

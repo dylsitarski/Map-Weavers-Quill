@@ -1,9 +1,16 @@
-"""Loopback development API. No mutable or externally backed endpoints yet."""
+"""Loopback editor API and local project snapshots."""
 
-from fastapi import FastAPI, HTTPException
+import sqlite3
+from uuid import UUID
+
+from fastapi import FastAPI, HTTPException, Request
+from pydantic import ValidationError
+from starlette.concurrency import run_in_threadpool
 
 from quill.doors import DoorRequest, DoorResult, reconcile_doors
 from quill.geometry import GeometryRequest, GeometryResult, validate_geometry
+from quill.models import Project
+from quill.projects import ProjectList, SaveConflict, SaveRequest, project_store
 from quill.providers import MockProvider, ProviderDescriptor
 from quill.walls import WallDerivationRequest, WallDerivationResult, derive_walls
 
@@ -41,3 +48,58 @@ def doors(request: DoorRequest) -> DoorResult:
         return reconcile_doors(request)
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@app.get("/api/projects", response_model=ProjectList)
+def list_projects() -> ProjectList:
+    try:
+        return project_store().list()
+    except (OSError, sqlite3.Error) as error:
+        raise HTTPException(503, "Could not read the local project store.") from error
+
+
+@app.get("/api/projects/{project_id}", response_model=Project)
+def open_project(project_id: UUID) -> Project:
+    try:
+        return project_store().open(project_id)
+    except KeyError as error:
+        raise HTTPException(404, "Saved project not found.") from error
+    except ValueError as error:
+        raise HTTPException(
+            422, "Saved project is invalid or unsupported. It was not opened."
+        ) from error
+    except (OSError, sqlite3.Error) as error:
+        raise HTTPException(503, "Could not read the local project store.") from error
+
+
+@app.post("/api/projects/save", response_model=Project)
+async def save_project(request: Request) -> Project:
+    # JSON-only local writes block simple cross-site form submissions. No CORS.
+    if request.headers.get("content-type", "").split(";")[0].strip() != "application/json":
+        raise HTTPException(415, "Use application/json.")
+    origin = request.headers.get("origin")
+    if origin and origin not in {
+        "http://127.0.0.1:5173",
+        "http://localhost:5173",
+        "http://127.0.0.1:8000",
+        "http://localhost:8000",
+    }:
+        raise HTTPException(403, "Only the local editor may save projects.")
+    body = bytearray()
+    async for chunk in request.stream():
+        body.extend(chunk)
+        if len(body) > 4 * 1024 * 1024:
+            raise HTTPException(413, "Project exceeds the 4 MiB save limit.")
+    try:
+        data = SaveRequest.model_validate_json(bytes(body))
+        return await run_in_threadpool(project_store().save, data)
+    except SaveConflict as error:
+        raise HTTPException(409, str(error)) from error
+    except ValidationError as error:
+        raise HTTPException(422, "Invalid project format or unsupported schema version.") from error
+    except ValueError as error:
+        raise HTTPException(422, str(error)) from error
+    except (OSError, sqlite3.Error) as error:
+        raise HTTPException(
+            503, "Save failed. The previous saved snapshot remains available; retry saving."
+        ) from error

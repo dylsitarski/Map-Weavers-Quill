@@ -109,4 +109,4 @@ class ApiTests(unittest.TestCase):
             response = client.get("/api/providers")
             self.assertEqual(response.status_code, 200)
             self.assertTrue(response.json()[0]["local"])
-            self.assertEqual(client.post("/api/projects").status_code, 404)
+            self.assertEqual(client.post("/api/projects").status_code, 405)

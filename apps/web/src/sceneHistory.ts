@@ -9,11 +9,14 @@ export const emptySceneHistory: SceneHistory = {
 };
 export type SceneAction =
   | { type: 'commit'; before: Scene; scene: Scene }
+  | { type: 'load'; scene: Scene }
   | { type: 'undo' | 'redo' };
 export function sceneReducer(
   state: SceneHistory,
   action: SceneAction,
 ): SceneHistory {
+  if (action.type === 'load')
+    return { past: [], present: action.scene, future: [] };
   if (action.type === 'commit') {
     if (
       action.before !== state.present ||

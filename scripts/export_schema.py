@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from quill.doors import DoorRequest, DoorResult
 from quill.geometry import GeometryRequest, GeometryResult
 from quill.models import Project
+from quill.projects import ProjectList, SaveRequest
 from quill.providers import (
     GenerateRequest,
     GenerationResult,
@@ -24,6 +25,12 @@ class ProviderContracts(BaseModel):
     inpaint: InpaintRequest
     result: GenerationResult
     error: ProviderError
+
+
+class PersistenceContracts(BaseModel):
+    save: SaveRequest
+    result: Project
+    listing: ProjectList
 
 
 class GeometryContracts(BaseModel):
@@ -47,6 +54,7 @@ def main() -> None:
         ("project", Project),
         ("provider", ProviderContracts),
         ("geometry", GeometryContracts),
+        ("persistence", PersistenceContracts),
     ]:
         target = ROOT / f"packages/schema/{name}.schema.json"
         schema = model.model_json_schema()

@@ -214,10 +214,12 @@ textarea {
   padding: 0;
   min-width: 0;
 }
+.project-file label,
 .info-panel label {
   display: grid;
   gap: 4px;
 }
+.project-file input,
 .info-panel input,
 .info-panel textarea {
   width: 100%;
@@ -335,4 +337,14 @@ li {
   .feedback {
     bottom: 48px;
   }
+}
+
+.project-list {
+  list-style: none;
+  padding: 0;
+}
+.project-list button {
+  width: 100%;
+  text-align: left;
+  overflow-wrap: anywhere;
 }

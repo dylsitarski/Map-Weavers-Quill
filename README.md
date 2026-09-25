@@ -12,7 +12,8 @@ image provider. Milestone 1 is **in progress**: the Konva viewport supports pan,
 pointer-anchored zoom, resize, grid visibility, snapping, rectangular room creation,
 polygon room creation, selection/move/vertex editing, a room inspector, deletion,
 undo/redo of room changes, derived wall inspection, and constrained door placement/editing. Geometry changes pass server-side polygon validation.
-There is no project persistence or Foundry importer yet.
+File → New/Save/Open now stores validated native project snapshots locally.
+There is no Foundry importer yet.
 
 ### Setup (Linux, Python 3.12 and Node 24)
 
@@ -28,7 +29,7 @@ make check
 `make dev` starts the web shell at http://127.0.0.1:5173 and API at
 http://127.0.0.1:8000. Ctrl-C stops both. This launcher currently targets Linux.
 The API exposes `/health`, `/api/health`, `/api/providers`, and
-`POST /api/geometry/validate`, and `POST /api/geometry/walls`, and `POST /api/geometry/doors`. Visit `/docs` for API documentation; `/` returns 404.
+`POST /api/geometry/validate`, and `POST /api/geometry/walls`, and `POST /api/geometry/doors`. Project endpoints are `GET /api/projects`, `GET /api/projects/{id}`, and `POST /api/projects/save`. Visit `/docs` for API documentation; `/` returns 404.
 
 `make schema` regenerates all schemas and TypeScript declarations. `make test`
 runs Python/TypeScript tests and checks generated files for drift. `make check`
@@ -85,8 +86,7 @@ Regions are semantic/gameplay areas, not generated visual assets. Visual feature
 belong to objects. Planned layer controls will allow room, object and effect artwork
 to be reordered above the base background, with undo and consistent save/export.
 Regeneration will preserve other layers and the target's stacking position.
-Room-shape ordering works now; generated raster/object composition, saving and
-export remain unimplemented. See docs/adr/0012-snapping-and-sidebar.md.
+Room-shape ordering works now; generated raster/object composition and export remain unimplemented. See docs/adr/0012-snapping-and-sidebar.md.
 
 Run `make dev`, open the web interface, choose Room → Rectangle room, and drag inside the map.
 Choose Pan to drag the view, scroll over the canvas to zoom, or use Fit map to
@@ -96,8 +96,8 @@ Undo/Redo applies to room additions, edits and deletion. Invalid geometry and AP
 add a room or change history. Dragging out of the drawing surface cancels a draft.
 
 This is a mouse-based, in-memory session on a fixed 1200 by 800 map with a 50-unit
-grid. **Refreshing discards rooms.** Saving is not implemented. Next work:
-atomic project persistence and complete project relationship validation. This increment does not complete Milestone 1.
+grid. **Unsaved changes are lost on refresh.** Saved projects remain available in File → Open saved project.
+Persistence validates the currently editable profile before saving or opening. This increment does not complete Milestone 1.
 
 Choose Room → Inspect walls to select a derived segment on the canvas. Information shows its endpoints, length, blocking flags and
 contributing rooms; selection preserves your current right-panel tab. Shared
@@ -123,7 +123,7 @@ long/short dash pattern. These are editor geometry/state, not Foundry gameplay y
 Whole-room translations carry doors. Wall splits away from openings remap their
 attachments; cuts through openings, ambiguous shared-wall movement, or deleting
 the last source room are rejected. Move/delete the door first, then retry the room
-edit. Room geometry, walls and doors undo together. Refresh still discards everything.
+edit. Room geometry, walls and doors undo together. Save through File to keep the committed scene across restarts.
 
 Choose Room → Polygon room to place corners with clicks. Click the first point
 again (within 8 screen pixels, or at the same snapped coordinate) or choose Finish
@@ -156,6 +156,36 @@ schema was expanded in place; old synthetic fixtures were updated together.
 The current schema validates structural data, not polygon simplicity or door
 attachment geometry. These limitations are explicit; do not use it as a complete
 editor validation boundary yet.
+
+
+## Local project files
+
+Open File, enter a project name, and choose **Save project**. **New project** starts
+a blank map; **Open saved project** lists saved maps. New/Open asks before discarding
+unsaved committed edits. Save records applied scene edits, room order, prompts,
+door states and grid preferences; Apply inspector drafts before saving. Opening
+resets selection, view and undo history; undo history is session-local. A save does
+not clear undo history. Dirty status compares content, so undoing to the saved
+scene returns to Saved. Browser refresh starts a new blank editor: reopen your
+saved map explicitly from File.
+
+Snapshots are stored in `data/projects.sqlite3` relative to the server working
+directory (normally the repository root). Export `MWQ_DATA_DIR` before `make dev`
+to choose another directory. This data is ignored by git. Stop the server before
+copying the whole data directory for a manual backup. SQLite uses WAL and FULL
+synchronous transactions; previous snapshots are retained. Concurrent/stale saves
+return a conflict instead of overwriting another session. A failed or interrupted
+save leaves the previous committed version available.
+
+This first persistence profile supports 1200 × 800 maps, a 50-unit grid, rooms,
+derived walls and doors. Unsupported dimensions, wall overrides, artwork, lights,
+objects, regions, sounds and generation records are rejected rather than stripped.
+All supported IDs, references, polygons and door openings are checked. Save requests
+are limited to 4 MiB, with existing geometry limits (128 rooms, 2048 total vertices,
+8192 walls, 1024 doors). Unknown schema versions are rejected without migration.
+Portable JSON/archive import/export, autosave and a revision-recovery UI are not
+implemented. Saved revision numbers are monotonic; unsaved scene snapshots remain
+local to this editor. See ADR-0015.
 
 ## Distribution
 

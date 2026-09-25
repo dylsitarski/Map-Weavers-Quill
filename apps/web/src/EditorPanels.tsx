@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import type { Door, Point, Room, Wall } from '../../../packages/schema/project';
 import { DoorInspector } from './DoorInspector';
 import type { Scope, Tool } from './editorTools';
@@ -7,6 +7,7 @@ import { RoomInspector } from './RoomInspector';
 
 type Props = {
   status: string;
+  fileControls: ReactNode;
   tool: Tool;
   setTool: (tool: Tool) => void;
   scope: Scope | null;
@@ -143,12 +144,7 @@ export function EditorPanels(p: Props) {
           aria-label={`${panel} options`}
         >
           <h2>{panel}</h2>
-          {panel === 'File' && (
-            <p>
-              Session only. Saving and opening projects are not available yet.
-              Refreshing clears rooms.
-            </p>
-          )}
+          {panel === 'File' && p.fileControls}
           {panel === 'View' && (
             <>
               <p>1200 × 800 map units · 50-unit grid</p>
@@ -539,7 +535,7 @@ export function EditorPanels(p: Props) {
           </div>
         )}
         <p className="notice surface" aria-live="polite">
-          {p.busy ? 'Validating geometry…' : p.notice}
+          {p.busy ? 'Working…' : p.notice}
         </p>
       </div>
       <div className="view-status surface">
