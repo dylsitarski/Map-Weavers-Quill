@@ -8,11 +8,12 @@ from pathlib import Path
 from typing import Annotated, Literal
 from uuid import UUID
 
-from PIL import Image
+from PIL import Image, ImageChops
 from pydantic import Field
 
 from quill.doors import validate_doors
 from quill.models import Contract, Project
+from quill.raster import image, polygon_mask
 from quill.walls import RoomBoundary, WallDerivationRequest, derive_walls
 
 
@@ -62,36 +63,58 @@ def validate_project(project: Project, *, derive_missing: bool = False) -> Proje
     ]
     if len({entity.id for entity in entities}) != len(entities):
         raise ValueError("Entity IDs must be unique across the project.")
-    if len(project.layers) > 1 or len(project.generations) > 128:
-        raise ValueError(
-            "This increment supports one base background and at most 128 generation records."
-        )
+    if len(project.layers) > 129 or len(project.generations) > 128:
+        raise ValueError("At most 129 raster layers and 128 generation records are supported.")
+    layers = {layer.id: layer for layer in project.layers}
+    rooms = {str(room.id): room for room in project.rooms}
+    backgrounds = 0
     for layer in project.layers:
         role = layer.metadata.get("quill.render")
         if (
             not isinstance(role, dict)
-            or role.get("role") != "background"
             or layer.bounds.origin.x != 0
             or layer.bounds.origin.y != 0
             or layer.bounds.width != 1200
             or layer.bounds.height != 800
             or layer.rotation != 0
-            or layer.zIndex != 0
             or layer.blendMode != "normal"
         ):
-            raise ValueError("Only a full-map base background is currently supported.")
+            raise ValueError("Unsupported raster transform or metadata.")
+        if role.get("role") == "background":
+            backgrounds += 1
+            if backgrounds > 1 or layer.zIndex != 0:
+                raise ValueError("One base background at zIndex zero is supported.")
+        elif role.get("role") == "room":
+            room = rooms.get(str(role.get("roomId")))
+            if room is None or room.renderLayerId != layer.id or layer.zIndex <= 0:
+                raise ValueError(
+                    "Room artwork must have one matching room reference and positive zIndex."
+                )
+        else:
+            raise ValueError("Unsupported raster role.")
+    for room in project.rooms:
+        if room.renderLayerId is not None:
+            referenced_layer = layers.get(room.renderLayerId)
+            role = referenced_layer.metadata.get("quill.render") if referenced_layer else None
+            if (
+                not isinstance(role, dict)
+                or role.get("roomId") != str(room.id)
+                or role.get("role") != "room"
+            ):
+                raise ValueError("A room references an unavailable or mismatched render layer.")
     for record in project.generations:
         if (
             record.providerId != "mock"
-            or record.capability != "text_to_image"
+            or record.capability not in {"text_to_image", "inpainting"}
             or record.status != "succeeded"
             or record.outputHash is None
-            or record.inputHashes
             or record.baseRevision > project.revision
         ):
-            raise ValueError("Unsupported background generation provenance.")
-    if any(room.renderLayerId is not None for room in project.rooms):
-        raise ValueError("A room references an unavailable render layer.")
+            raise ValueError("Unsupported mock generation provenance.")
+        if (record.capability == "text_to_image" and record.inputHashes) or (
+            record.capability == "inpainting" and len(record.inputHashes) != 2
+        ):
+            raise ValueError("Invalid mock generation input references.")
     walls = derive_walls(
         WallDerivationRequest(
             width=project.map.width,
@@ -189,11 +212,19 @@ class ProjectStore:
 
     @staticmethod
     def validate_assets(db: sqlite3.Connection, project: Project) -> None:
-        hashes = {layer.assetHash for layer in project.layers} | {
-            record.outputHash for record in project.generations if record.outputHash is not None
-        }
-        for key in hashes:
-            ProjectStore.read_asset(db, key)
+        hashes = (
+            {layer.assetHash for layer in project.layers}
+            | {record.outputHash for record in project.generations if record.outputHash is not None}
+            | {key for record in project.generations for key in record.inputHashes}
+        )
+        assets = {key: ProjectStore.read_asset(db, key) for key in hashes}
+        for room in project.rooms:
+            if room.renderLayerId is not None:
+                layer = next(layer for layer in project.layers if layer.id == room.renderLayerId)
+                alpha = image(assets[layer.assetHash]).getchannel("A")
+                outside = ImageChops.multiply(alpha, ImageChops.invert(polygon_mask(room.polygon)))
+                if outside.getbbox() is not None:
+                    raise ValueError("Room artwork contains pixels outside its current polygon.")
 
     @staticmethod
     def publish(db: sqlite3.Connection, project_id: str, revision: int) -> None:

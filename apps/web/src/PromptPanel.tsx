@@ -20,7 +20,7 @@ export function PromptPanel({
       }}
     >
       <h2>{room.label}</h2>
-      <p>Room appearance. Generation is not available yet.</p>
+      <p>Apply your room appearance prompt before generating.</p>
       <label>
         Room prompt
         <textarea
@@ -32,7 +32,7 @@ export function PromptPanel({
       <button type="submit" disabled={busy || prompt === room.prompt}>
         Apply prompt
       </button>
-      <p>Stored in this session only. Refreshing clears it.</p>
+      <p>Save the project to keep applied prompts and accepted artwork.</p>
     </form>
   );
 }

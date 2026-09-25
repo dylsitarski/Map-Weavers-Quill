@@ -154,3 +154,9 @@ preview. The image preview stays in the right panel until accepted; it does not
 replace canvas pixels automatically. Stale previews explain why acceptance is
 blocked. Layers exposes background visibility and opacity; the base stays at the
 bottom. Room imagery and independent artwork ordering remain planned (ADR-0016).
+
+Room generation now follows the applied room prompt in AI. Generate preview,
+Accept room artwork, Reject preview and regeneration use the same preview lifecycle
+as Map. Room layers are bound through renderLayerId. Geometry changes clear outdated
+artwork with a notice; Undo restores it. Layers still orders room geometry only;
+independent artwork ordering remains the next layer-management increment (ADR-0017).

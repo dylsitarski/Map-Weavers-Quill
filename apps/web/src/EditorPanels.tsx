@@ -15,6 +15,7 @@ type Props = {
   status: string;
   fileControls: ReactNode;
   backgroundControls: ReactNode;
+  roomGenerationControls: ReactNode;
   background: RasterLayer | null;
   changeBackground: (changes: { visible?: boolean; opacity?: number }) => void;
   tool: Tool;
@@ -546,20 +547,23 @@ export function EditorPanels(p: Props) {
           >
             <div hidden={p.scope !== 'Map'}>{p.backgroundControls}</div>
             {p.selected ? (
-              <PromptPanel
-                key={JSON.stringify(p.selected)}
-                room={p.selected}
-                busy={p.busy}
-                save={(prompt) => {
-                  if (p.selected)
-                    p.applyRoom(p.selected.polygon, p.selected.label, prompt);
-                }}
-              />
+              <>
+                <PromptPanel
+                  key={JSON.stringify(p.selected)}
+                  room={p.selected}
+                  busy={p.busy}
+                  save={(prompt) => {
+                    if (p.selected)
+                      p.applyRoom(p.selected.polygon, p.selected.label, prompt);
+                  }}
+                />
+                {p.roomGenerationControls}
+              </>
             ) : (
               <p>
                 {p.scope === 'Map'
                   ? 'Accepting a preview changes only the base background.'
-                  : 'Select a room to edit its prompt, or Map to target the base background. Room generation is not available yet.'}
+                  : 'Select a room to edit its prompt, or Map to target the base background. Apply a room prompt, then generate a mock preview.'}
               </p>
             )}
           </section>

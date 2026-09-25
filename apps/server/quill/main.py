@@ -14,6 +14,7 @@ from quill.geometry import GeometryRequest, GeometryResult, validate_geometry
 from quill.models import Project
 from quill.projects import ProjectList, SaveConflict, SaveRequest, project_store
 from quill.providers import MockProvider, ProviderDescriptor
+from quill.room_images import RoomImageRequest, generate_room
 from quill.walls import WallDerivationRequest, WallDerivationResult, derive_walls
 
 app = FastAPI(title="Map-Weaver's Quill", version="0.0.0")
@@ -153,3 +154,31 @@ def asset(asset_hash: str) -> Response:
         raise HTTPException(404, "Image asset is missing or invalid.") from error
     except (OSError, sqlite3.Error) as error:
         raise HTTPException(503, "Could not read the image asset.") from error
+
+
+@app.post("/api/generation/room", response_model=BackgroundResult)
+async def room_image(request: Request) -> BackgroundResult:
+    if request.headers.get("content-type", "").split(";")[0].strip() != "application/json":
+        raise HTTPException(415, "Use application/json.")
+    origin = request.headers.get("origin")
+    if origin and origin not in {
+        "http://127.0.0.1:5173",
+        "http://localhost:5173",
+        "http://127.0.0.1:8000",
+        "http://localhost:8000",
+    }:
+        raise HTTPException(403, "Only the local editor may generate images.")
+    body = bytearray()
+    async for chunk in request.stream():
+        body.extend(chunk)
+        if len(body) > 4 * 1024 * 1024:
+            raise HTTPException(413, "Room generation request exceeds 4 MiB.")
+    try:
+        data = RoomImageRequest.model_validate_json(bytes(body))
+        return await run_in_threadpool(generate_room, data)
+    except ValidationError as error:
+        raise HTTPException(422, "Invalid room generation request.") from error
+    except ValueError as error:
+        raise HTTPException(422, str(error)) from error
+    except (OSError, sqlite3.Error) as error:
+        raise HTTPException(503, "Could not generate or store room artwork. Retry.") from error

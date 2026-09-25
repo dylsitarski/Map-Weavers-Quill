@@ -17,10 +17,12 @@ from quill.providers import (
     ProviderDescriptor,
     ProviderError,
 )
+from quill.room_images import RoomImageRequest
 from quill.walls import WallDerivationRequest, WallDerivationResult
 
 
 class RasterContracts(BaseModel):
+    roomRequest: RoomImageRequest
     request: BackgroundRequest
     result: BackgroundResult
 

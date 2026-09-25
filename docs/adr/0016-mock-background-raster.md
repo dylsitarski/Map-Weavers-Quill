@@ -59,3 +59,7 @@ canvas pixel equality after save/open, stale geometry and cancel/late-response h
 Milestone 2 is not complete: next add room context crops and polygon masks with exact
 outside-mask preservation, then room layers/order, job orchestration and flattened
 PNG/WebP export. Mock output is visibly a test pattern, not generated fantasy art.
+
+Update: ADR-0017 adds masked room layers and context crops. The current profile now
+allows one background plus one art layer per room; room/layer references and mask
+coverage are validated on save/open. Independent layer-order controls remain planned.

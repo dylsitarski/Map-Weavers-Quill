@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
-import { Image as CanvasImage } from 'react-konva';
-import type { RasterLayer } from '../../../packages/schema/project';
-import type { View } from './viewport';
+import { Image as CanvasImage, Group } from 'react-konva';
+import type { Point, RasterLayer } from '../../../packages/schema/project';
+import { type View, worldToScreen } from './viewport';
 export function BackgroundImage({
   layer,
   view,
   onError,
+  polygon,
 }: {
+  polygon?: Point[];
   layer: RasterLayer;
   view: View;
   onError: (message: string) => void;
@@ -35,13 +37,29 @@ export function BackgroundImage({
     };
   }, [layer.assetHash, onError]);
   return loaded?.hash === layer.assetHash && layer.visible ? (
-    <CanvasImage
-      image={loaded.image}
-      x={view.x}
-      y={view.y}
-      width={1200 * view.scale}
-      height={800 * view.scale}
-      opacity={layer.opacity}
-    />
+    <Group
+      clipFunc={
+        polygon
+          ? (context) => {
+              context.beginPath();
+              polygon.forEach((point, index) => {
+                const p = worldToScreen(point, view);
+                if (index === 0) context.moveTo(p.x, p.y);
+                else context.lineTo(p.x, p.y);
+              });
+              context.closePath();
+            }
+          : undefined
+      }
+    >
+      <CanvasImage
+        image={loaded.image}
+        x={view.x}
+        y={view.y}
+        width={1200 * view.scale}
+        height={800 * view.scale}
+        opacity={layer.opacity}
+      />
+    </Group>
   ) : null;
 }

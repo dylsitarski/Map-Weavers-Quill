@@ -70,6 +70,12 @@ export function Editor({ status }: { status: string }) {
   );
   const scene = sceneHistory.present;
   const history = { ...sceneHistory, present: scene.rooms };
+  const backgroundLayer = scene.layers?.find(
+    (layer) =>
+      layer.metadata['quill.render'] &&
+      (layer.metadata['quill.render'] as { role?: string }).role ===
+        'background',
+  );
   const derived = useDerivedWalls(scene.doors.length ? [] : scene.rooms);
   const wallState = scene.doors.length
     ? { walls: scene.walls, loading: false, error: '', retry: derived.retry }
@@ -327,16 +333,34 @@ export function Editor({ status }: { status: string }) {
     const attachments = scene.doors.length
       ? await reconcileDoors(scene.rooms, next, scene.doors)
       : { doors: scene.doors, walls: scene.walls };
+    const invalidArt = new Set(
+      scene.rooms
+        .filter((room) => {
+          const after = next.find((value) => value.id === room.id);
+          return (
+            !after ||
+            JSON.stringify(after.polygon) !== JSON.stringify(room.polygon)
+          );
+        })
+        .map((room) => room.renderLayerId)
+        .filter(Boolean),
+    );
     dispatchScene({
       type: 'commit',
       before: scene,
       scene: {
         ...scene,
-        rooms: next,
+        layers: scene.layers?.filter((layer) => !invalidArt.has(layer.id)),
+        rooms: next.map((room) =>
+          invalidArt.has(room.renderLayerId)
+            ? { ...room, renderLayerId: null }
+            : room,
+        ),
         walls: attachments.walls,
         doors: attachments.doors,
       },
     });
+    return invalidArt.size > 0;
   }
   async function changeDoors(doors: Door[]) {
     if (pending.current) return;
@@ -454,12 +478,16 @@ export function Editor({ status }: { status: string }) {
       if (result.valid !== true)
         throw new Error(result.error || 'Room geometry was rejected.');
       if (before) {
-        await commitRoom({
+        const clearedArtwork = await commitRoom({
           type: 'update',
           before,
           room: { ...before, ...details, polygon },
         });
-        setNotice('Room updated.');
+        setNotice(
+          clearedArtwork
+            ? 'Room updated; outdated artwork cleared. Undo restores it.'
+            : 'Room updated.',
+        );
       } else {
         await commitRoom({
           type: 'add',
@@ -599,7 +627,10 @@ export function Editor({ status }: { status: string }) {
         data-wall-count={wallState.walls.length}
         data-walls-loading={wallState.loading}
         data-door-count={scene.doors.length}
-        data-background-hash={scene.layers?.[0]?.assetHash ?? ''}
+        data-background-hash={backgroundLayer?.assetHash ?? ''}
+        data-room-art-count={
+          scene.rooms.filter((room) => room.renderLayerId !== null).length
+        }
       >
         <Stage
           width={size.width}
@@ -713,13 +744,20 @@ export function Editor({ status }: { status: string }) {
               fill="#e9e2ce"
               stroke="#b7a578"
             />
-            {scene.layers?.[0] && (
-              <BackgroundImage
-                layer={scene.layers[0]}
-                view={view}
-                onError={setError}
-              />
-            )}
+            {[...(scene.layers ?? [])]
+              .sort((a, b) => a.zIndex - b.zIndex || a.id.localeCompare(b.id))
+              .map((layer) => (
+                <BackgroundImage
+                  key={layer.id}
+                  layer={layer}
+                  polygon={
+                    scene.rooms.find((room) => room.renderLayerId === layer.id)
+                      ?.polygon
+                  }
+                  view={view}
+                  onError={setError}
+                />
+              ))}
             {gridLines.map((line) => (
               <Line
                 key={`${line[0].x},${line[0].y}:${line[1].x},${line[1].y}`}
@@ -865,7 +903,7 @@ export function Editor({ status }: { status: string }) {
             count={scene.generations?.length ?? 0}
             accept={(result) => {
               if (pending.current) return;
-              const previous = scene.layers?.[0];
+              const previous = backgroundLayer;
               const layer = previous
                 ? {
                     ...previous,
@@ -878,7 +916,11 @@ export function Editor({ status }: { status: string }) {
                 before: scene,
                 scene: {
                   ...scene,
-                  layers: [layer],
+                  layers: previous
+                    ? scene.layers?.map((current) =>
+                        current.id === previous.id ? layer : current,
+                      )
+                    : [layer, ...(scene.layers ?? [])],
                   generations: [
                     ...(scene.generations ?? []),
                     result.generation,
@@ -889,16 +931,71 @@ export function Editor({ status }: { status: string }) {
             }}
           />
         }
-        background={scene.layers?.[0] ?? null}
+        roomGenerationControls={
+          <BackgroundPanel
+            room={selected}
+            project={currentProject}
+            context={sceneHistory}
+            fingerprint={fingerprint}
+            projectId={project.projectId}
+            revision={project.revision}
+            busy={busy}
+            count={scene.generations?.length ?? 0}
+            accept={(result) => {
+              if (pending.current || !selected) return;
+              const previous = scene.layers?.find(
+                (layer) => layer.id === selected.renderLayerId,
+              );
+              const layer = previous
+                ? {
+                    ...previous,
+                    assetHash: result.layer.assetHash,
+                    revision: previous.revision + 1,
+                  }
+                : result.layer;
+              dispatchScene({
+                type: 'commit',
+                before: scene,
+                scene: {
+                  ...scene,
+                  rooms: scene.rooms.map((room) =>
+                    room.id === selected.id
+                      ? {
+                          ...room,
+                          renderLayerId: layer.id,
+                          revision: room.revision + 1,
+                        }
+                      : room,
+                  ),
+                  layers: previous
+                    ? scene.layers?.map((current) =>
+                        current.id === previous.id ? layer : current,
+                      )
+                    : [...(scene.layers ?? []), layer],
+                  generations: [
+                    ...(scene.generations ?? []),
+                    result.generation,
+                  ],
+                },
+              });
+              setNotice('Room artwork accepted. Save to keep it.');
+            }}
+          />
+        }
+        background={backgroundLayer ?? null}
         changeBackground={(changes) => {
-          if (pending.current || !scene.layers?.[0]) return;
-          const layer = scene.layers[0];
+          if (pending.current || !backgroundLayer) return;
+          const layer = backgroundLayer;
           dispatchScene({
             type: 'commit',
             before: scene,
             scene: {
               ...scene,
-              layers: [{ ...layer, ...changes, revision: layer.revision + 1 }],
+              layers: scene.layers?.map((current) =>
+                current.id === layer.id
+                  ? { ...layer, ...changes, revision: layer.revision + 1 }
+                  : current,
+              ),
             },
           });
         }}

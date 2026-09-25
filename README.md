@@ -189,8 +189,8 @@ return a conflict instead of overwriting another session. A failed or interrupte
 save leaves the previous committed version available.
 
 This first persistence profile supports 1200 × 800 maps, a 50-unit grid, rooms,
-derived walls, doors, one base background and its mock generation records.
-Unsupported dimensions, wall overrides, additional artwork layers, lights, objects,
+derived walls, doors, one base background, independently masked room artwork and mock generation records.
+Unsupported dimensions, wall overrides, non-room artwork layers, lights, objects,
 regions and sounds are rejected rather than stripped.
 All supported IDs, references, polygons and door openings are checked. Save requests
 are limited to 4 MiB, with existing geometry limits (128 rooms, 2048 total vertices,
@@ -217,13 +217,29 @@ job queue and does not claim provider-side cancellation.
 PNG bytes are SHA-256 addressed in the same local SQLite database. Save/open verify
 that referenced assets exist and match their hashes; missing/corrupt assets reject
 opening rather than silently dropping artwork. Previous and rejected assets are
-retained (garbage collection is not implemented). This profile permits one base
-background and at most 128 generation records. Existing projects remain compatible.
+retained (garbage collection is not implemented). This profile permits one base background, one art layer per room (129 total
+layers maximum), and at most 128 generation records. Existing projects remain compatible.
 No credentials or external model calls are used.
 
-Room crops/masks, protected-pixel compositing, room artwork, independent layer
-ordering, generation job orchestration and flattened export remain Milestone 2 work.
-See ADR-0016. APIs: POST /api/generation/background and GET /api/assets/{sha256}.
+Select a room with Select/edit room, open AI, enter its prompt and choose Apply
+prompt, then Generate preview. Accept room artwork creates an independent transparent
+layer bound to that room. Regeneration keeps its layer identity, opacity and order;
+background regeneration preserves room artwork. Rejection changes nothing.
+Room previews use an eight-pixel context margin and a binary polygon mask at the
+canonical 480 × 320 resolution (2.5 map units per pixel). Coverage is evaluated at
+pixel centers; outside-mask RGBA pixels are transparent, and compositing preserves
+all outside-mask pixels exactly, even if the provider paints outside the mask.
+This is still the deterministic offline mock, not AI imagery.
+
+Moving/reshaping a room clears its outdated art in the same undoable transaction;
+undo restores both. Changing its name or prompt preserves art. Deleting a room also
+removes its bound layer. Save/Open validates bindings and rejects art that has alpha
+outside its current room mask. Apply inspector drafts before generation. Geometry
+changes make open previews stale; changing scope may discard room previews.
+
+Independent artwork ordering, persistent generation jobs and flattened export remain
+Milestone 2 work. Room masks/crops and protected compositing are now implemented.
+See ADR-0016. APIs: POST /api/generation/background, POST /api/generation/room and GET /api/assets/{sha256}. See ADR-0017 for room generation.
 
 ## Distribution
 

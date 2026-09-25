@@ -1,6 +1,7 @@
 import Ajv2020 from 'ajv/dist/2020';
 import addFormats from 'ajv-formats';
 import { useEffect, useRef, useState } from 'react';
+import type { Project, Room } from '../../../packages/schema/project';
 import type { BackgroundResult } from '../../../packages/schema/raster';
 import schema from '../../../packages/schema/raster.schema.json';
 
@@ -11,6 +12,8 @@ const valid = ajv.compile<BackgroundResult>({
   $ref: '#/$defs/BackgroundResult',
 });
 export function BackgroundPanel(p: {
+  room?: Room | null;
+  project?: Project;
   context: object;
   fingerprint: string;
   projectId: string;
@@ -19,6 +22,7 @@ export function BackgroundPanel(p: {
   count: number;
   accept: (result: BackgroundResult) => void;
 }) {
+  const target = p.room ? 'room' : 'background';
   const [prompt, setPrompt] = useState('Stone dungeon floor');
   const [seed, setSeed] = useState(0);
   const [working, setWorking] = useState(false);
@@ -29,6 +33,7 @@ export function BackgroundPanel(p: {
     context: object;
     fingerprint: string;
     projectId: string;
+    roomId?: string;
   } | null>(null);
   const controller = useRef<AbortController | null>(null);
   const sequence = useRef(0);
@@ -54,10 +59,14 @@ export function BackgroundPanel(p: {
     controller.current = abort;
     setWorking(true);
     try {
-      const response = await fetch('/api/generation/background', {
+      const response = await fetch(`/api/generation/${target}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, seed, baseRevision: p.revision }),
+        body: JSON.stringify(
+          p.room
+            ? { project: p.project, roomId: p.room.id, seed }
+            : { prompt, seed, baseRevision: p.revision },
+        ),
         signal: AbortSignal.any([abort.signal, AbortSignal.timeout(15000)]),
       });
       const data = await response.json().catch(() => null);
@@ -75,6 +84,7 @@ export function BackgroundPanel(p: {
           context: p.context,
           fingerprint: p.fingerprint,
           projectId: p.projectId,
+          roomId: p.room?.id,
         });
     } catch (failure) {
       if (attempt === sequence.current)
@@ -89,22 +99,27 @@ export function BackgroundPanel(p: {
     proposal &&
     (proposal.context !== p.context ||
       proposal.fingerprint !== p.fingerprint ||
-      proposal.projectId !== p.projectId);
+      proposal.projectId !== p.projectId ||
+      proposal.roomId !== p.room?.id);
   return (
-    <section aria-label="Background generation">
-      <h2>Map background</h2>
+    <section aria-label={p.room ? 'Room generation' : 'Background generation'}>
+      <h2>{p.room ? 'Room artwork' : 'Map background'}</h2>
       <p>
         Offline mock: generates a deterministic test pattern, not AI artwork.
       </p>
-      <label>
-        Background prompt
-        <textarea
-          maxLength={4000}
-          value={prompt}
-          disabled={working}
-          onChange={(e) => setPrompt(e.target.value)}
-        />
-      </label>
+      {p.room ? (
+        <p>Uses the applied room prompt: {p.room.prompt || '(empty)'}</p>
+      ) : (
+        <label>
+          Background prompt
+          <textarea
+            maxLength={4000}
+            value={prompt}
+            disabled={working}
+            onChange={(e) => setPrompt(e.target.value)}
+          />
+        </label>
+      )}
       <label>
         Seed
         <input
@@ -146,7 +161,9 @@ export function BackgroundPanel(p: {
           <img
             className="background-preview"
             src={`/api/assets/${proposal.result.layer.assetHash}`}
-            alt="Generated background preview"
+            alt={
+              p.room ? 'Generated room preview' : 'Generated background preview'
+            }
             onLoad={() => setLoaded(true)}
             onError={() => {
               setLoaded(false);
@@ -172,7 +189,7 @@ export function BackgroundPanel(p: {
               reject();
             }}
           >
-            Accept background
+            {p.room ? 'Accept room artwork' : 'Accept background'}
           </button>
           <button type="button" onClick={reject}>
             Reject preview
