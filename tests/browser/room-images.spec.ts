@@ -87,6 +87,15 @@ test('room artwork accepts separately, survives background generation and save/o
     'data-room-art-count',
     '1',
   );
+  await page.getByRole('tab', { name: 'Layers', exact: true }).click();
+  const artwork = page.getByRole('list', { name: 'Artwork layers' });
+  const roomArt = artwork.locator('li').first();
+  await roomArt.getByRole('checkbox').uncheck();
+  await roomArt.getByRole('combobox').selectOption('0.5');
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(roomArt.getByRole('combobox')).toHaveValue('1');
+  await page.getByRole('button', { name: 'Redo', exact: true }).click();
+  await expect(roomArt.getByRole('combobox')).toHaveValue('0.5');
   await page.getByRole('button', { name: 'File', exact: true }).click();
   const name = `Room art ${crypto.randomUUID()}`;
   await page.getByRole('textbox', { name: 'Project name' }).fill(name);
@@ -103,6 +112,9 @@ test('room artwork accepts separately, survives background generation and save/o
     'data-room-art-count',
     '1',
   );
+  await page.getByRole('tab', { name: 'Layers', exact: true }).click();
+  await expect(roomArt.getByRole('checkbox')).not.toBeChecked();
+  await expect(roomArt.getByRole('combobox')).toHaveValue('0.5');
   await page.getByRole('button', { name: 'Room', exact: true }).click();
   await page
     .getByRole('button', { name: 'Select/edit room', exact: true })
@@ -143,4 +155,65 @@ test('editing geometry while a room preview is open makes acceptance unavailable
     'data-room-art-count',
     '0',
   );
+});
+test('artwork order survives undo/redo and native save/open without reordering room geometry', async ({
+  page,
+}) => {
+  await setup(page);
+  await generate(page);
+  await page.getByRole('button', { name: 'Accept room artwork' }).click();
+  await page
+    .getByRole('button', { name: 'Rectangle room', exact: true })
+    .click();
+  await page.mouse.move(480, 320);
+  await page.mouse.down();
+  await page.mouse.move(740, 500);
+  await page.mouse.up();
+  await page
+    .getByRole('button', { name: 'Select/edit room', exact: true })
+    .click();
+  await page.mouse.click(650, 430);
+  await generate(page);
+  await page.getByRole('button', { name: 'Accept room artwork' }).click();
+  await page.getByRole('tab', { name: 'Layers', exact: true }).click();
+  const list = page.getByRole('list', { name: 'Artwork layers' });
+  const rows = list.locator('li');
+  await expect(rows).toHaveCount(2);
+  const front = await rows.first().getAttribute('data-artwork-id');
+  const back = await rows.last().getAttribute('data-artwork-id');
+  const geometry = await page
+    .locator('[data-room-id]')
+    .evaluateAll((elements) =>
+      elements.map((element) => element.getAttribute('data-geometry')),
+    );
+  await rows
+    .first()
+    .getByRole('button', { name: /^Lower/ })
+    .click();
+  await expect(rows.first()).toHaveAttribute('data-artwork-id', back ?? '');
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(rows.first()).toHaveAttribute('data-artwork-id', front ?? '');
+  await page.getByRole('button', { name: 'Redo', exact: true }).click();
+  await expect(rows.first()).toHaveAttribute('data-artwork-id', back ?? '');
+  expect(
+    await page
+      .locator('[data-room-id]')
+      .evaluateAll((elements) =>
+        elements.map((element) => element.getAttribute('data-geometry')),
+      ),
+  ).toEqual(geometry);
+  await page.getByRole('button', { name: 'File', exact: true }).click();
+  const name = `Art order ${crypto.randomUUID()}`;
+  await page.getByRole('textbox', { name: 'Project name' }).fill(name);
+  await page.getByRole('button', { name: 'Save project', exact: true }).click();
+  await expect(page.getByTestId('save-status')).toHaveText(
+    'Saved · revision 1',
+  );
+  await page.reload();
+  await page.getByRole('button', { name: 'File', exact: true }).click();
+  await page
+    .getByRole('button', { name: `${name} · revision 1`, exact: true })
+    .click();
+  await page.getByRole('tab', { name: 'Layers', exact: true }).click();
+  await expect(rows.first()).toHaveAttribute('data-artwork-id', back ?? '');
 });

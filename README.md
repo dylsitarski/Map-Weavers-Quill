@@ -87,7 +87,7 @@ Regions are semantic/gameplay areas, not generated visual assets. Visual feature
 belong to objects. Planned layer controls will allow room, object and effect artwork
 to be reordered above the base background, with undo and consistent save/export.
 Regeneration will preserve other layers and the target's stacking position.
-Room-shape ordering works now; generated raster/object composition and export remain unimplemented. See docs/adr/0012-snapping-and-sidebar.md.
+Room-shape ordering and independent generated-artwork ordering work now; object composition and flattened export remain unimplemented. See docs/adr/0012-snapping-and-sidebar.md.
 
 Run `make dev`, open the web interface, choose Room → Rectangle room, and drag inside the map.
 Choose Pan to drag the view, scroll over the canvas to zoom, or use Fit map to
@@ -237,7 +237,8 @@ removes its bound layer. Save/Open validates bindings and rejects art that has a
 outside its current room mask. Apply inspector drafts before generation. Geometry
 changes make open previews stale; changing scope may discard room previews.
 
-Independent artwork ordering, persistent generation jobs and flattened export remain
+Artwork ordering, visibility and opacity controls are available in Layers and persist
+through undo/redo and save/open. Persistent generation jobs and flattened export remain
 Milestone 2 work. Room masks/crops and protected compositing are now implemented.
 See ADR-0016. APIs: POST /api/generation/background, POST /api/generation/room and GET /api/assets/{sha256}. See ADR-0017 for room generation.
 

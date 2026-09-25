@@ -1,6 +1,6 @@
 # ADR-0017: Context-cropped room artwork with enforced masks
 
-Status: Implemented Milestone 2 increment; independent layer ordering, persistent
+Status: Implemented Milestone 2 increment; artwork ordering/visibility/opacity controls are implemented. Persistent
 jobs and flattened export remain unfinished.
 
 ## Raster convention and protection
@@ -57,7 +57,7 @@ with a notice; name/prompt-only edits preserve art. Deletion removes its bound l
 Undo restores geometry and artwork together. No implicit stretching, translation or
 regeneration of pixels is performed. Background regeneration/reconfiguration preserves
 all independent room layers. Regions retain their semantic, non-artwork definition.
-Room-shape order is still independent of artwork order; general layer controls follow.
+Room-shape order is independent of artwork order. The Layers tab lists artwork front-to-back with raise/lower, visibility and opacity controls. Background stays at zIndex zero; room art has positive ranks. Reordering normalizes room-art ranks, resolves ties by UUID, and updates revisions only for changed ranks. Every change is one undoable document edit and invalidates pending previews. Geometry and generation provenance are unchanged.
 
 ## Verification
 

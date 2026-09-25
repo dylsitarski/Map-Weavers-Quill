@@ -160,3 +160,5 @@ Accept room artwork, Reject preview and regeneration use the same preview lifecy
 as Map. Room layers are bound through renderLayerId. Geometry changes clear outdated
 artwork with a notice; Undo restores it. Layers still orders room geometry only;
 independent artwork ordering remains the next layer-management increment (ADR-0017).
+
+Artwork controls in Layers are listed front-to-back separately from room outlines. Raise/lower changes raster composition only; background stays pinned at the bottom. Visibility and opacity apply per artwork layer. All changes support undo/redo and native save/open; regeneration retains these settings.

@@ -8,6 +8,7 @@ import type {
   Project,
   Room,
 } from '../../../packages/schema/project';
+import { reorderArtwork } from './artworkLayers';
 import { BackgroundImage } from './BackgroundImage';
 import { BackgroundPanel } from './BackgroundPanel';
 import {
@@ -982,10 +983,26 @@ export function Editor({ status }: { status: string }) {
             }}
           />
         }
-        background={backgroundLayer ?? null}
-        changeBackground={(changes) => {
-          if (pending.current || !backgroundLayer) return;
-          const layer = backgroundLayer;
+        layers={scene.layers ?? []}
+        reorderArtwork={(id, direction) => {
+          if (pending.current) return;
+          const layers = reorderArtwork(scene.layers ?? [], id, direction);
+          if (layers === scene.layers) return;
+          dispatchScene({
+            type: 'commit',
+            before: scene,
+            scene: { ...scene, layers },
+          });
+        }}
+        changeArtwork={(id, changes) => {
+          if (pending.current) return;
+          const layer = scene.layers?.find((item) => item.id === id);
+          if (
+            !layer ||
+            ((changes.visible ?? layer.visible) === layer.visible &&
+              (changes.opacity ?? layer.opacity) === layer.opacity)
+          )
+            return;
           dispatchScene({
             type: 'commit',
             before: scene,

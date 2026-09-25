@@ -6,6 +6,7 @@ import type {
   Room,
   Wall,
 } from '../../../packages/schema/project';
+import { ArtworkLayers } from './ArtworkLayers';
 import { DoorInspector } from './DoorInspector';
 import type { Scope, Tool } from './editorTools';
 import { PromptPanel } from './PromptPanel';
@@ -16,8 +17,12 @@ type Props = {
   fileControls: ReactNode;
   backgroundControls: ReactNode;
   roomGenerationControls: ReactNode;
-  background: RasterLayer | null;
-  changeBackground: (changes: { visible?: boolean; opacity?: number }) => void;
+  layers: RasterLayer[];
+  changeArtwork: (
+    id: string,
+    changes: { visible?: boolean; opacity?: number },
+  ) => void;
+  reorderArtwork: (id: string, direction: 'up' | 'down') => void;
   tool: Tool;
   setTool: (tool: Tool) => void;
   scope: Scope | null;
@@ -460,7 +465,14 @@ export function EditorPanels(p: Props) {
             aria-labelledby="tab-Layers"
             hidden={tab !== 'Layers'}
           >
-            <p>Front to back. Select a room or change its drawing order.</p>
+            <ArtworkLayers
+              layers={p.layers}
+              rooms={p.rooms}
+              busy={p.busy}
+              change={p.changeArtwork}
+              reorder={p.reorderArtwork}
+            />
+            <p>Room outlines · front to back</p>
             <ul aria-label="Room layers">
               {[...p.rooms].reverse().map((room, index) => (
                 <li
@@ -495,49 +507,6 @@ export function EditorPanels(p: Props) {
                 </li>
               ))}
             </ul>
-            <p>Base background · fixed at bottom</p>
-            {p.background && (
-              <>
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={p.background.visible}
-                    disabled={p.busy}
-                    onChange={(e) =>
-                      p.changeBackground({ visible: e.target.checked })
-                    }
-                  />
-                  Show background
-                </label>
-                <label>
-                  Background opacity
-                  <select
-                    value={p.background.opacity}
-                    disabled={p.busy}
-                    onChange={(e) =>
-                      p.changeBackground({ opacity: Number(e.target.value) })
-                    }
-                  >
-                    {[
-                      0,
-                      0.25,
-                      0.5,
-                      0.75,
-                      1,
-                      ...([0, 0.25, 0.5, 0.75, 1].includes(p.background.opacity)
-                        ? []
-                        : [p.background.opacity]),
-                    ]
-                      .sort((a, b) => a - b)
-                      .map((value) => (
-                        <option key={value} value={value}>
-                          {Math.round(value * 100)}%
-                        </option>
-                      ))}
-                  </select>
-                </label>
-              </>
-            )}
           </section>
           <section
             role="tabpanel"
