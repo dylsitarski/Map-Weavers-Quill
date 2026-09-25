@@ -12,6 +12,15 @@ import type {
 } from '../../../packages/schema/raster';
 import schema from '../../../packages/schema/raster.schema.json';
 
+import {
+  forgetRecovery,
+  previewSignature,
+  type Recovery,
+  readRecovery,
+  recoveryKey,
+  rememberRecovery,
+} from './previewRecovery';
+
 const ajv = new Ajv2020({ strict: false });
 addFormats(ajv);
 const valid = ajv.compile<BackgroundResult>({
@@ -44,6 +53,24 @@ export function BackgroundPanel(p: {
   accept: (result: BackgroundResult) => void;
 }) {
   const target = p.room ? 'room' : 'background';
+  const key = recoveryKey(p.projectId, p.room?.id);
+  const [recovery, setRecovery] = useState<{
+    key: string;
+    value: Recovery;
+  } | null>(null);
+  const remembered = useRef<{ key: string; value: Recovery } | null>(null);
+  const [storageWarning, setStorageWarning] = useState('');
+  useEffect(() => {
+    sequence.current++;
+    controller.current?.abort();
+    jobId.current = null;
+    remembered.current = null;
+    setProposal(null);
+    setWorking(false);
+    setError('');
+    const value = readRecovery(key);
+    setRecovery(value ? { key, value } : null);
+  }, [key]);
   const [prompt, setPrompt] = useState('Stone dungeon floor');
   const [seed, setSeed] = useState(0);
   const [working, setWorking] = useState(false);
@@ -64,11 +91,15 @@ export function BackgroundPanel(p: {
     () => () => {
       sequence.current++;
       controller.current?.abort();
-      if (jobId.current) cancelJob(jobId.current);
     },
     [],
   );
   function reject() {
+    if (remembered.current) {
+      forgetRecovery(remembered.current.key, remembered.current.value.id);
+      remembered.current = null;
+    }
+    setRecovery(null);
     sequence.current++;
     controller.current?.abort();
     if (jobId.current) cancelJob(jobId.current);
@@ -78,26 +109,62 @@ export function BackgroundPanel(p: {
     setError('');
     setLoaded(false);
   }
-  async function generate() {
+  async function generate(resume?: Recovery) {
+    if (
+      resume &&
+      resume.signature !== (await previewSignature(p.fingerprint))
+    ) {
+      setError(
+        'This preview belongs to a different project state. Reopen the matching saved project or discard it and generate again.',
+      );
+      return;
+    }
+    if (!resume) {
+      const previous = readRecovery(key);
+      if (previous) {
+        cancelJob(previous.id);
+        forgetRecovery(key, previous.id);
+      }
+    }
     reject();
     const attempt = sequence.current;
     const abort = new AbortController();
     controller.current = abort;
     setWorking(true);
     setJobStatus('queued');
-    const id = crypto.randomUUID();
+    const id = resume?.id ?? crypto.randomUUID();
     jobId.current = id;
     try {
-      const response = await fetch(`/api/jobs/${id}/${target}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(
-          p.room
-            ? { project: p.project, roomId: p.room.id, seed }
-            : { prompt, seed, baseRevision: p.revision },
-        ),
-        signal: AbortSignal.any([abort.signal, AbortSignal.timeout(15000)]),
-      });
+      const value = resume ?? {
+        id,
+        signature: await previewSignature(p.fingerprint),
+        prompt: p.room?.prompt ?? prompt,
+        seed,
+      };
+      if (attempt !== sequence.current) return;
+      remembered.current = { key, value };
+      setRecovery({ key, value });
+      setStorageWarning(
+        rememberRecovery(key, value)
+          ? ''
+          : 'Browser storage is unavailable. This preview cannot be recovered after reload.',
+      );
+      if (resume) {
+        setPrompt(resume.prompt);
+        setSeed(resume.seed);
+      }
+      const response = resume
+        ? await fetch(`/api/jobs/${id}`, { signal: abort.signal })
+        : await fetch(`/api/jobs/${id}/${target}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(
+              p.room
+                ? { project: p.project, roomId: p.room.id, seed }
+                : { prompt, seed, baseRevision: p.revision },
+            ),
+            signal: AbortSignal.any([abort.signal, AbortSignal.timeout(15000)]),
+          });
       let data = await response.json().catch(() => null);
       if (!response.ok)
         throw new Error(
@@ -105,7 +172,7 @@ export function BackgroundPanel(p: {
             ? data.detail
             : 'Background generation failed. Retry.',
         );
-      if (!validJob(data))
+      if (!validJob(data) || data.id !== id)
         throw new Error('The server returned an invalid job.');
       while (data.status === 'queued' || data.status === 'running') {
         if (abort.signal.aborted) return;
@@ -125,7 +192,7 @@ export function BackgroundPanel(p: {
           signal: AbortSignal.any([abort.signal, AbortSignal.timeout(15000)]),
         });
         data = await poll.json().catch(() => null);
-        if (!poll.ok || !validJob(data))
+        if (!poll.ok || !validJob(data) || data.id !== id)
           throw new Error(`Could not read job ${id}. Retry generation.`);
       }
       if (data.status !== 'succeeded')
@@ -143,10 +210,7 @@ export function BackgroundPanel(p: {
           roomId: p.room?.id,
         });
     } catch (failure) {
-      if (attempt === sequence.current && jobId.current) {
-        cancelJob(jobId.current);
-        jobId.current = null;
-      }
+      if (attempt === sequence.current) jobId.current = null;
       if (attempt === sequence.current)
         setError(
           failure instanceof Error ? failure.message : 'Generation failed.',
@@ -225,6 +289,30 @@ export function BackgroundPanel(p: {
       >
         {proposal ? 'Regenerate preview' : 'Generate preview'}
       </button>
+      {recovery?.key === key && !working && !proposal && (
+        <div>
+          <button
+            type="button"
+            disabled={p.busy || p.count >= 128}
+            onClick={() => void generate(recovery.value)}
+          >
+            Recover preview
+          </button>
+          <button
+            type="button"
+            disabled={p.busy}
+            onClick={() => {
+              cancelJob(recovery.value.id);
+              forgetRecovery(key, recovery.value.id);
+              setRecovery(null);
+              setError('');
+            }}
+          >
+            Discard recoverable preview
+          </button>
+        </div>
+      )}
+      {storageWarning && <p role="alert">{storageWarning}</p>}
       {p.count >= 128 && <p>Generation history limit reached (128 records).</p>}
       {working && (
         <>

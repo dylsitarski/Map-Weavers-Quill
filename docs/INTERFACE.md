@@ -188,3 +188,7 @@ unsaved applied edits without saving or changing history.
 AI generation displays queued/running job state and Cancel preview sends server-side
 cancellation. Job completion still requires explicit acceptance. Room interiors have no
 green fill; wall outlines and selection/editing guides remain.
+
+After reload, reopen the saved map, choose its Map or room target, and use AI → Recover
+preview. A document mismatch blocks recovery with an explanation and Discard action.
+Nothing is auto-accepted. Browser storage failure is reported without blocking generation.

@@ -40,3 +40,7 @@ Tests cover persisted success, idempotent submission, conflicting requests, canc
 before submit, queued/running cancellation, late completion, failure, restart recovery,
 API guards and browser cancellation/late responses. Room interiors no longer receive a
 green fill; wall/selection/draft guides remain.
+
+Update: ADR-0020 adds explicit latest-preview recovery for matching saved projects.
+Unmount/selection changes and polling failures now preserve server jobs for recovery;
+explicit Cancel and regeneration still cancel. A general job-history UI remains deferred.

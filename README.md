@@ -262,7 +262,11 @@ See docs/adr/0018-flattened-artwork-export.md.
 Generation runs through a durable local queue with queued/running status and cancellation.
 Job requests/results survive server restart; interrupted work is marked failed and can
 be regenerated. Cancelling prevents a queued job from starting and discards late output
-from running work. The synchronous mock may finish internally after cancellation. A
-browser reload does not restore its preview automatically; job history is available via
-GET /api/jobs/{id}, with a recovery UI and real-provider interruption still future work.
+from running work. The synchronous mock may finish internally after cancellation. After reload, reopen the saved project and select the same Map/room target in AI, then
+choose Recover preview. Recovery requires the matching document and same browser origin.
+Changed/lost unsaved work blocks recovery. Accept/Reject or Discard clears the recovery
+record. Real-provider interruption and a general job-history browser remain future work.
 Use one API worker per data directory. See docs/adr/0019-durable-generation-jobs.md.
+
+The Milestone 2 acceptance review is in docs/MILESTONE_2_ACCEPTANCE.md. Core raster
+criteria have regression coverage; a dedicated room style inspector is still pending.
