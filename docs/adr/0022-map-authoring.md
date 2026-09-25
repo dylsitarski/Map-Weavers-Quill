@@ -33,3 +33,7 @@ Tests cover native persistence, immutable provenance, style changes reaching gen
 undo after Save, prompt/default restoration after Open, inherited room placeholders,
 draft generation gating, stale previews and preservation of unrelated settings. Mock
 imagery remains deterministic test patterns; real-provider integration is separate.
+
+Planned extension: ADR-0023 specifies layout-aware background context and complete building
+exteriors beneath interior layers. The prompt/style-only request implemented here does
+not yet carry room footprints or guarantee exterior alignment.

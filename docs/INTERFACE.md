@@ -201,3 +201,13 @@ Map AI exposes Background prompt and map-wide Environment, Render style and Pale
 Apply map prompt and style is one undoable change; Save persists applied values. Pending
 map drafts disable generation. Blank room fields inherit these defaults. Editing map
 settings invalidates previews but preserves accepted artwork.
+
+### Planned exterior/interior composition
+
+Map AI will use placed room footprints and relevant descriptions to generate exterior
+terrain/buildings. Interior room artwork covers that background. The existing layer
+visibility checkbox reveals the exterior underneath; it never deletes room geometry or
+wall/door metadata. The exterior must remain complete under hidden interiors. This
+requires layout-aware generation and explicit building/open-air intent (ADR-0023), neither
+of which is implemented yet. Do not add implicit roof behavior to every room polygon or
+relabel Regions as building artwork. Flat-image export reflects visible artwork only.

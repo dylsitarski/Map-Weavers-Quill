@@ -13,8 +13,8 @@ pointer-anchored zoom, resize, grid visibility, snapping, rectangular room creat
 polygon room creation, selection/move/vertex editing, a room inspector, deletion,
 undo/redo of room changes, derived wall inspection, and constrained door placement/editing. Geometry changes pass server-side polygon validation.
 File → New/Save/Open now stores validated native project snapshots locally.
-Milestone 2 has begun with persistent mock background generation, preview/accept,
-undo and saved raster assets. There is no Foundry importer yet.
+Milestone 2 is complete for the mock profile: persistent jobs, background/room artwork,
+style authoring, preview recovery, layer controls, undo, save/open and PNG/WebP export. There is no Foundry importer yet.
 
 ### Setup (Linux, Python 3.12 and Node 24)
 
@@ -283,3 +283,16 @@ undoable, including after saving; Open restores applied values. Generation waits
 map drafts are applied. Rooms inherit blank style fields from these defaults. Existing
 artwork is preserved until regenerated and accepted. For older projects without a stored
 prompt, the latest accepted background prompt is used when available. See ADR-0022.
+
+### Planned exterior/interior workflow
+
+The background will depict terrain and building exteriors aligned to the rooms you place.
+Interior artwork sits above it: hide a room's artwork to reveal that portion of the
+exterior, or hide all interiors to show the whole building exterior. This changes artwork
+visibility only; room geometry and wall/door data remain intact.
+
+This is **planned**, not implemented spatial guidance. Current background generation
+receives prompt/style/seed but no room layout. Existing toggles reveal whatever background
+pixels are present. Milestone 3 will add layout context and explicit building/open-air
+intent so a path can lead to the cottage you actually placed. See
+[ADR-0023](docs/adr/0023-exterior-background-and-room-interiors.md).

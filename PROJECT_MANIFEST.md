@@ -536,15 +536,17 @@ and be respected by preview and flattened export. Regeneration MUST preserve the
 target layer's order, visibility and opacity while replacing its image revision.
 Reordering MUST NOT alter geometry, collision, region membership or gameplay rules.
 Opaque pixels hide lower layers; revealing them requires transparency or a mask.
-The existing raster `zIndex` field represents raster order. Interactive room-shape
-ordering is implemented in the Layers tab; managed raster/object compositing remains planned. Room-shape order now persists
-through File Save/Open (ADR-0015). See ADR-0010 and ADR-0012 for boundaries and planned checks.
+The existing raster `zIndex` field represents raster order. The Layers tab manages
+background and room artwork ordering, visibility and opacity; object compositing remains
+planned. These artwork settings persist through File Save/Open and flattened export.
 
 ### 10.2.1 Scope semantics
 
-- **Map:** selects the base background as the target for future generation or
+- **Map:** selects the base background as the target for generation or
   regeneration across map bounds. It does not target the flattened scene or all
-  entities. Other layers may supply context but MUST NOT be replaced by this action.
+  entities. Other layers may supply suitable context but MUST NOT be replaced by this action.
+  Planned geometry-aware generation depicts terrain and building exteriors beneath room
+  interiors; it must receive placed footprints and relevant descriptions (ADR-0023).
 - **Room:** bounded architectural geometry and an associated masked render layer;
   imagery may be regenerated without silently changing boundaries or separate assets.
 - **Object:** independent visual asset and optional gameplay properties. Use objects
@@ -560,8 +562,12 @@ through File Save/Open (ADR-0015). See ADR-0010 and ADR-0012 for boundaries and 
 
 Scopes identify editing targets; layers determine visual composition. Selecting a
 scope does not invoke AI. Future generation still follows preview, accept/reject,
-revision checks and undo. The current Map button selects the future background
-target only; there is no background-generation operation yet.
+revision checks and undo. Mock background generation is implemented; geometry-aware
+exterior generation remains planned. Hiding room artwork should reveal the exterior
+background beneath it without removing the room, its walls/doors or gameplay data.
+The background must retain complete exterior pixels under interiors. Do not bake room
+interiors into that background or infer a roof for every room polygon. Building grouping
+and open-air intent require explicit design; Regions remain semantic areas. See ADR-0023.
 
 ### 10.3 Undo and redo
 
@@ -800,11 +806,18 @@ Tasks:
 4. Develop persistent map-style and prompt-wrapper behavior.
 5. Record reproducibility metadata and cost/usage data when the provider supplies it.
 6. Test continuity across adjacent room generations.
+7. Implement geometry-aware exterior backgrounds over the placed layout (ADR-0023):
+   define building/open-air intent and grouping, pass room/entrance context, select a
+   layout-capable provider, and retain complete exterior imagery beneath interior layers.
 
 Exit criteria:
 
 - A user can configure the provider without exposing the secret to the browser or project file.
 - Two adjacent rooms can be generated independently with preserved geometry.
+- In an explicitly defined building case, the background exterior aligns with placed
+  room footprints; hiding interior artwork reveals it without generation or geometry
+  changes. Context includes hidden rooms, stale layouts cannot apply, and background
+  regeneration preserves independent interior assets (ADR-0023).
 - Unsupported operations are disabled or explained before invocation.
 - Failures do not mutate the project.
 
