@@ -189,8 +189,8 @@ test('artwork order survives undo/redo and native save/open without reordering r
     );
   await rows
     .first()
-    .getByRole('button', { name: /^Lower/ })
-    .click();
+    .getByRole('button', { name: /^Reorder/ })
+    .dragTo(rows.last());
   await expect(rows.first()).toHaveAttribute('data-artwork-id', back ?? '');
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(rows.first()).toHaveAttribute('data-artwork-id', front ?? '');
