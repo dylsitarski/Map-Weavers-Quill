@@ -1,11 +1,14 @@
 """Native editor snapshots in a transactional local SQLite store."""
 
+import hashlib
 import os
 import sqlite3
+from io import BytesIO
 from pathlib import Path
 from typing import Annotated, Literal
 from uuid import UUID
 
+from PIL import Image
 from pydantic import Field
 
 from quill.doors import validate_doors
@@ -42,19 +45,51 @@ def validate_project(project: Project, *, derive_missing: bool = False) -> Proje
     if any(
         (
             project.lights,
-            project.layers,
             project.objects,
             project.regions,
             project.sounds,
-            project.generations,
         )
     ):
         raise ValueError(
-            "This editor cannot yet open projects containing lights, artwork, objects, regions, sounds or generation records."
+            "This editor cannot yet open projects containing lights, objects, regions or sounds."
         )
-    entities = [*project.rooms, *project.walls, *project.doors]
+    entities = [
+        *project.rooms,
+        *project.walls,
+        *project.doors,
+        *project.layers,
+        *project.generations,
+    ]
     if len({entity.id for entity in entities}) != len(entities):
         raise ValueError("Entity IDs must be unique across the project.")
+    if len(project.layers) > 1 or len(project.generations) > 128:
+        raise ValueError(
+            "This increment supports one base background and at most 128 generation records."
+        )
+    for layer in project.layers:
+        role = layer.metadata.get("quill.render")
+        if (
+            not isinstance(role, dict)
+            or role.get("role") != "background"
+            or layer.bounds.origin.x != 0
+            or layer.bounds.origin.y != 0
+            or layer.bounds.width != 1200
+            or layer.bounds.height != 800
+            or layer.rotation != 0
+            or layer.zIndex != 0
+            or layer.blendMode != "normal"
+        ):
+            raise ValueError("Only a full-map base background is currently supported.")
+    for record in project.generations:
+        if (
+            record.providerId != "mock"
+            or record.capability != "text_to_image"
+            or record.status != "succeeded"
+            or record.outputHash is None
+            or record.inputHashes
+            or record.baseRevision > project.revision
+        ):
+            raise ValueError("Unsupported background generation provenance.")
     if any(room.renderLayerId is not None for room in project.rooms):
         raise ValueError("A room references an unavailable render layer.")
     walls = derive_walls(
@@ -71,7 +106,16 @@ def validate_project(project: Project, *, derive_missing: bool = False) -> Proje
             raise ValueError(
                 "Stored walls do not match derived room boundaries or contain unsupported overrides."
             )
-    all_ids = [entity.id for entity in [*project.rooms, *walls, *project.doors]]
+    all_ids = [
+        entity.id
+        for entity in [
+            *project.rooms,
+            *walls,
+            *project.doors,
+            *project.layers,
+            *project.generations,
+        ]
+    ]
     if len(set(all_ids)) != len(all_ids):
         raise ValueError("Derived wall IDs collide with another project entity.")
     validate_doors(project.doors, walls)
@@ -91,6 +135,9 @@ class ProjectStore:
         db.execute("PRAGMA journal_mode=WAL")
         db.execute("PRAGMA synchronous=FULL")
         db.executescript("""
+            CREATE TABLE IF NOT EXISTS assets (
+                hash TEXT PRIMARY KEY, content BLOB NOT NULL
+            );
             CREATE TABLE IF NOT EXISTS snapshots (
                 project_id TEXT NOT NULL, revision INTEGER NOT NULL,
                 name TEXT NOT NULL, document TEXT NOT NULL,
@@ -102,6 +149,51 @@ class ProjectStore:
             );
         """)
         return db
+
+    @staticmethod
+    def validate_asset(data: bytes) -> str:
+        if len(data) > 2 * 1024 * 1024:
+            raise ValueError("Raster asset exceeds 2 MiB.")
+        with Image.open(BytesIO(data)) as image:
+            if image.format != "PNG" or image.size != (480, 320):
+                raise ValueError("Expected a 480 × 320 PNG background.")
+            image.verify()
+        return hashlib.sha256(data).hexdigest()
+
+    def put_asset(self, data: bytes) -> str:
+        key = self.validate_asset(data)
+        db = self.connect()
+        try:
+            with db:
+                db.execute("INSERT OR IGNORE INTO assets(hash, content) VALUES (?, ?)", (key, data))
+            return key
+        finally:
+            db.close()
+
+    @staticmethod
+    def read_asset(db: sqlite3.Connection, key: str) -> bytes:
+        row = db.execute("SELECT content FROM assets WHERE hash=?", (key,)).fetchone()
+        if row is None:
+            raise ValueError("A referenced image asset is missing from this computer.")
+        data = bytes(row[0])
+        if ProjectStore.validate_asset(data) != key:
+            raise ValueError("Image asset integrity check failed.")
+        return data
+
+    def get_asset(self, key: str) -> bytes:
+        db = self.connect()
+        try:
+            return self.read_asset(db, key)
+        finally:
+            db.close()
+
+    @staticmethod
+    def validate_assets(db: sqlite3.Connection, project: Project) -> None:
+        hashes = {layer.assetHash for layer in project.layers} | {
+            record.outputHash for record in project.generations if record.outputHash is not None
+        }
+        for key in hashes:
+            ProjectStore.read_asset(db, key)
 
     @staticmethod
     def publish(db: sqlite3.Connection, project_id: str, revision: int) -> None:
@@ -126,6 +218,7 @@ class ProjectStore:
                     raise SaveConflict(
                         "This project changed in another session. Reopen it before saving; your current edits have not been overwritten."
                     )
+                self.validate_assets(db, project)
                 saved = project.model_copy(update={"revision": (actual or 0) + 1})
                 document = saved.model_dump_json()
                 # Validate the serialized snapshot before publishing its pointer.
@@ -148,7 +241,9 @@ class ProjectStore:
             ).fetchone()
             if row is None:
                 raise KeyError(project_id)
-            return validate_project(Project.model_validate_json(row[0]))
+            project = validate_project(Project.model_validate_json(row[0]))
+            self.validate_assets(db, project)
+            return project
         finally:
             db.close()
 

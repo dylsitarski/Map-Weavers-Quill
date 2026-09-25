@@ -348,3 +348,9 @@ li {
   text-align: left;
   overflow-wrap: anywhere;
 }
+
+.background-preview {
+  width: 100%;
+  height: auto;
+  display: block;
+}

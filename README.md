@@ -13,7 +13,8 @@ pointer-anchored zoom, resize, grid visibility, snapping, rectangular room creat
 polygon room creation, selection/move/vertex editing, a room inspector, deletion,
 undo/redo of room changes, derived wall inspection, and constrained door placement/editing. Geometry changes pass server-side polygon validation.
 File → New/Save/Open now stores validated native project snapshots locally.
-There is no Foundry importer yet.
+Milestone 2 has begun with persistent mock background generation, preview/accept,
+undo and saved raster assets. There is no Foundry importer yet.
 
 ### Setup (Linux, Python 3.12 and Node 24)
 
@@ -68,7 +69,7 @@ are implemented and run before persistence (ADR-0015).
 
 The accepted UI scheme and future feature placement are in [docs/INTERFACE.md](docs/INTERFACE.md).
 The left rail selects the Map background or toggles persistent Room tools. Map
-targets the base environmental image without opening a panel; generation is planned.
+targets the base environmental image without opening a left panel; AI contains mock preview controls.
 Global menus live along the top, and the
 right panel at upper-right collapses and has Information, Layers and AI tabs.
 Information contains selection details only. Layers replaces the room list and
@@ -188,14 +189,41 @@ return a conflict instead of overwriting another session. A failed or interrupte
 save leaves the previous committed version available.
 
 This first persistence profile supports 1200 × 800 maps, a 50-unit grid, rooms,
-derived walls and doors. Unsupported dimensions, wall overrides, artwork, lights,
-objects, regions, sounds and generation records are rejected rather than stripped.
+derived walls, doors, one base background and its mock generation records.
+Unsupported dimensions, wall overrides, additional artwork layers, lights, objects,
+regions and sounds are rejected rather than stripped.
 All supported IDs, references, polygons and door openings are checked. Save requests
 are limited to 4 MiB, with existing geometry limits (128 rooms, 2048 total vertices,
 8192 walls, 1024 doors). Unknown schema versions are rejected without migration.
 Portable JSON/archive import/export, autosave and a revision-recovery UI are not
 implemented. Saved revision numbers are monotonic; unsaved scene snapshots remain
 local to this editor. See ADR-0015.
+
+## Milestone 2: First raster increment
+
+Select **Map → AI → Generate preview**. The offline mock produces a deterministic
+480 × 320 checker pattern from the prompt and seed, scaled across the 1200 × 800 map.
+This is a pipeline test, not AI artwork. Accept background creates/replaces only
+the base layer; Reject preview changes no document data. Regenerate preview replaces
+the proposal. Accepted artwork and provenance support undo/redo and File Save/Open.
+Layers offers background visibility and opacity; regeneration preserves both and
+the layer's ID. Room and door geometry remain independent.
+
+Any document/history change makes a preview stale, including an edit followed by
+Undo. Regenerate before accepting. Cancel preview abandons the response; the fast
+mock computation may still finish on the server. This increment is not a persistent
+job queue and does not claim provider-side cancellation.
+
+PNG bytes are SHA-256 addressed in the same local SQLite database. Save/open verify
+that referenced assets exist and match their hashes; missing/corrupt assets reject
+opening rather than silently dropping artwork. Previous and rejected assets are
+retained (garbage collection is not implemented). This profile permits one base
+background and at most 128 generation records. Existing projects remain compatible.
+No credentials or external model calls are used.
+
+Room crops/masks, protected-pixel compositing, room artwork, independent layer
+ordering, generation job orchestration and flattened export remain Milestone 2 work.
+See ADR-0016. APIs: POST /api/generation/background and GET /api/assets/{sha256}.
 
 ## Distribution
 

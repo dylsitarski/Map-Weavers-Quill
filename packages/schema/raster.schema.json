@@ -1,0 +1,315 @@
+{
+  "$defs": {
+    "BackgroundRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "baseRevision": {
+          "minimum": 0,
+          "title": "Baserevision",
+          "type": "integer"
+        },
+        "contractVersion": {
+          "const": "0.1.0",
+          "default": "0.1.0",
+          "title": "Contractversion",
+          "type": "string"
+        },
+        "prompt": {
+          "maxLength": 4000,
+          "title": "Prompt",
+          "type": "string"
+        },
+        "seed": {
+          "maximum": 2147483647,
+          "minimum": 0,
+          "title": "Seed",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "prompt",
+        "seed",
+        "baseRevision"
+      ],
+      "title": "BackgroundRequest",
+      "type": "object"
+    },
+    "BackgroundResult": {
+      "additionalProperties": false,
+      "properties": {
+        "contractVersion": {
+          "const": "0.1.0",
+          "default": "0.1.0",
+          "title": "Contractversion",
+          "type": "string"
+        },
+        "generation": {
+          "$ref": "#/$defs/GenerationRecord"
+        },
+        "layer": {
+          "$ref": "#/$defs/RasterLayer"
+        }
+      },
+      "required": [
+        "layer",
+        "generation"
+      ],
+      "title": "BackgroundResult",
+      "type": "object"
+    },
+    "Bounds": {
+      "additionalProperties": false,
+      "properties": {
+        "height": {
+          "exclusiveMinimum": 0,
+          "title": "Height",
+          "type": "number"
+        },
+        "origin": {
+          "$ref": "#/$defs/Point"
+        },
+        "width": {
+          "exclusiveMinimum": 0,
+          "title": "Width",
+          "type": "number"
+        }
+      },
+      "required": [
+        "origin",
+        "width",
+        "height"
+      ],
+      "title": "Bounds",
+      "type": "object"
+    },
+    "GenerationRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "baseRevision": {
+          "minimum": 0,
+          "title": "Baserevision",
+          "type": "integer"
+        },
+        "capability": {
+          "title": "Capability",
+          "type": "string"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "inputHashes": {
+          "items": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "title": "Inputhashes",
+          "type": "array"
+        },
+        "kind": {
+          "const": "generation",
+          "title": "Kind",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "metadata": {
+          "additionalProperties": false,
+          "patternProperties": {
+            "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)+$": {
+              "$ref": "#/$defs/JsonValue"
+            }
+          },
+          "title": "Metadata",
+          "type": "object"
+        },
+        "outputHash": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Outputhash"
+        },
+        "parameters": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Parameters",
+          "type": "object"
+        },
+        "prompt": {
+          "title": "Prompt",
+          "type": "string"
+        },
+        "providerId": {
+          "title": "Providerid",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 0,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "running",
+            "succeeded",
+            "failed",
+            "cancelled",
+            "stale"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "label",
+        "metadata",
+        "kind",
+        "providerId",
+        "capability",
+        "prompt",
+        "inputHashes",
+        "outputHash",
+        "parameters",
+        "status",
+        "baseRevision"
+      ],
+      "title": "GenerationRecord",
+      "type": "object"
+    },
+    "JsonValue": {},
+    "Point": {
+      "additionalProperties": false,
+      "properties": {
+        "x": {
+          "title": "X",
+          "type": "number"
+        },
+        "y": {
+          "title": "Y",
+          "type": "number"
+        }
+      },
+      "required": [
+        "x",
+        "y"
+      ],
+      "title": "Point",
+      "type": "object"
+    },
+    "RasterLayer": {
+      "additionalProperties": false,
+      "properties": {
+        "assetHash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Assethash",
+          "type": "string"
+        },
+        "blendMode": {
+          "enum": [
+            "normal",
+            "multiply",
+            "screen"
+          ],
+          "title": "Blendmode",
+          "type": "string"
+        },
+        "bounds": {
+          "$ref": "#/$defs/Bounds"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "raster",
+          "title": "Kind",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "metadata": {
+          "additionalProperties": false,
+          "patternProperties": {
+            "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)+$": {
+              "$ref": "#/$defs/JsonValue"
+            }
+          },
+          "title": "Metadata",
+          "type": "object"
+        },
+        "opacity": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Opacity",
+          "type": "number"
+        },
+        "revision": {
+          "minimum": 0,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "rotation": {
+          "exclusiveMaximum": 360,
+          "minimum": 0,
+          "title": "Rotation",
+          "type": "number"
+        },
+        "visible": {
+          "title": "Visible",
+          "type": "boolean"
+        },
+        "zIndex": {
+          "title": "Zindex",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "label",
+        "metadata",
+        "kind",
+        "assetHash",
+        "bounds",
+        "rotation",
+        "zIndex",
+        "opacity",
+        "visible",
+        "blendMode"
+      ],
+      "title": "RasterLayer",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "request": {
+      "$ref": "#/$defs/BackgroundRequest"
+    },
+    "result": {
+      "$ref": "#/$defs/BackgroundResult"
+    }
+  },
+  "required": [
+    "request",
+    "result"
+  ],
+  "title": "RasterContracts",
+  "type": "object"
+}

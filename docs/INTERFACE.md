@@ -147,3 +147,10 @@ coordinate snaps and the center remains on the wall. A 50-unit opening can meet 
 wall endpoint exactly. Click-drag slides only along its attached wall, with a live
 preview and one validated undo entry on release; leaving the canvas, blur, Escape
 or tool changes cancel. Inspector positions remain exact, independent of Snap.
+
+Milestone 2 first increment: Map → AI now provides mock background prompt/seed,
+Generate preview, Accept background, Reject preview, Regenerate preview and Cancel
+preview. The image preview stays in the right panel until accepted; it does not
+replace canvas pixels automatically. Stale previews explain why acceptance is
+blocked. Layers exposes background visibility and opacity; the base stays at the
+bottom. Room imagery and independent artwork ordering remain planned (ADR-0016).

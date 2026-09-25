@@ -69,3 +69,7 @@ rooms and a door, save/reload/open and compare native geometry and canvas pixels
 also test failure recovery, conflicts and cancelling New. Existing tests cover
 50 sequential scene changes through undo/redo. Linux is the tested platform;
 Windows 11 remains unverified. No Foundry importer or AI generation is implied.
+
+Milestone 2 update: ADR-0016 extends this profile to one base background and its
+mock generation records, with PNG assets in the same database. Historical restrictions
+on all artwork/generation records above describe the original Milestone 1 profile.

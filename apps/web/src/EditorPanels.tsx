@@ -1,5 +1,11 @@
 import { type ReactNode, useEffect, useRef, useState } from 'react';
-import type { Door, Point, Room, Wall } from '../../../packages/schema/project';
+import type {
+  Door,
+  Point,
+  RasterLayer,
+  Room,
+  Wall,
+} from '../../../packages/schema/project';
 import { DoorInspector } from './DoorInspector';
 import type { Scope, Tool } from './editorTools';
 import { PromptPanel } from './PromptPanel';
@@ -8,6 +14,9 @@ import { RoomInspector } from './RoomInspector';
 type Props = {
   status: string;
   fileControls: ReactNode;
+  backgroundControls: ReactNode;
+  background: RasterLayer | null;
+  changeBackground: (changes: { visible?: boolean; opacity?: number }) => void;
   tool: Tool;
   setTool: (tool: Tool) => void;
   scope: Scope | null;
@@ -185,7 +194,7 @@ export function EditorPanels(p: Props) {
             aria-controls={name === 'Room' ? 'scope-panel' : undefined}
             title={
               name === 'Map'
-                ? 'Select the base background. AI generation is planned.'
+                ? 'Select the base background. Open AI for a mock preview.'
                 : undefined
             }
             onClick={(e) => {
@@ -439,7 +448,7 @@ export function EditorPanels(p: Props) {
             ) : (
               <p>
                 {p.scope === 'Map'
-                  ? 'Base background selected. Generation controls will be available in AI.'
+                  ? 'Base background selected. Open AI to generate a mock background preview.'
                   : 'Select an item to inspect it.'}
               </p>
             )}
@@ -486,6 +495,48 @@ export function EditorPanels(p: Props) {
               ))}
             </ul>
             <p>Base background · fixed at bottom</p>
+            {p.background && (
+              <>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={p.background.visible}
+                    disabled={p.busy}
+                    onChange={(e) =>
+                      p.changeBackground({ visible: e.target.checked })
+                    }
+                  />
+                  Show background
+                </label>
+                <label>
+                  Background opacity
+                  <select
+                    value={p.background.opacity}
+                    disabled={p.busy}
+                    onChange={(e) =>
+                      p.changeBackground({ opacity: Number(e.target.value) })
+                    }
+                  >
+                    {[
+                      0,
+                      0.25,
+                      0.5,
+                      0.75,
+                      1,
+                      ...([0, 0.25, 0.5, 0.75, 1].includes(p.background.opacity)
+                        ? []
+                        : [p.background.opacity]),
+                    ]
+                      .sort((a, b) => a - b)
+                      .map((value) => (
+                        <option key={value} value={value}>
+                          {Math.round(value * 100)}%
+                        </option>
+                      ))}
+                  </select>
+                </label>
+              </>
+            )}
           </section>
           <section
             role="tabpanel"
@@ -493,6 +544,7 @@ export function EditorPanels(p: Props) {
             aria-labelledby="tab-AI"
             hidden={tab !== 'AI'}
           >
+            <div hidden={p.scope !== 'Map'}>{p.backgroundControls}</div>
             {p.selected ? (
               <PromptPanel
                 key={JSON.stringify(p.selected)}
@@ -506,8 +558,8 @@ export function EditorPanels(p: Props) {
             ) : (
               <p>
                 {p.scope === 'Map'
-                  ? 'Target: base background. Background generation is not available yet.'
-                  : 'Select a room to edit its prompt, or Map to target the base background. AI generation is not available yet.'}
+                  ? 'Accepting a preview changes only the base background.'
+                  : 'Select a room to edit its prompt, or Map to target the base background. Room generation is not available yet.'}
               </p>
             )}
           </section>

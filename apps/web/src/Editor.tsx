@@ -8,6 +8,8 @@ import type {
   Project,
   Room,
 } from '../../../packages/schema/project';
+import { BackgroundImage } from './BackgroundImage';
+import { BackgroundPanel } from './BackgroundPanel';
 import {
   type DoorDrag,
   doorSegment,
@@ -111,6 +113,8 @@ export function Editor({ status }: { status: string }) {
     ...project,
     rooms: scene.rooms,
     doors: scene.doors,
+    layers: scene.layers ?? [],
+    generations: scene.generations ?? [],
     walls: scene.doors.length ? scene.walls : [],
     map: { ...project.map, grid: { ...project.map.grid, visible: grid, snap } },
   };
@@ -137,7 +141,13 @@ export function Editor({ status }: { status: string }) {
     changeTools({ type: 'close' });
     dispatchScene({
       type: 'load',
-      scene: { rooms: next.rooms, walls: next.walls, doors: next.doors },
+      scene: {
+        rooms: next.rooms,
+        walls: next.walls,
+        doors: next.doors,
+        layers: next.layers,
+        generations: next.generations,
+      },
     });
     setProject(next);
     setGrid(next.map.grid.visible);
@@ -321,6 +331,7 @@ export function Editor({ status }: { status: string }) {
       type: 'commit',
       before: scene,
       scene: {
+        ...scene,
         rooms: next,
         walls: attachments.walls,
         doors: attachments.doors,
@@ -338,6 +349,7 @@ export function Editor({ status }: { status: string }) {
         type: 'commit',
         before: scene,
         scene: {
+          ...scene,
           rooms: scene.rooms,
           walls: attachments.walls,
           doors: attachments.doors,
@@ -587,6 +599,7 @@ export function Editor({ status }: { status: string }) {
         data-wall-count={wallState.walls.length}
         data-walls-loading={wallState.loading}
         data-door-count={scene.doors.length}
+        data-background-hash={scene.layers?.[0]?.assetHash ?? ''}
       >
         <Stage
           width={size.width}
@@ -700,6 +713,13 @@ export function Editor({ status }: { status: string }) {
               fill="#e9e2ce"
               stroke="#b7a578"
             />
+            {scene.layers?.[0] && (
+              <BackgroundImage
+                layer={scene.layers[0]}
+                view={view}
+                onError={setError}
+              />
+            )}
             {gridLines.map((line) => (
               <Line
                 key={`${line[0].x},${line[0].y}:${line[1].x},${line[1].y}`}
@@ -835,6 +855,53 @@ export function Editor({ status }: { status: string }) {
       </div>
       <EditorPanels
         status={status}
+        backgroundControls={
+          <BackgroundPanel
+            context={sceneHistory}
+            fingerprint={fingerprint}
+            projectId={project.projectId}
+            revision={project.revision}
+            busy={busy}
+            count={scene.generations?.length ?? 0}
+            accept={(result) => {
+              if (pending.current) return;
+              const previous = scene.layers?.[0];
+              const layer = previous
+                ? {
+                    ...previous,
+                    assetHash: result.layer.assetHash,
+                    revision: previous.revision + 1,
+                  }
+                : result.layer;
+              dispatchScene({
+                type: 'commit',
+                before: scene,
+                scene: {
+                  ...scene,
+                  layers: [layer],
+                  generations: [
+                    ...(scene.generations ?? []),
+                    result.generation,
+                  ],
+                },
+              });
+              setNotice('Background accepted. Save to keep it.');
+            }}
+          />
+        }
+        background={scene.layers?.[0] ?? null}
+        changeBackground={(changes) => {
+          if (pending.current || !scene.layers?.[0]) return;
+          const layer = scene.layers[0];
+          dispatchScene({
+            type: 'commit',
+            before: scene,
+            scene: {
+              ...scene,
+              layers: [{ ...layer, ...changes, revision: layer.revision + 1 }],
+            },
+          });
+        }}
         fileControls={
           <ProjectMenu
             name={project.name}

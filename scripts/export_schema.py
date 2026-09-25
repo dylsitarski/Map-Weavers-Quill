@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 from pydantic import BaseModel
+from quill.backgrounds import BackgroundRequest, BackgroundResult
 from quill.doors import DoorRequest, DoorResult
 from quill.geometry import GeometryRequest, GeometryResult
 from quill.models import Project
@@ -17,6 +18,11 @@ from quill.providers import (
     ProviderError,
 )
 from quill.walls import WallDerivationRequest, WallDerivationResult
+
+
+class RasterContracts(BaseModel):
+    request: BackgroundRequest
+    result: BackgroundResult
 
 
 class ProviderContracts(BaseModel):
@@ -55,6 +61,7 @@ def main() -> None:
         ("provider", ProviderContracts),
         ("geometry", GeometryContracts),
         ("persistence", PersistenceContracts),
+        ("raster", RasterContracts),
     ]:
         target = ROOT / f"packages/schema/{name}.schema.json"
         schema = model.model_json_schema()

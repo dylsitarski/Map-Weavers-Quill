@@ -1,6 +1,18 @@
-import type { Door, Room, Wall } from '../../../packages/schema/project';
+import type {
+  Door,
+  GenerationRecord,
+  RasterLayer,
+  Room,
+  Wall,
+} from '../../../packages/schema/project';
 
-export type Scene = { rooms: Room[]; doors: Door[]; walls: Wall[] };
+export type Scene = {
+  rooms: Room[];
+  doors: Door[];
+  walls: Wall[];
+  layers?: RasterLayer[];
+  generations?: GenerationRecord[];
+};
 export type SceneHistory = { past: Scene[]; present: Scene; future: Scene[] };
 export const emptySceneHistory: SceneHistory = {
   past: [],
