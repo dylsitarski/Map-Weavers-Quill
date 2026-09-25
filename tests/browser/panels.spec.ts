@@ -75,50 +75,26 @@ test('scrolling inspector never zooms; tabs remain fixed and retain form drafts'
   ).toHaveValue('Unsaved name');
 });
 
-test('layer ordering updates stacking and is undoable without changing geometry', async ({
+test('Layers omits room outlines and canvas selection preserves the current tab', async ({
   page,
 }) => {
   await setup(page);
-  await room(page);
-  await expect(page.locator('[data-room-id]')).toHaveCount(2);
   await page.getByRole('tab', { name: 'Layers', exact: true }).click();
-  const rows = page.locator('[data-room-id]');
-  const geometry = await rows.first().getAttribute('data-geometry');
+  await expect(page.getByRole('list', { name: 'Room layers' })).toHaveCount(0);
   await expect(
-    rows.first().getByRole('button', { name: 'Room 2', exact: true }),
-  ).toBeVisible();
-  await page.getByRole('button', { name: 'Lower Room 2', exact: true }).click();
-  await expect(
-    rows.first().getByRole('button', { name: 'Room 1', exact: true }),
-  ).toBeVisible();
-  await expect(rows.last()).toHaveAttribute('data-geometry', geometry ?? '');
-  // Hit testing follows the newly visible top room.
-  await edit(page);
-  await expect(
-    page.getByRole('textbox', { name: 'Name', exact: true }),
-  ).toHaveValue('Room 1');
-  await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  await page.getByRole('tab', { name: 'Layers', exact: true }).click();
-  await expect(
-    rows.first().getByRole('button', { name: 'Room 2', exact: true }),
-  ).toBeVisible();
-  await page.getByRole('button', { name: 'Room 2', exact: true }).click();
+    page.getByRole('list', { name: 'Artwork layers' }).locator('li'),
+  ).toHaveCount(0);
+  await page
+    .getByRole('button', { name: 'Select/edit room', exact: true })
+    .click();
+  await page.mouse.click(550, 350);
   await expect(
     page.getByRole('tab', { name: 'Layers', exact: true }),
   ).toHaveAttribute('aria-selected', 'true');
   await page.getByRole('tab', { name: 'Information', exact: true }).click();
   await expect(
     page.getByRole('textbox', { name: 'Name', exact: true }),
-  ).toHaveValue('Room 2');
-  await page.getByRole('tab', { name: 'AI', exact: true }).click();
-  await page.mouse.click(850, 550);
-  await page.mouse.click(550, 350);
-  await expect(
-    page.getByRole('tab', { name: 'AI', exact: true }),
-  ).toHaveAttribute('aria-selected', 'true');
-  await expect(
-    page.getByRole('textbox', { name: 'Room prompt', exact: true }),
-  ).toBeVisible();
+  ).toHaveValue('Room 1');
 });
 
 test('reenabling snap realigns an off-grid room without deforming it', async ({

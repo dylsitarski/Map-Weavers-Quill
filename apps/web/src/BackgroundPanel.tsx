@@ -1,7 +1,11 @@
 import Ajv2020 from 'ajv/dist/2020';
 import addFormats from 'ajv-formats';
 import { useEffect, useRef, useState } from 'react';
-import type { Project, Room } from '../../../packages/schema/project';
+import type {
+  Project,
+  RasterLayer,
+  Room,
+} from '../../../packages/schema/project';
 import type { BackgroundResult } from '../../../packages/schema/raster';
 import schema from '../../../packages/schema/raster.schema.json';
 
@@ -12,6 +16,8 @@ const valid = ajv.compile<BackgroundResult>({
   $ref: '#/$defs/BackgroundResult',
 });
 export function BackgroundPanel(p: {
+  preview: (layer: RasterLayer | null) => void;
+  active: boolean;
   room?: Room | null;
   project?: Project;
   context: object;
@@ -101,6 +107,25 @@ export function BackgroundPanel(p: {
       proposal.fingerprint !== p.fingerprint ||
       proposal.projectId !== p.projectId ||
       proposal.roomId !== p.room?.id);
+  useEffect(() => {
+    setLoaded(false);
+    if (!proposal || stale) return;
+    const image = new window.Image();
+    image.onload = () => setLoaded(true);
+    image.onerror = () =>
+      setError('Could not load the preview image. Regenerate to retry.');
+    image.src = `/api/assets/${proposal.result.layer.assetHash}`;
+    return () => {
+      image.onload = null;
+      image.onerror = null;
+    };
+  }, [proposal, stale]);
+  useEffect(() => {
+    p.preview(
+      proposal && !stale && loaded && p.active ? proposal.result.layer : null,
+    );
+    return () => p.preview(null);
+  }, [proposal, stale, loaded, p.active, p.preview]);
   return (
     <section aria-label={p.room ? 'Room generation' : 'Background generation'}>
       <h2>{p.room ? 'Room artwork' : 'Map background'}</h2>
@@ -158,20 +183,6 @@ export function BackgroundPanel(p: {
       {error && <p role="alert">{error}</p>}
       {proposal && (
         <>
-          <img
-            className="background-preview"
-            src={`/api/assets/${proposal.result.layer.assetHash}`}
-            alt={
-              p.room ? 'Generated room preview' : 'Generated background preview'
-            }
-            onLoad={() => setLoaded(true)}
-            onError={() => {
-              setLoaded(false);
-              setError(
-                'Could not load the preview image. Regenerate to retry.',
-              );
-            }}
-          />
           <p>
             Preview: {proposal.result.generation.prompt} · seed{' '}
             {String(proposal.result.generation.parameters.seed)}

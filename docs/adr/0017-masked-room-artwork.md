@@ -57,7 +57,7 @@ with a notice; name/prompt-only edits preserve art. Deletion removes its bound l
 Undo restores geometry and artwork together. No implicit stretching, translation or
 regeneration of pixels is performed. Background regeneration/reconfiguration preserves
 all independent room layers. Regions retain their semantic, non-artwork definition.
-Room-shape order is independent of artwork order. The Layers tab lists artwork front-to-back with raise/lower, visibility and opacity controls. Background stays at zIndex zero; room art has positive ranks. Reordering normalizes room-art ranks, resolves ties by UUID, and updates revisions only for changed ranks. Every change is one undoable document edit and invalidates pending previews. Geometry and generation provenance are unchanged.
+Room-shape order is independent of artwork order. The Layers tab lists artwork front-to-back with drag reordering (keyboard arrows on the handle), visibility and opacity sliders. Background stays at zIndex zero; room art has positive ranks. Reordering normalizes room-art ranks, resolves ties by UUID, and updates revisions only for changed ranks. Every change is one undoable document edit and invalidates pending previews. Geometry and generation provenance are unchanged.
 
 ## Verification
 
@@ -66,3 +66,8 @@ context crop bounds, exact outside-mask equality with other room art present, an
 provider deliberately painting the entire crop. Persistence tests verify binding and
 reject out-of-mask alpha. Browser tests cover room preview/accept/reject/regenerate,
 undo/redo, save/open, background independence, stale geometry and artwork clearing.
+
+Previews are transient map overlays, replacing the target artwork visually at its rank
+while leaving the document untouched. Preview displays at full opacity; acceptance
+retains the existing layer settings. Scope changes hide previews; stale context removes
+them. The Layers tab no longer lists room outlines. See INTERFACE.md for row controls.

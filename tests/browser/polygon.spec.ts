@@ -9,7 +9,7 @@ async function begin(page: Page) {
 async function corners(page: Page, points: number[][]) {
   for (const [x, y] of points) await page.mouse.click(x, y);
 }
-const rooms = (page: Page) => page.locator('[aria-label="Room layers"]');
+const rooms = (page: Page) => page.locator('[data-testid="room-geometry"]');
 
 test('concave polygon closes at the first point and round trips undo/redo', async ({
   page,
@@ -35,11 +35,11 @@ test('concave polygon closes at the first point and round trips undo/redo', asyn
       (p: { x: number; y: number }) => p.x % 50 === 0 && p.y % 50 === 0,
     ),
   ).toBe(true);
-  await expect(rooms(page).locator('li')).toHaveCount(1);
+  await expect(rooms(page).locator('[data-room-id]')).toHaveCount(1);
   await expect(page.getByTestId('vertex-count')).toHaveText('0 vertices');
   const geometry = await rooms(page).textContent();
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  await expect(rooms(page).locator('li')).toHaveCount(0);
+  await expect(rooms(page).locator('[data-room-id]')).toHaveCount(0);
   await page.getByRole('button', { name: 'Redo', exact: true }).click();
   await expect(rooms(page)).toHaveText(geometry ?? '');
 });
@@ -62,7 +62,7 @@ test('crossed polygon is rejected without history and its draft can be repaired'
   ).toBeDisabled();
   await page.getByRole('button', { name: 'Remove last point' }).click();
   await page.getByRole('button', { name: 'Finish polygon' }).click();
-  await expect(rooms(page).locator('li')).toHaveCount(1);
+  await expect(rooms(page).locator('[data-room-id]')).toHaveCount(1);
   await expect(page.getByRole('alert')).toHaveCount(0);
 });
 
@@ -93,7 +93,7 @@ test('temporary pan preserves polygon draft; scope closure cancels draft but rem
     [700, 500],
   ]);
   await page.keyboard.press('Escape');
-  await expect(rooms(page).locator('li')).toHaveCount(0);
+  await expect(rooms(page).locator('[data-room-id]')).toHaveCount(0);
   await expect(
     page.getByRole('button', { name: 'Undo', exact: true }),
   ).toBeDisabled();

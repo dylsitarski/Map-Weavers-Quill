@@ -12,7 +12,7 @@ async function setup(page: Page) {
   await page.mouse.move(700, 450);
   await page.mouse.up();
   await expect(
-    page.locator('[aria-label="Room layers"]').locator('li'),
+    page.locator('[data-testid="room-geometry"]').locator('[data-room-id]'),
   ).toHaveCount(1);
   await page
     .getByRole('button', { name: 'Select/edit room', exact: true })
@@ -69,7 +69,7 @@ test('move, reshape, inspect and delete are undoable room edits', async ({
   await page.getByRole('tab', { name: 'Information', exact: true }).click();
   await page.getByRole('button', { name: 'Delete room', exact: true }).click();
   await expect(
-    page.locator('[aria-label="Room layers"]').locator('li'),
+    page.locator('[data-testid="room-geometry"]').locator('[data-room-id]'),
   ).toHaveCount(0);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(
@@ -84,7 +84,7 @@ test('invalid edits leave geometry and history unchanged; Escape cancels a drag'
   page,
 }) => {
   await setup(page);
-  const rooms = page.locator('[aria-label="Room layers"]');
+  const rooms = page.locator('[data-testid="room-geometry"]');
   const before = await rooms.textContent();
   const x2 = await page
     .getByRole('spinbutton', { name: 'Vertex 2 x', exact: true })
@@ -104,5 +104,5 @@ test('invalid edits leave geometry and history unchanged; Escape cancels a drag'
   await page.mouse.up();
   await expect(rooms).toHaveText(before ?? '');
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  await expect(rooms.locator('li')).toHaveCount(0);
+  await expect(rooms.locator('[data-room-id]')).toHaveCount(0);
 });

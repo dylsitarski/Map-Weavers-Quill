@@ -162,3 +162,15 @@ artwork with a notice; Undo restores it. Layers still orders room geometry only;
 independent artwork ordering remains the next layer-management increment (ADR-0017).
 
 Artwork controls in Layers are listed front-to-back separately from room outlines. Raise/lower changes raster composition only; background stays pinned at the bottom. Visibility and opacity apply per artwork layer. All changes support undo/redo and native save/open; regeneration retains these settings.
+
+Generation previews render temporarily on the map in the target layer's stack position
+(or its proposed position for new art), at full opacity and visible. They do not enter
+history or save data until accepted. Reject, stale context and leaving the target scope
+remove the overlay. Accepted artwork settings remain unchanged. The AI panel contains
+preview actions, with no thumbnail. Room-outline lists are removed; geometry selection
+is performed on the canvas.
+
+Artwork rows use a drag handle, truncated room name, visibility checkbox and compact
+0–100% opacity slider. Drag onto another artwork row to move to its position. Focus the
+handle and use Up/Down for keyboard reordering. The background is pinned. Opacity edits
+commit once on release/keyboard completion/blur, so a gesture is one undo transaction.

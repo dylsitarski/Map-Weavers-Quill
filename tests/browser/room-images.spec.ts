@@ -91,11 +91,12 @@ test('room artwork accepts separately, survives background generation and save/o
   const artwork = page.getByRole('list', { name: 'Artwork layers' });
   const roomArt = artwork.locator('li').first();
   await roomArt.getByRole('checkbox').uncheck();
-  await roomArt.getByRole('combobox').selectOption('0.5');
+  await roomArt.getByRole('slider').click();
+  await page.getByRole('tab', { name: 'Layers', exact: true }).focus();
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  await expect(roomArt.getByRole('combobox')).toHaveValue('1');
+  await expect(roomArt.getByRole('slider')).toHaveValue('1');
   await page.getByRole('button', { name: 'Redo', exact: true }).click();
-  await expect(roomArt.getByRole('combobox')).toHaveValue('0.5');
+  await expect(roomArt.getByRole('slider')).toHaveValue('0.5');
   await page.getByRole('button', { name: 'File', exact: true }).click();
   const name = `Room art ${crypto.randomUUID()}`;
   await page.getByRole('textbox', { name: 'Project name' }).fill(name);
@@ -114,7 +115,7 @@ test('room artwork accepts separately, survives background generation and save/o
   );
   await page.getByRole('tab', { name: 'Layers', exact: true }).click();
   await expect(roomArt.getByRole('checkbox')).not.toBeChecked();
-  await expect(roomArt.getByRole('combobox')).toHaveValue('0.5');
+  await expect(roomArt.getByRole('slider')).toHaveValue('0.5');
   await page.getByRole('button', { name: 'Room', exact: true }).click();
   await page
     .getByRole('button', { name: 'Select/edit room', exact: true })

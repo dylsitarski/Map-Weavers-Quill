@@ -24,7 +24,7 @@ test('Map toggles background selection without opening a panel', async ({
   ).toHaveAttribute('aria-pressed', 'true');
   await draw(page);
   await expect(
-    page.locator('[aria-label="Room layers"]').locator('li'),
+    page.locator('[data-testid="room-geometry"]').locator('[data-room-id]'),
   ).toHaveCount(0);
   await map.click();
   await expect(map).toHaveAttribute('aria-pressed', 'false');
@@ -56,8 +56,8 @@ test('draw validated room, zoom without mutation, undo and redo', async ({
   await expect(page.getByRole('status')).toHaveText('Local server connected');
   await activateRectangle(page);
   await draw(page);
-  const rooms = page.locator('[aria-label="Room layers"]');
-  await expect(rooms.locator('li')).toHaveCount(1);
+  const rooms = page.locator('[data-testid="room-geometry"]');
+  await expect(rooms.locator('[data-room-id]')).toHaveCount(1);
   const geometry = (await rooms.textContent()) ?? '';
   const zoom = await page.getByTestId('zoom').innerText();
   await page.mouse.wheel(0, -120);
@@ -71,7 +71,7 @@ test('draw validated room, zoom without mutation, undo and redo', async ({
   await page.getByRole('button', { name: 'Fit map', exact: true }).click();
   await expect(rooms).toHaveText(geometry);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  await expect(rooms.locator('li')).toHaveCount(0);
+  await expect(rooms.locator('[data-room-id]')).toHaveCount(0);
   await page.getByRole('button', { name: 'Redo', exact: true }).click();
   await expect(rooms).toHaveText(geometry);
   await page.getByRole('checkbox', { name: 'Grid', exact: true }).uncheck();
@@ -86,7 +86,7 @@ test('failed validation adds no room or history', async ({ page }) => {
   await draw(page);
   await expect(page.getByRole('alert')).toContainText('No room was added');
   await expect(
-    page.locator('[aria-label="Room layers"]').locator('li'),
+    page.locator('[data-testid="room-geometry"]').locator('[data-room-id]'),
   ).toHaveCount(0);
   await expect(
     page.getByRole('button', { name: 'Undo', exact: true }),
@@ -119,7 +119,7 @@ test('scope persists while drawing and remembers tools after closing', async ({
   await draw(page);
   await expect(roomScope).toHaveAttribute('aria-expanded', 'true');
   await expect(
-    page.locator('[aria-label="Room layers"]').locator('li'),
+    page.locator('[data-testid="room-geometry"]').locator('[data-room-id]'),
   ).toHaveCount(1);
   await roomScope.click();
   await expect(pan).toHaveAttribute('aria-pressed', 'true');
@@ -144,7 +144,7 @@ test('scope persists while drawing and remembers tools after closing', async ({
       .evaluate((canvas) => (canvas as HTMLCanvasElement).toDataURL()),
   ).not.toEqual(beforePan);
   await expect(
-    page.locator('[aria-label="Room layers"]').locator('li'),
+    page.locator('[data-testid="room-geometry"]').locator('[data-room-id]'),
   ).toHaveCount(1);
   await rectangle.click();
   await expect(pan).toHaveAttribute('aria-pressed', 'true');

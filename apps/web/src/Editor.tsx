@@ -8,7 +8,7 @@ import type {
   Project,
   Room,
 } from '../../../packages/schema/project';
-import { reorderArtwork } from './artworkLayers';
+import { moveArtwork } from './artworkLayers';
 import { BackgroundImage } from './BackgroundImage';
 import { BackgroundPanel } from './BackgroundPanel';
 import {
@@ -53,6 +53,12 @@ export function Editor({ status }: { status: string }) {
   const container = useRef<HTMLDivElement>(null);
   const initialized = useRef(false);
   const pending = useRef(false);
+  const [backgroundPreview, setBackgroundPreview] = useState<
+    import('../../../packages/schema/project').RasterLayer | null
+  >(null);
+  const [roomArtPreview, setRoomArtPreview] = useState<
+    import('../../../packages/schema/project').RasterLayer | null
+  >(null);
   const [size, setSize] = useState({ width: 800, height: 560 });
   const [view, setView] = useState<View>(fitView(800, 560));
   const [tools, changeTools] = useReducer(toolsReducer, initialTools);
@@ -628,6 +634,9 @@ export function Editor({ status }: { status: string }) {
         data-wall-count={wallState.walls.length}
         data-walls-loading={wallState.loading}
         data-door-count={scene.doors.length}
+        data-preview-hash={
+          roomArtPreview?.assetHash ?? backgroundPreview?.assetHash ?? ''
+        }
         data-background-hash={backgroundLayer?.assetHash ?? ''}
         data-room-art-count={
           scene.rooms.filter((room) => room.renderLayerId !== null).length
@@ -745,15 +754,41 @@ export function Editor({ status }: { status: string }) {
               fill="#e9e2ce"
               stroke="#b7a578"
             />
-            {[...(scene.layers ?? [])]
+            {(() => {
+              let layers = [...(scene.layers ?? [])];
+              for (const preview of [backgroundPreview, roomArtPreview]) {
+                if (!preview) continue;
+                const owner = (
+                  preview.metadata['quill.render'] as { roomId?: string }
+                )?.roomId;
+                const previous = owner
+                  ? scene.rooms.find((room) => room.id === owner)?.renderLayerId
+                  : backgroundLayer?.id;
+                const existing = layers.find((layer) => layer.id === previous);
+                layers = layers.filter((layer) => layer.id !== previous);
+                layers.push({
+                  ...preview,
+                  zIndex: existing?.zIndex ?? preview.zIndex,
+                });
+              }
+              return layers;
+            })()
               .sort((a, b) => a.zIndex - b.zIndex || a.id.localeCompare(b.id))
               .map((layer) => (
                 <BackgroundImage
                   key={layer.id}
                   layer={layer}
                   polygon={
-                    scene.rooms.find((room) => room.renderLayerId === layer.id)
-                      ?.polygon
+                    scene.rooms.find(
+                      (room) =>
+                        room.renderLayerId === layer.id ||
+                        room.id ===
+                          (
+                            layer.metadata['quill.render'] as {
+                              roomId?: string;
+                            }
+                          )?.roomId,
+                    )?.polygon
                   }
                   view={view}
                   onError={setError}
@@ -892,10 +927,23 @@ export function Editor({ status }: { status: string }) {
           />
         )}
       </div>
+      <div hidden data-testid="room-geometry">
+        {scene.rooms.map((room) => (
+          <span
+            key={room.id}
+            data-room-id={room.id}
+            data-geometry={JSON.stringify(room.polygon)}
+          >
+            {room.label}
+          </span>
+        ))}
+      </div>
       <EditorPanels
         status={status}
         backgroundControls={
           <BackgroundPanel
+            preview={setBackgroundPreview}
+            active={scope === 'Map'}
             context={sceneHistory}
             fingerprint={fingerprint}
             projectId={project.projectId}
@@ -934,6 +982,8 @@ export function Editor({ status }: { status: string }) {
         }
         roomGenerationControls={
           <BackgroundPanel
+            preview={setRoomArtPreview}
+            active={scope === 'Room'}
             room={selected}
             project={currentProject}
             context={sceneHistory}
@@ -984,9 +1034,9 @@ export function Editor({ status }: { status: string }) {
           />
         }
         layers={scene.layers ?? []}
-        reorderArtwork={(id, direction) => {
+        reorderArtwork={(id, target) => {
           if (pending.current) return;
-          const layers = reorderArtwork(scene.layers ?? [], id, direction);
+          const layers = moveArtwork(scene.layers ?? [], id, target);
           if (layers === scene.layers) return;
           dispatchScene({
             type: 'commit',
@@ -1098,19 +1148,6 @@ export function Editor({ status }: { status: string }) {
           if (selected) void accept(points, selected, { label, prompt });
         }}
         deleteRoom={() => void deleteRoom()}
-        reorderRoom={(id, direction) => {
-          if (pending.current) return;
-          cancelEdit();
-          const rooms = historyReducer(
-            { past: [], present: scene.rooms, future: [] },
-            { type: 'reorder', id, direction },
-          ).present;
-          dispatchScene({
-            type: 'commit',
-            before: scene,
-            scene: { ...scene, rooms },
-          });
-        }}
         zoom={Math.round(view.scale * 100)}
         error={error}
         clearError={() => setError('')}

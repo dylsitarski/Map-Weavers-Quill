@@ -24,3 +24,23 @@ export function reorderArtwork(
       : { ...layer, zIndex, revision: layer.revision + 1 };
   });
 }
+
+export function moveArtwork(
+  layers: RasterLayer[],
+  id: string,
+  targetId: string,
+): RasterLayer[] {
+  const ordered = orderedArtwork(layers).filter((layer) => layer.zIndex > 0);
+  const from = ordered.findIndex((layer) => layer.id === id);
+  const to = ordered.findIndex((layer) => layer.id === targetId);
+  if (from < 0 || to < 0 || from === to) return layers;
+  const [moved] = ordered.splice(from, 1);
+  ordered.splice(to, 0, moved);
+  const ranks = new Map(ordered.map((layer, index) => [layer.id, index + 1]));
+  return layers.map((layer) => {
+    const zIndex = ranks.get(layer.id) ?? layer.zIndex;
+    return zIndex === layer.zIndex
+      ? layer
+      : { ...layer, zIndex, revision: layer.revision + 1 };
+  });
+}

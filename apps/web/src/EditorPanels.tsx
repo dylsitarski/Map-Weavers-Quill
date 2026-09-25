@@ -22,7 +22,7 @@ type Props = {
     id: string,
     changes: { visible?: boolean; opacity?: number },
   ) => void;
-  reorderArtwork: (id: string, direction: 'up' | 'down') => void;
+  reorderArtwork: (id: string, target: string) => void;
   tool: Tool;
   setTool: (tool: Tool) => void;
   scope: Scope | null;
@@ -55,7 +55,6 @@ type Props = {
   selectRoom: (id: string) => void;
   applyRoom: (points: Point[], label: string, prompt: string) => void;
   deleteRoom: () => void;
-  reorderRoom: (id: string, direction: 'up' | 'down') => void;
   zoom: number;
   error: string;
   clearError: () => void;
@@ -472,41 +471,6 @@ export function EditorPanels(p: Props) {
               change={p.changeArtwork}
               reorder={p.reorderArtwork}
             />
-            <p>Room outlines · front to back</p>
-            <ul aria-label="Room layers">
-              {[...p.rooms].reverse().map((room, index) => (
-                <li
-                  key={room.id}
-                  data-room-id={room.id}
-                  data-geometry={JSON.stringify(room.polygon)}
-                >
-                  <button
-                    type="button"
-                    disabled={p.busy}
-                    aria-pressed={p.selected?.id === room.id}
-                    onClick={() => p.selectRoom(room.id)}
-                  >
-                    {room.label}
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={`Raise ${room.label}`}
-                    disabled={p.busy || index === 0}
-                    onClick={() => p.reorderRoom(room.id, 'up')}
-                  >
-                    ↑
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={`Lower ${room.label}`}
-                    disabled={p.busy || index === p.rooms.length - 1}
-                    onClick={() => p.reorderRoom(room.id, 'down')}
-                  >
-                    ↓
-                  </button>
-                </li>
-              ))}
-            </ul>
           </section>
           <section
             role="tabpanel"

@@ -31,13 +31,18 @@ test('background preview rejection, acceptance, undo, regeneration and save/open
   const blank = await pixels(page);
   await generate(page);
   const preview = await page
-    .getByRole('img', { name: 'Generated background preview' })
-    .getAttribute('src');
+    .getByTestId('map-canvas')
+    .getAttribute('data-preview-hash');
   await expect(page.getByTestId('map-canvas')).toHaveAttribute(
     'data-background-hash',
     '',
   );
+  await expect.poll(() => pixels(page)).not.toBe(blank);
+  await expect(
+    page.getByRole('img', { name: 'Generated background preview' }),
+  ).toHaveCount(0);
   await page.getByRole('button', { name: 'Reject preview' }).click();
+  await expect.poll(() => pixels(page)).toBe(blank);
   await expect(
     page.getByRole('button', { name: 'Undo', exact: true }),
   ).toBeDisabled();
@@ -74,9 +79,8 @@ test('background preview rejection, acceptance, undo, regeneration and save/open
     .getAttribute('data-geometry');
   await page.getByRole('button', { name: 'Map', exact: true }).click();
   await page.getByRole('tab', { name: 'Layers', exact: true }).click();
-  await page
-    .getByRole('combobox', { name: 'Background opacity' })
-    .selectOption('0.5');
+  await page.getByRole('slider', { name: 'Background opacity' }).click();
+  await page.getByRole('tab', { name: 'Layers', exact: true }).focus();
   await page.getByRole('tab', { name: 'AI', exact: true }).click();
   await page.getByRole('spinbutton', { name: 'Seed', exact: true }).fill('1');
   await generate(page);
@@ -111,7 +115,7 @@ test('background preview rejection, acceptance, undo, regeneration and save/open
   );
   await page.getByRole('tab', { name: 'Layers', exact: true }).click();
   await expect(
-    page.getByRole('combobox', { name: 'Background opacity' }),
+    page.getByRole('slider', { name: 'Background opacity' }),
   ).toHaveValue('0.5');
   await expect.poll(() => pixels(page)).toBe(savedPixels);
 });

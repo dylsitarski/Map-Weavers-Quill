@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { orderedArtwork, reorderArtwork } from '../apps/web/src/artworkLayers';
+import {
+  moveArtwork,
+  orderedArtwork,
+  reorderArtwork,
+} from '../apps/web/src/artworkLayers';
 import { type Scene, sceneReducer } from '../apps/web/src/sceneHistory';
 import type { RasterLayer } from '../packages/schema/project';
 
@@ -54,4 +58,24 @@ test('artwork reordering resolves tied ranks, pins background and preserves cont
   assert.equal(reorderArtwork(layers, 'a', 'down'), layers);
   assert.equal(reorderArtwork(layers, 'c', 'up'), layers);
   assert.equal(reorderArtwork(layers, 'missing', 'up'), layers);
+});
+
+test('drag reordering moves across multiple rows and cannot move the background', () => {
+  const layers = [
+    layer('background', 0),
+    layer('a', 1),
+    layer('b', 2),
+    layer('c', 3),
+  ];
+  assert.deepEqual(
+    orderedArtwork(moveArtwork(layers, 'a', 'c')).map((item) => item.id),
+    ['background', 'b', 'c', 'a'],
+  );
+  assert.deepEqual(
+    orderedArtwork(moveArtwork(layers, 'c', 'a')).map((item) => item.id),
+    ['background', 'c', 'a', 'b'],
+  );
+  assert.equal(moveArtwork(layers, 'background', 'c'), layers);
+  assert.equal(moveArtwork(layers, 'c', 'background'), layers);
+  assert.equal(moveArtwork(layers, 'a', 'a'), layers);
 });
