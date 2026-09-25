@@ -180,3 +180,7 @@ targets following it. Line and highlight clear on the source row, invalid target
 leaving a row/list, drop or cancellation. Clicking a room artwork name selects that
 room without switching the right-panel tab. Object artwork selection will use the
 same interaction when object editing is implemented.
+
+File offers Export PNG and Export WebP (480 × 320). Export uses accepted artwork with
+current layer settings, excluding on-map previews and all editing guides. It includes
+unsaved applied edits without saving or changing history.

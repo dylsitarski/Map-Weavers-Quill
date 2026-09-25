@@ -1,7 +1,7 @@
 # ADR-0017: Context-cropped room artwork with enforced masks
 
 Status: Implemented Milestone 2 increment; artwork ordering/visibility/opacity controls are implemented. Persistent
-jobs and flattened export remain unfinished.
+jobs remain unfinished; flattened export is implemented in ADR-0018.
 
 ## Raster convention and protection
 

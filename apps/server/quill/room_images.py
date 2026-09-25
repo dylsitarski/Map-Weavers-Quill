@@ -8,6 +8,7 @@ from PIL import Image
 from pydantic import Field
 
 from quill.backgrounds import BackgroundResult
+from quill.exports import composite_artwork
 from quill.models import Bounds, Contract, GenerationRecord, Point, Project, RasterLayer
 from quill.projects import project_store, validate_project
 from quill.providers import InpaintRequest, MockProvider
@@ -39,14 +40,7 @@ def generate_room(request: RoomImageRequest) -> BackgroundResult:
     if box is None:
         raise ValueError("The room is too small at the current 2.5-map-unit pixel resolution.")
     # Context includes current composited art, including previous target art for regeneration.
-    source = Image.new("RGBA", (WIDTH, HEIGHT), "#e9e2ce")
-    for layer in sorted(project.layers, key=lambda layer: (layer.zIndex, str(layer.id))):
-        if layer.visible:
-            overlay = image(store.get_asset(layer.assetHash))
-            overlay.putalpha(
-                overlay.getchannel("A").point(lambda alpha: round(alpha * layer.opacity))
-            )
-            source = Image.alpha_composite(source, overlay)
+    source = composite_artwork(project, store)
     # Eight pixels of protected surrounding context; crop never changes the mask.
     crop = (max(0, box[0] - 8), max(0, box[1] - 8), min(WIDTH, box[2] + 8), min(HEIGHT, box[3] + 8))
     provider = MockProvider()

@@ -168,6 +168,34 @@
       "title": "Door",
       "type": "object"
     },
+    "ExportRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "contractVersion": {
+          "const": "0.1.0",
+          "default": "0.1.0",
+          "title": "Contractversion",
+          "type": "string"
+        },
+        "format": {
+          "enum": [
+            "png",
+            "webp"
+          ],
+          "title": "Format",
+          "type": "string"
+        },
+        "project": {
+          "$ref": "#/$defs/Project"
+        }
+      },
+      "required": [
+        "project",
+        "format"
+      ],
+      "title": "ExportRequest",
+      "type": "object"
+    },
     "GenerationRecord": {
       "additionalProperties": false,
       "properties": {
@@ -1149,6 +1177,9 @@
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "properties": {
+    "exportRequest": {
+      "$ref": "#/$defs/ExportRequest"
+    },
     "request": {
       "$ref": "#/$defs/BackgroundRequest"
     },
@@ -1160,6 +1191,7 @@
     }
   },
   "required": [
+    "exportRequest",
     "roomRequest",
     "request",
     "result"

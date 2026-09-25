@@ -87,7 +87,7 @@ Regions are semantic/gameplay areas, not generated visual assets. Visual feature
 belong to objects. Planned layer controls will allow room, object and effect artwork
 to be reordered above the base background, with undo and consistent save/export.
 Regeneration will preserve other layers and the target's stacking position.
-Room-shape ordering and independent generated-artwork ordering work now; object composition and flattened export remain unimplemented. See docs/adr/0012-snapping-and-sidebar.md.
+Room-shape ordering and independent generated-artwork ordering work now; object composition remains unimplemented; flattened PNG/WebP export is available. See docs/adr/0012-snapping-and-sidebar.md.
 
 Run `make dev`, open the web interface, choose Room → Rectangle room, and drag inside the map.
 Choose Pan to drag the view, scroll over the canvas to zoom, or use Fit map to
@@ -238,7 +238,7 @@ outside its current room mask. Apply inspector drafts before generation. Geometr
 changes make open previews stale; changing scope may discard room previews.
 
 Artwork ordering, visibility and opacity controls are available in Layers and persist
-through undo/redo and save/open. Persistent generation jobs and flattened export remain
+through undo/redo and save/open. Persistent generation jobs remain
 Milestone 2 work. Room masks/crops and protected compositing are now implemented.
 See ADR-0016. APIs: POST /api/generation/background, POST /api/generation/room and GET /api/assets/{sha256}. See ADR-0017 for room generation.
 
@@ -248,3 +248,12 @@ Public, free distribution is intended. A software license has not been selected;
 this repository does not yet grant a general redistribution license. The owner's
 noncommercial release intent does not itself select a legal license. Do not bundle
 third-party model weights or private assets.
+
+### Export artwork
+
+File → Export PNG or Export WebP downloads the current accepted artwork at 480 × 320
+pixels. Export respects layer order, visibility and opacity, including unsaved applied
+edits. It excludes previews, grid and editing guides. Both formats are lossless; empty
+areas use the neutral map background. Export does not save the project or change undo
+history. Higher-resolution output and Foundry metadata bundles are not implemented.
+See docs/adr/0018-flattened-artwork-export.md.

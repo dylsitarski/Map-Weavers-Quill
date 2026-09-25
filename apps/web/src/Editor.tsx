@@ -19,6 +19,7 @@ import {
   wallPosition,
 } from './doorEditing';
 import { EditorPanels } from './EditorPanels';
+import { ExportPanel } from './ExportPanel';
 import { initialTools, toolsReducer } from './editorTools';
 import { ProjectMenu } from './ProjectMenu';
 import {
@@ -1068,6 +1069,9 @@ export function Editor({ status }: { status: string }) {
         }}
         fileControls={
           <ProjectMenu
+            exportControls={
+              <ExportPanel project={currentProject} busy={busy} />
+            }
             name={project.name}
             revision={project.revision}
             dirty={dirty}

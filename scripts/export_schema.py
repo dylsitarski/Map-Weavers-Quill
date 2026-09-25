@@ -7,6 +7,7 @@ from pathlib import Path
 from pydantic import BaseModel
 from quill.backgrounds import BackgroundRequest, BackgroundResult
 from quill.doors import DoorRequest, DoorResult
+from quill.exports import ExportRequest
 from quill.geometry import GeometryRequest, GeometryResult
 from quill.models import Project
 from quill.projects import ProjectList, SaveRequest
@@ -22,6 +23,7 @@ from quill.walls import WallDerivationRequest, WallDerivationResult
 
 
 class RasterContracts(BaseModel):
+    exportRequest: ExportRequest
     roomRequest: RoomImageRequest
     request: BackgroundRequest
     result: BackgroundResult

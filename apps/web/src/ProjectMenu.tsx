@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import type { ProjectSummary } from '../../../packages/schema/persistence';
 import { listProjects } from './projectFiles';
 export function ProjectMenu(p: {
+  exportControls: ReactNode;
   name: string;
   revision: number;
   dirty: boolean;
@@ -67,6 +68,7 @@ export function ProjectMenu(p: {
       <button type="button" disabled={p.busy} onClick={p.create}>
         New project
       </button>
+      {p.exportControls}
       <h3>Open saved project</h3>
       {loading ? (
         <p>Loading projects…</p>

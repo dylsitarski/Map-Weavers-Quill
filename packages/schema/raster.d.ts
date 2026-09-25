@@ -1,15 +1,10 @@
 /* Generated. Run make schema; do not edit. */
 
-export type Baserevision = number;
 export type Contractversion = "0.1.0";
-export type Prompt = string;
-export type Seed = number;
-export type Contractversion1 = "0.1.0";
-export type Baserevision1 = number;
-export type Capability = string;
+export type Format = "png" | "webp";
+export type Doortype = "door" | "window";
 export type Id = string;
-export type Inputhashes = string[];
-export type Kind = "generation";
+export type Kind = "door";
 export type Label = string;
 /**
  * This interface was referenced by `Metadata`'s JSON-Schema definition
@@ -46,38 +41,39 @@ export type Label = string;
  * via the `patternProperty` "^[a-z][a-z0-9_-]*(\.[a-z][a-z0-9_-]*)+$".
  */
 export type JsonValue = unknown;
-export type Outputhash = string | null;
-export type Prompt1 = string;
-export type Providerid = string;
+export type Position = number;
 export type Revision = number;
+export type Secret = boolean;
+export type State = "open" | "closed" | "locked";
+export type Wallid = string;
+export type Width = number;
+export type Doors = Door[];
+export type Baserevision = number;
+export type Capability = string;
+export type Id1 = string;
+export type Inputhashes = string[];
+export type Kind1 = "generation";
+export type Label1 = string;
+export type Outputhash = string | null;
+export type Prompt = string;
+export type Providerid = string;
+export type Revision1 = number;
 export type Status = "pending" | "running" | "succeeded" | "failed" | "cancelled" | "stale";
+export type Generations = GenerationRecord[];
 export type Assethash = string;
 export type Blendmode = "normal" | "multiply" | "screen";
 export type Height = number;
 export type X = number;
 export type Y = number;
-export type Width = number;
-export type Id1 = string;
-export type Kind1 = "raster";
-export type Label1 = string;
+export type Width1 = number;
+export type Id2 = string;
+export type Kind2 = "raster";
+export type Label2 = string;
 export type Opacity = number;
-export type Revision1 = number;
+export type Revision2 = number;
 export type Rotation = number;
 export type Visible = boolean;
 export type Zindex = number;
-export type Contractversion2 = "0.1.0";
-export type Doortype = "door" | "window";
-export type Id2 = string;
-export type Kind2 = "door";
-export type Label2 = string;
-export type Position = number;
-export type Revision2 = number;
-export type Secret = boolean;
-export type State = "open" | "closed" | "locked";
-export type Wallid = string;
-export type Width1 = number;
-export type Doors = Door[];
-export type Generations = GenerationRecord[];
 export type Layers = RasterLayer[];
 export type Animation = string | null;
 export type Brightradius = number;
@@ -133,7 +129,7 @@ export type Label6 = string;
  * @minItems 3
  */
 export type Polygon = [Point, Point, Point, ...Point[]];
-export type Prompt2 = string;
+export type Prompt1 = string;
 export type Renderlayerid = string | null;
 export type Revision7 = number;
 export type Rooms = Room[];
@@ -155,78 +151,26 @@ export type Revision9 = number;
 export type Sight = boolean;
 export type Sourceroomid = string | null;
 export type Walls = Wall[];
+export type Baserevision1 = number;
+export type Contractversion1 = "0.1.0";
+export type Prompt2 = string;
+export type Seed = number;
+export type Contractversion2 = "0.1.0";
+export type Contractversion3 = "0.1.0";
 export type Roomid = string;
 export type Seed1 = number;
 
 export interface RasterContracts {
+  exportRequest: ExportRequest;
   request: BackgroundRequest;
   result: BackgroundResult;
   roomRequest: RoomImageRequest;
   [k: string]: unknown;
 }
-export interface BackgroundRequest {
-  baseRevision: Baserevision;
+export interface ExportRequest {
   contractVersion?: Contractversion;
-  prompt: Prompt;
-  seed: Seed;
-}
-export interface BackgroundResult {
-  contractVersion?: Contractversion1;
-  generation: GenerationRecord;
-  layer: RasterLayer;
-}
-export interface GenerationRecord {
-  baseRevision: Baserevision1;
-  capability: Capability;
-  id: Id;
-  inputHashes: Inputhashes;
-  kind: Kind;
-  label: Label;
-  metadata: Metadata;
-  outputHash: Outputhash;
-  parameters: Parameters;
-  prompt: Prompt1;
-  providerId: Providerid;
-  revision: Revision;
-  status: Status;
-}
-export interface Metadata {
-  [k: string]: JsonValue;
-}
-export interface Parameters {
-  [k: string]: JsonValue;
-}
-export interface RasterLayer {
-  assetHash: Assethash;
-  blendMode: Blendmode;
-  bounds: Bounds;
-  id: Id1;
-  kind: Kind1;
-  label: Label1;
-  metadata: Metadata1;
-  opacity: Opacity;
-  revision: Revision1;
-  rotation: Rotation;
-  visible: Visible;
-  zIndex: Zindex;
-}
-export interface Bounds {
-  height: Height;
-  origin: Point;
-  width: Width;
-}
-export interface Point {
-  x: X;
-  y: Y;
-}
-export interface Metadata1 {
-  [k: string]: JsonValue;
-}
-export interface RoomImageRequest {
-  contractVersion?: Contractversion2;
+  format: Format;
   project: Project;
-  roomId: Roomid;
-  seed: Seed1;
 }
 export interface Project {
   doors: Doors;
@@ -247,16 +191,63 @@ export interface Project {
 }
 export interface Door {
   doorType: Doortype;
+  id: Id;
+  kind: Kind;
+  label: Label;
+  metadata: Metadata;
+  position: Position;
+  revision: Revision;
+  secret: Secret;
+  state: State;
+  wallId: Wallid;
+  width: Width;
+}
+export interface Metadata {
+  [k: string]: JsonValue;
+}
+export interface GenerationRecord {
+  baseRevision: Baserevision;
+  capability: Capability;
+  id: Id1;
+  inputHashes: Inputhashes;
+  kind: Kind1;
+  label: Label1;
+  metadata: Metadata1;
+  outputHash: Outputhash;
+  parameters: Parameters;
+  prompt: Prompt;
+  providerId: Providerid;
+  revision: Revision1;
+  status: Status;
+}
+export interface Metadata1 {
+  [k: string]: JsonValue;
+}
+export interface Parameters {
+  [k: string]: JsonValue;
+}
+export interface RasterLayer {
+  assetHash: Assethash;
+  blendMode: Blendmode;
+  bounds: Bounds;
   id: Id2;
   kind: Kind2;
   label: Label2;
   metadata: Metadata2;
-  position: Position;
+  opacity: Opacity;
   revision: Revision2;
-  secret: Secret;
-  state: State;
-  wallId: Wallid;
+  rotation: Rotation;
+  visible: Visible;
+  zIndex: Zindex;
+}
+export interface Bounds {
+  height: Height;
+  origin: Point;
   width: Width1;
+}
+export interface Point {
+  x: X;
+  y: Y;
 }
 export interface Metadata2 {
   [k: string]: JsonValue;
@@ -346,7 +337,7 @@ export interface Room {
   label: Label6;
   metadata: Metadata6;
   polygon: Polygon;
-  prompt: Prompt2;
+  prompt: Prompt1;
   renderLayerId: Renderlayerid;
   revision: Revision7;
   styleOverrides: Styleoverrides;
@@ -389,4 +380,21 @@ export interface Wall {
 }
 export interface Metadata8 {
   [k: string]: JsonValue;
+}
+export interface BackgroundRequest {
+  baseRevision: Baserevision1;
+  contractVersion?: Contractversion1;
+  prompt: Prompt2;
+  seed: Seed;
+}
+export interface BackgroundResult {
+  contractVersion?: Contractversion2;
+  generation: GenerationRecord;
+  layer: RasterLayer;
+}
+export interface RoomImageRequest {
+  contractVersion?: Contractversion3;
+  project: Project;
+  roomId: Roomid;
+  seed: Seed1;
 }

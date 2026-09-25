@@ -10,6 +10,7 @@ from starlette.concurrency import run_in_threadpool
 
 from quill.backgrounds import BackgroundRequest, BackgroundResult, generate_background
 from quill.doors import DoorRequest, DoorResult, reconcile_doors
+from quill.exports import ExportRequest, export_image
 from quill.geometry import GeometryRequest, GeometryResult, validate_geometry
 from quill.models import Project
 from quill.projects import ProjectList, SaveConflict, SaveRequest, project_store
@@ -182,3 +183,42 @@ async def room_image(request: Request) -> BackgroundResult:
         raise HTTPException(422, str(error)) from error
     except (OSError, sqlite3.Error) as error:
         raise HTTPException(503, "Could not generate or store room artwork. Retry.") from error
+
+
+@app.post("/api/export/image")
+async def flattened_image(request: Request) -> Response:
+    if request.headers.get("content-type", "").split(";")[0].strip() != "application/json":
+        raise HTTPException(415, "Use application/json.")
+    origin = request.headers.get("origin")
+    if origin and origin not in {
+        "http://127.0.0.1:5173",
+        "http://localhost:5173",
+        "http://127.0.0.1:8000",
+        "http://localhost:8000",
+    }:
+        raise HTTPException(403, "Only the local editor may export images.")
+    body = bytearray()
+    async for chunk in request.stream():
+        body.extend(chunk)
+        if len(body) > 4 * 1024 * 1024:
+            raise HTTPException(413, "Export request exceeds 4 MiB.")
+    try:
+        data = ExportRequest.model_validate_json(bytes(body))
+        output = await run_in_threadpool(export_image, data)
+        return Response(
+            output,
+            media_type=f"image/{data.format}",
+            headers={
+                "Content-Disposition": f'attachment; filename="map.{data.format}"',
+                "Cache-Control": "no-store",
+                "X-Content-Type-Options": "nosniff",
+            },
+        )
+    except ValidationError as error:
+        raise HTTPException(422, "Invalid image export request.") from error
+    except ValueError as error:
+        raise HTTPException(422, str(error)) from error
+    except (OSError, sqlite3.Error) as error:
+        raise HTTPException(
+            503, "Could not export artwork. Check local assets and retry."
+        ) from error
