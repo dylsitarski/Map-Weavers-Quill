@@ -465,6 +465,8 @@ export function EditorPanels(p: Props) {
             hidden={tab !== 'Layers'}
           >
             <ArtworkLayers
+              selectedId={p.selected?.id}
+              selectRoom={p.selectRoom}
               layers={p.layers}
               rooms={p.rooms}
               busy={p.busy}

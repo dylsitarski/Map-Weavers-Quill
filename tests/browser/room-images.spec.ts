@@ -180,6 +180,44 @@ test('artwork order survives undo/redo and native save/open without reordering r
   const list = page.getByRole('list', { name: 'Artwork layers' });
   const rows = list.locator('li');
   await expect(rows).toHaveCount(2);
+  await rows
+    .last()
+    .getByRole('button', { name: /^Select/ })
+    .click();
+  await expect(
+    rows.last().getByRole('button', { name: /^Select/ }),
+  ).toHaveAttribute('aria-pressed', 'true');
+  await expect(
+    page.getByRole('tab', { name: 'Layers', exact: true }),
+  ).toHaveAttribute('aria-selected', 'true');
+  const transfer = await page.evaluateHandle(() => new DataTransfer());
+  await rows
+    .first()
+    .getByRole('button', { name: /^Reorder/ })
+    .dispatchEvent('dragstart', { dataTransfer: transfer });
+  await rows.last().dispatchEvent('dragover', { dataTransfer: transfer });
+  await expect(rows.last()).toHaveClass(/drop-below/);
+  await rows.first().dispatchEvent('dragover', { dataTransfer: transfer });
+  await expect(list.locator('.drop-target')).toHaveCount(0);
+  await rows.last().dispatchEvent('dragover', { dataTransfer: transfer });
+  await rows.last().dispatchEvent('dragleave', { relatedTarget: null });
+  await expect(list.locator('.drop-target')).toHaveCount(0);
+  await rows
+    .first()
+    .getByRole('button', { name: /^Reorder/ })
+    .dispatchEvent('dragend');
+  await rows
+    .last()
+    .getByRole('button', { name: /^Reorder/ })
+    .dispatchEvent('dragstart', { dataTransfer: transfer });
+  await rows.first().dispatchEvent('dragover', { dataTransfer: transfer });
+  await expect(rows.first()).toHaveClass(/drop-above/);
+  await rows
+    .last()
+    .getByRole('button', { name: /^Reorder/ })
+    .dispatchEvent('dragend');
+  await expect(list.locator('.drop-target')).toHaveCount(0);
+  await transfer.dispose();
   const front = await rows.first().getAttribute('data-artwork-id');
   const back = await rows.last().getAttribute('data-artwork-id');
   const geometry = await page

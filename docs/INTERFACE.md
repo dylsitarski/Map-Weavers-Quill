@@ -174,3 +174,9 @@ Artwork rows use a drag handle, truncated room name, visibility checkbox and com
 0–100% opacity slider. Drag onto another artwork row to move to its position. Focus the
 handle and use Up/Down for keyboard reordering. The background is pinned. Opacity edits
 commit once on release/keyboard completion/blur, so a gesture is one undo transaction.
+
+The drag insertion line appears above targets preceding the source row and below
+targets following it. Line and highlight clear on the source row, invalid targets,
+leaving a row/list, drop or cancellation. Clicking a room artwork name selects that
+room without switching the right-panel tab. Object artwork selection will use the
+same interaction when object editing is implemented.

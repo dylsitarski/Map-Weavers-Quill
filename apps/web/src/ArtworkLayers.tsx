@@ -6,13 +6,23 @@ type Props = {
   layers: RasterLayer[];
   rooms: Room[];
   busy: boolean;
+  selectedId?: string;
+  selectRoom: (id: string) => void;
   change: (
     id: string,
     changes: { visible?: boolean; opacity?: number },
   ) => void;
   reorder: (id: string, target: string) => void;
 };
-export function ArtworkLayers({ layers, rooms, busy, change, reorder }: Props) {
+export function ArtworkLayers({
+  layers,
+  rooms,
+  busy,
+  change,
+  reorder,
+  selectedId,
+  selectRoom,
+}: Props) {
   const ordered = orderedArtwork(layers).reverse();
   const [dragged, setDragged] = useState<string | null>(null);
   const [over, setOver] = useState<string | null>(null);
@@ -27,22 +37,31 @@ export function ArtworkLayers({ layers, rooms, busy, change, reorder }: Props) {
       <ul className="artwork-list" aria-label="Artwork layers">
         {ordered.map((layer, index) => {
           const background = layer.zIndex === 0;
+          const room = rooms.find((room) => room.renderLayerId === layer.id);
           const label = background
             ? 'Background'
-            : (rooms.find((room) => room.renderLayerId === layer.id)?.label ??
-              layer.label);
+            : (room?.label ?? layer.label);
           return (
             <li
               key={layer.id}
               data-artwork-id={layer.id}
               className={
-                over === layer.id ? 'artwork-row drop-target' : 'artwork-row'
+                over === layer.id
+                  ? `artwork-row drop-target ${index < ordered.findIndex((item) => item.id === dragged) ? 'drop-above' : 'drop-below'}`
+                  : 'artwork-row'
               }
               onDragOver={(e) => {
                 if (!busy && !background && dragged && dragged !== layer.id) {
                   e.preventDefault();
                   setOver(layer.id);
-                }
+                } else setOver(null);
+              }}
+              onDragLeave={(e) => {
+                if (
+                  !(e.relatedTarget instanceof Node) ||
+                  !e.currentTarget.contains(e.relatedTarget)
+                )
+                  setOver(null);
               }}
               onDrop={(e) => {
                 e.preventDefault();
@@ -81,9 +100,23 @@ export function ArtworkLayers({ layers, rooms, busy, change, reorder }: Props) {
               >
                 ⠿
               </button>
-              <span className="artwork-name" title={label}>
-                {label}
-              </span>
+              {room ? (
+                <button
+                  type="button"
+                  className="artwork-name"
+                  title={label}
+                  disabled={busy}
+                  aria-label={`Select ${label}`}
+                  aria-pressed={selectedId === room.id}
+                  onClick={() => selectRoom(room.id)}
+                >
+                  {label}
+                </button>
+              ) : (
+                <span className="artwork-name" title={label}>
+                  {label}
+                </span>
+              )}
               <input
                 type="checkbox"
                 aria-label={background ? 'Show background' : `Show ${label}`}
