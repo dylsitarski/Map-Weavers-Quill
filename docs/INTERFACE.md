@@ -196,3 +196,8 @@ Nothing is auto-accepted. Browser storage failure is reported without blocking g
 Room AI includes Environment, Render style and Palette. Blank values inherit the map
 default shown as a placeholder. Apply prompt and style commits one undoable edit;
 existing artwork stays until the user generates and accepts a replacement.
+
+Map AI exposes Background prompt and map-wide Environment, Render style and Palette.
+Apply map prompt and style is one undoable change; Save persists applied values. Pending
+map drafts disable generation. Blank room fields inherit these defaults. Editing map
+settings invalidates previews but preserves accepted artwork.

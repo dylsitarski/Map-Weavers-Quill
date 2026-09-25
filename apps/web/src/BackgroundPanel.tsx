@@ -2,6 +2,7 @@ import Ajv2020 from 'ajv/dist/2020';
 import addFormats from 'ajv-formats';
 import { useEffect, useRef, useState } from 'react';
 import type {
+  MapStyle,
   Project,
   RasterLayer,
   Room,
@@ -40,6 +41,9 @@ function cancelJob(id: string) {
   }).catch(() => {});
 }
 export function BackgroundPanel(p: {
+  mapPrompt?: string;
+  mapStyle?: MapStyle;
+  saveMap?: (prompt: string, style: MapStyle) => void;
   preview: (layer: RasterLayer | null) => void;
   active: boolean;
   room?: Room | null;
@@ -71,7 +75,17 @@ export function BackgroundPanel(p: {
     const value = readRecovery(key);
     setRecovery(value ? { key, value } : null);
   }, [key]);
-  const [prompt, setPrompt] = useState('Stone dungeon floor');
+  const [prompt, setPrompt] = useState(p.mapPrompt ?? 'Stone dungeon floor');
+  const [styleDraft, setStyleDraft] = useState(p.mapStyle);
+  useEffect(() => {
+    void p.projectId;
+    setPrompt(p.mapPrompt ?? 'Stone dungeon floor');
+    setStyleDraft(p.mapStyle);
+  }, [p.mapPrompt, p.mapStyle, p.projectId]);
+  const mapDraftDirty =
+    !p.room &&
+    (prompt !== p.mapPrompt ||
+      JSON.stringify(styleDraft) !== JSON.stringify(p.mapStyle));
   const [seed, setSeed] = useState(0);
   const [working, setWorking] = useState(false);
   const [jobStatus, setJobStatus] = useState('queued');
@@ -138,7 +152,7 @@ export function BackgroundPanel(p: {
       const value = resume ?? {
         id,
         signature: await previewSignature(p.fingerprint),
-        prompt: p.room?.prompt ?? prompt,
+        prompt: p.room?.prompt ?? p.mapPrompt ?? prompt,
         seed,
       };
       if (attempt !== sequence.current) return;
@@ -150,7 +164,6 @@ export function BackgroundPanel(p: {
           : 'Browser storage is unavailable. This preview cannot be recovered after reload.',
       );
       if (resume) {
-        setPrompt(resume.prompt);
         setSeed(resume.seed);
       }
       const response = resume
@@ -161,7 +174,12 @@ export function BackgroundPanel(p: {
             body: JSON.stringify(
               p.room
                 ? { project: p.project, roomId: p.room.id, seed }
-                : { prompt, seed, baseRevision: p.revision },
+                : {
+                    prompt: p.mapPrompt ?? prompt,
+                    style: p.mapStyle,
+                    seed,
+                    baseRevision: p.revision,
+                  },
             ),
             signal: AbortSignal.any([abort.signal, AbortSignal.timeout(15000)]),
           });
@@ -253,15 +271,48 @@ export function BackgroundPanel(p: {
       {p.room ? (
         <p>Uses the applied room prompt: {p.room.prompt || '(empty)'}</p>
       ) : (
-        <label>
-          Background prompt
-          <textarea
-            maxLength={4000}
-            value={prompt}
-            disabled={working}
-            onChange={(e) => setPrompt(e.target.value)}
-          />
-        </label>
+        <form
+          aria-label="Map authoring"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (styleDraft) p.saveMap?.(prompt, styleDraft);
+          }}
+        >
+          <label>
+            Background prompt
+            <textarea
+              value={prompt}
+              maxLength={4000}
+              disabled={working || p.busy}
+              onChange={(e) => setPrompt(e.target.value)}
+            />
+          </label>
+          <p>Map defaults · inherited by rooms unless overridden.</p>
+          {styleDraft &&
+            (
+              [
+                ['environment', 'Map environment'],
+                ['renderStyle', 'Map render style'],
+                ['palette', 'Map palette'],
+              ] as const
+            ).map(([key, label]) => (
+              <label key={key}>
+                {label}
+                <input
+                  value={styleDraft[key]}
+                  maxLength={512}
+                  disabled={working || p.busy}
+                  onChange={(e) =>
+                    setStyleDraft({ ...styleDraft, [key]: e.target.value })
+                  }
+                />
+              </label>
+            ))}
+          <button type="submit" disabled={working || p.busy || !mapDraftDirty}>
+            Apply map prompt and style
+          </button>
+          <p>Apply, then save the project to keep these settings.</p>
+        </form>
       )}
       <label>
         Seed
@@ -280,6 +331,7 @@ export function BackgroundPanel(p: {
         disabled={
           working ||
           p.busy ||
+          mapDraftDirty ||
           p.count >= 128 ||
           !Number.isInteger(seed) ||
           seed < 0 ||
@@ -333,6 +385,7 @@ export function BackgroundPanel(p: {
             Preview:{' '}
             {String(
               proposal.result.generation.parameters.roomPrompt ??
+                proposal.result.generation.parameters.backgroundPrompt ??
                 proposal.result.generation.prompt,
             )}{' '}
             · seed {String(proposal.result.generation.parameters.seed)}

@@ -1,12 +1,17 @@
 import type {
   Door,
   GenerationRecord,
+  Project,
   RasterLayer,
   Room,
   Wall,
 } from '../../../packages/schema/project';
 
 export type Scene = {
+  mapAuthoring?: {
+    style: Project['map']['style'];
+    settings: Project['settings'];
+  };
   rooms: Room[];
   doors: Door[];
   walls: Wall[];

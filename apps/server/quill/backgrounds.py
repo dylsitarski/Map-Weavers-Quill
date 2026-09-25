@@ -1,18 +1,20 @@
 """First raster workflow: deterministic mock background proposals."""
 
 import asyncio
+import json
 from typing import Annotated, Literal
 from uuid import uuid4
 
 from pydantic import Field
 
-from quill.models import Bounds, Contract, GenerationRecord, Point, RasterLayer
+from quill.models import Bounds, Contract, GenerationRecord, MapStyle, Point, RasterLayer
 from quill.projects import project_store
 from quill.providers import GenerateRequest, MockProvider
 
 
 class BackgroundRequest(Contract):
     contractVersion: Literal["0.1.0"] = "0.1.0"
+    style: MapStyle | None = None
     prompt: Annotated[str, Field(max_length=4000)]
     seed: Annotated[int, Field(ge=0, le=2147483647)]
     baseRevision: Annotated[int, Field(ge=0)]
@@ -25,12 +27,24 @@ class BackgroundResult(Contract):
 
 
 def generate_background(request: BackgroundRequest) -> BackgroundResult:
+    prompt = request.prompt
+    if request.style is not None:
+        effective = {
+            key: getattr(request.style, key).strip()
+            for key in ("environment", "renderStyle", "palette")
+        }
+        if any(len(value) > 512 for value in effective.values()):
+            raise ValueError("Each map style value supports at most 512 characters.")
+        prompt += "\nStyle: " + json.dumps(effective, sort_keys=True, ensure_ascii=False)
+        prompt += (
+            f"\nCamera: {request.style.camera}. Baked lighting: {request.style.bakedLighting}."
+        )
     provider = MockProvider()
     result = asyncio.run(
         provider.generate(
             GenerateRequest(
                 requestId=str(uuid4()),
-                prompt=request.prompt,
+                prompt=prompt,
                 seed=request.seed,
                 width=480,
                 height=320,
@@ -61,10 +75,17 @@ def generate_background(request: BackgroundRequest) -> BackgroundResult:
             metadata={"quill.generation": {"target": "map"}},
             providerId="mock",
             capability="text_to_image",
-            prompt=request.prompt,
+            prompt=prompt,
             inputHashes=[],
             outputHash=asset_hash,
-            parameters={"seed": request.seed, "width": 480, "height": 320},
+            parameters={
+                "seed": request.seed,
+                "width": 480,
+                "height": 320,
+                "backgroundPrompt": request.prompt,
+                "promptTemplate": "map-style-v1" if request.style else "background-v0",
+                "mapStyle": request.style.model_dump(mode="json") if request.style else None,
+            },
             status="succeeded",
             baseRevision=request.baseRevision,
         ),

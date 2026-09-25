@@ -274,3 +274,12 @@ Room AI style fields (Environment, Render style, Palette) override map defaults 
 nonblank. Apply prompt and style is undoable, preserves existing art, and invalidates
 pending previews. Generate again to use the new style. The assembled provider prompt
 and resolved style are saved in generation provenance. Output remains a mock pattern.
+
+### Map prompt and style defaults
+
+Map → AI contains Background prompt, Map environment, Map render style and Map palette.
+Apply map prompt and style, then Save project to retain them across sessions. Apply is
+undoable, including after saving; Open restores applied values. Generation waits until
+map drafts are applied. Rooms inherit blank style fields from these defaults. Existing
+artwork is preserved until regenerated and accepted. For older projects without a stored
+prompt, the latest accepted background prompt is used when available. See ADR-0022.

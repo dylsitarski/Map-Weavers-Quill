@@ -401,6 +401,7 @@ export interface BackgroundRequest {
   contractVersion?: Contractversion2;
   prompt: Prompt2;
   seed: Seed;
+  style?: MapStyle | null;
 }
 export interface RoomImageRequest {
   contractVersion?: Contractversion3;

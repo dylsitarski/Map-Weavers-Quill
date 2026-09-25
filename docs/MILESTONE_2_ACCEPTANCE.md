@@ -12,6 +12,7 @@ part of Ubuntu CI; real AI image quality and Windows 11 remain unverified.
 | Stale geometry cannot auto-apply | in-session stale-preview tests and recovery.spec.ts mismatch refusal |
 | Durable jobs and cancellation | test_jobs.py covers success, duplicate IDs, cancellation races, failure and restart recovery |
 | Recover an unaccepted preview after reload | recovery.spec.ts covers background and room retrieval without regeneration |
+| Map prompt/default persistence | map-authoring.spec.ts, map-authoring.test.ts and test_backgrounds.py cover Apply, Save/Open, undo after Save, inherited room defaults and generation provenance |
 | Room prompt and style inspector | test_room_images.py and room-images.spec.ts cover inheritance, prompt/provenance, undo, stale results and persistence |
 
 Limits: 480 × 320 mock rasters, one API worker per data directory, synchronous mock
@@ -22,4 +23,4 @@ render style and palette inherit map defaults until overridden (ADR-0021).
 Next implementation task: Milestone 3's first real-provider integration. Confirm the
 provider/model, local runtime and available hardware before choosing its deployment;
 then extend health/configuration and test one room through the existing safe workflow.
-Map-level style editing and provider-specific prompt tuning remain in that milestone.
+Map-level authoring is implemented in ADR-0022; provider-specific prompt tuning remains in that milestone.

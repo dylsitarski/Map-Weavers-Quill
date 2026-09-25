@@ -21,6 +21,7 @@ import {
 import { EditorPanels } from './EditorPanels';
 import { ExportPanel } from './ExportPanel';
 import { initialTools, toolsReducer } from './editorTools';
+import { backgroundPrompt } from './mapAuthoring';
 import { ProjectMenu } from './ProjectMenu';
 import {
   newProject,
@@ -72,10 +73,13 @@ export function Editor({ status }: { status: string }) {
   );
   const [grid, setGrid] = useState(true);
   const [snap, setSnap] = useState(true);
-  const [sceneHistory, dispatchScene] = useReducer(
-    sceneReducer,
-    emptySceneHistory,
-  );
+  const [sceneHistory, dispatchScene] = useReducer(sceneReducer, {
+    ...emptySceneHistory,
+    present: {
+      ...emptySceneHistory.present,
+      mapAuthoring: { style: project.map.style, settings: project.settings },
+    },
+  });
   const scene = sceneHistory.present;
   const history = { ...sceneHistory, present: scene.rooms };
   const backgroundLayer = scene.layers?.find(
@@ -130,7 +134,12 @@ export function Editor({ status }: { status: string }) {
     layers: scene.layers ?? [],
     generations: scene.generations ?? [],
     walls: scene.doors.length ? scene.walls : [],
-    map: { ...project.map, grid: { ...project.map.grid, visible: grid, snap } },
+    settings: scene.mapAuthoring?.settings ?? project.settings,
+    map: {
+      ...project.map,
+      style: scene.mapAuthoring?.style ?? project.map.style,
+      grid: { ...project.map.grid, visible: grid, snap },
+    },
   };
   const fingerprint = projectFingerprint(currentProject);
   const dirty = fingerprint !== savedFingerprint;
@@ -156,6 +165,7 @@ export function Editor({ status }: { status: string }) {
     dispatchScene({
       type: 'load',
       scene: {
+        mapAuthoring: { style: next.map.style, settings: next.settings },
         rooms: next.rooms,
         walls: next.walls,
         doors: next.doors,
@@ -950,6 +960,29 @@ export function Editor({ status }: { status: string }) {
         status={status}
         backgroundControls={
           <BackgroundPanel
+            mapPrompt={backgroundPrompt(currentProject)}
+            mapStyle={currentProject.map.style}
+            saveMap={(prompt, style) => {
+              if (pending.current) return;
+              const previous = currentProject.settings['quill.background'];
+              const settings = {
+                ...currentProject.settings,
+                'quill.background': {
+                  ...(previous &&
+                  typeof previous === 'object' &&
+                  !Array.isArray(previous)
+                    ? previous
+                    : {}),
+                  prompt,
+                },
+              };
+              dispatchScene({
+                type: 'commit',
+                before: scene,
+                scene: { ...scene, mapAuthoring: { style, settings } },
+              });
+              setNotice('Map prompt and style applied. Save to keep them.');
+            }}
             preview={setBackgroundPreview}
             active={scope === 'Map'}
             context={sceneHistory}

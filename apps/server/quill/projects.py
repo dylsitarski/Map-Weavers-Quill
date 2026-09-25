@@ -39,6 +39,11 @@ class SaveConflict(ValueError):
 
 def validate_project(project: Project, *, derive_missing: bool = False) -> Project:
     """Accept exactly the currently editable profile; never drop unsupported data."""
+    background = project.settings.get("quill.background")
+    if background is not None:
+        background_prompt = background.get("prompt") if isinstance(background, dict) else None
+        if not isinstance(background_prompt, str) or len(background_prompt) > 4000:
+            raise ValueError("Background settings require a prompt of at most 4000 characters.")
     if not project.name.strip():
         raise ValueError("Project name cannot be blank.")
     if project.map.width != 1200 or project.map.height != 800 or project.map.grid.sizePx != 50:

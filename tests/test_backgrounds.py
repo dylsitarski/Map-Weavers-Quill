@@ -115,3 +115,27 @@ def app():
     from quill.main import app
 
     return app
+
+    def test_map_prompt_style_persistence_and_generation_provenance(self):
+        project = document()
+        project.settings["quill.background"] = {"prompt": "Ancient ruins"}
+        project.map.style.environment = "desert"
+        project.map.style.palette = "ochre"
+        saved = self.store.save(SaveRequest(project=project, expectedRevision=None))
+        reopened = self.store.open(saved.projectId)
+        self.assertEqual(reopened.settings, project.settings)
+        self.assertEqual(reopened.map.style, project.map.style)
+        request = BackgroundRequest(
+            prompt="Ancient ruins", style=reopened.map.style, seed=0, baseRevision=1
+        )
+        a = generate_background(request)
+        self.assertEqual(a.generation.parameters["backgroundPrompt"], "Ancient ruins")
+        self.assertEqual(a.generation.parameters["mapStyle"]["palette"], "ochre")
+        self.assertIn('"environment": "desert"', a.generation.prompt)
+        request.style.palette = "blue"
+        b = generate_background(request)
+        self.assertNotEqual(a.layer.assetHash, b.layer.assetHash)
+        self.assertEqual(a.generation.parameters["mapStyle"]["palette"], "ochre")
+        project.settings["quill.background"] = {"prompt": 123}
+        with self.assertRaisesRegex(ValueError, "Background settings"):
+            self.store.save(SaveRequest(project=project, expectedRevision=1))
