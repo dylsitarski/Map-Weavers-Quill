@@ -210,3 +210,34 @@ test('snap point matches the submitted corner and hides when snapping or drawing
   await page.keyboard.up('Space');
   await expect(marker).toBeVisible();
 });
+
+test('room interiors have no green editor tint', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByRole('status')).toHaveText('Local server connected');
+  const pixel = () =>
+    page.locator('canvas').evaluate((canvas) => {
+      const element = canvas as HTMLCanvasElement;
+      const scale = element.width / element.getBoundingClientRect().width;
+      const context = element.getContext('2d');
+      if (!context) throw new Error('Canvas context unavailable');
+      return Array.from(
+        context.getImageData(
+          Math.round(550 * scale),
+          Math.round(350 * scale),
+          1,
+          1,
+        ).data,
+      );
+    });
+  const before = await pixel();
+  await page.getByRole('button', { name: 'Room', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Rectangle room', exact: true })
+    .click();
+  await page.mouse.move(450, 280);
+  await page.mouse.down();
+  await page.mouse.move(700, 450);
+  await page.mouse.up();
+  await expect(page.locator('[data-room-id]')).toHaveCount(1);
+  await expect.poll(pixel).toEqual(before);
+});

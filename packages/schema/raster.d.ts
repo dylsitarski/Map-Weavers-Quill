@@ -151,17 +151,21 @@ export type Revision9 = number;
 export type Sight = boolean;
 export type Sourceroomid = string | null;
 export type Walls = Wall[];
-export type Baserevision1 = number;
+export type Error = string | null;
+export type Id9 = string;
 export type Contractversion1 = "0.1.0";
+export type Status1 = "queued" | "running" | "succeeded" | "failed" | "cancelled";
+export type Baserevision1 = number;
+export type Contractversion2 = "0.1.0";
 export type Prompt2 = string;
 export type Seed = number;
-export type Contractversion2 = "0.1.0";
 export type Contractversion3 = "0.1.0";
 export type Roomid = string;
 export type Seed1 = number;
 
 export interface RasterContracts {
   exportRequest: ExportRequest;
+  job: GenerationJob;
   request: BackgroundRequest;
   result: BackgroundResult;
   roomRequest: RoomImageRequest;
@@ -381,16 +385,22 @@ export interface Wall {
 export interface Metadata8 {
   [k: string]: JsonValue;
 }
-export interface BackgroundRequest {
-  baseRevision: Baserevision1;
-  contractVersion?: Contractversion1;
-  prompt: Prompt2;
-  seed: Seed;
+export interface GenerationJob {
+  error?: Error;
+  id: Id9;
+  result?: BackgroundResult | null;
+  status: Status1;
 }
 export interface BackgroundResult {
-  contractVersion?: Contractversion2;
+  contractVersion?: Contractversion1;
   generation: GenerationRecord;
   layer: RasterLayer;
+}
+export interface BackgroundRequest {
+  baseRevision: Baserevision1;
+  contractVersion?: Contractversion2;
+  prompt: Prompt2;
+  seed: Seed;
 }
 export interface RoomImageRequest {
   contractVersion?: Contractversion3;

@@ -184,3 +184,7 @@ same interaction when object editing is implemented.
 File offers Export PNG and Export WebP (480 × 320). Export uses accepted artwork with
 current layer settings, excluding on-map previews and all editing guides. It includes
 unsaved applied edits without saving or changing history.
+
+AI generation displays queued/running job state and Cancel preview sends server-side
+cancellation. Job completion still requires explicit acceptance. Room interiors have no
+green fill; wall outlines and selection/editing guides remain.

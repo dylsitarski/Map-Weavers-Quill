@@ -153,7 +153,7 @@ test('cancel ignores a late response and failures allow retry', async ({
     release = resolve;
   });
   let started = false;
-  await page.route('**/api/generation/background', async (route) => {
+  await page.route('**/api/jobs/*/background', async (route) => {
     const response = await route.fetch();
     started = true;
     await gate;
@@ -168,12 +168,12 @@ test('cancel ignores a late response and failures allow retry', async ({
   await expect(
     page.getByRole('button', { name: 'Accept background' }),
   ).toHaveCount(0);
-  await page.unroute('**/api/generation/background');
-  await page.route('**/api/generation/background', (route) =>
+  await page.unroute('**/api/jobs/*/background');
+  await page.route('**/api/jobs/*/background', (route) =>
     route.fulfill({ status: 503, json: { detail: 'Mock unavailable' } }),
   );
   await page.getByRole('button', { name: 'Generate preview' }).click();
   await expect(page.getByRole('alert')).toContainText('Mock unavailable');
-  await page.unroute('**/api/generation/background');
+  await page.unroute('**/api/jobs/*/background');
   await generate(page);
 });

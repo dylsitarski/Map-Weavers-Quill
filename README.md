@@ -238,8 +238,7 @@ outside its current room mask. Apply inspector drafts before generation. Geometr
 changes make open previews stale; changing scope may discard room previews.
 
 Artwork ordering, visibility and opacity controls are available in Layers and persist
-through undo/redo and save/open. Persistent generation jobs remain
-Milestone 2 work. Room masks/crops and protected compositing are now implemented.
+through undo/redo and save/open. Durable generation jobs are implemented in ADR-0019. Room masks/crops and protected compositing are now implemented.
 See ADR-0016. APIs: POST /api/generation/background, POST /api/generation/room and GET /api/assets/{sha256}. See ADR-0017 for room generation.
 
 ## Distribution
@@ -257,3 +256,13 @@ edits. It excludes previews, grid and editing guides. Both formats are lossless;
 areas use the neutral map background. Export does not save the project or change undo
 history. Higher-resolution output and Foundry metadata bundles are not implemented.
 See docs/adr/0018-flattened-artwork-export.md.
+
+### Generation jobs
+
+Generation runs through a durable local queue with queued/running status and cancellation.
+Job requests/results survive server restart; interrupted work is marked failed and can
+be regenerated. Cancelling prevents a queued job from starting and discards late output
+from running work. The synchronous mock may finish internally after cancellation. A
+browser reload does not restore its preview automatically; job history is available via
+GET /api/jobs/{id}, with a recovery UI and real-provider interruption still future work.
+Use one API worker per data directory. See docs/adr/0019-durable-generation-jobs.md.

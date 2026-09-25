@@ -2,6 +2,8 @@
 
 import re
 import sqlite3
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from uuid import UUID
 
 from fastapi import FastAPI, HTTPException, Request, Response
@@ -12,13 +14,24 @@ from quill.backgrounds import BackgroundRequest, BackgroundResult, generate_back
 from quill.doors import DoorRequest, DoorResult, reconcile_doors
 from quill.exports import ExportRequest, export_image
 from quill.geometry import GeometryRequest, GeometryResult, validate_geometry
+from quill.jobs import GenerationJob, JobConflict, JobQueueFull, JobService
 from quill.models import Project
 from quill.projects import ProjectList, SaveConflict, SaveRequest, project_store
 from quill.providers import MockProvider, ProviderDescriptor
 from quill.room_images import RoomImageRequest, generate_room
 from quill.walls import WallDerivationRequest, WallDerivationResult, derive_walls
 
-app = FastAPI(title="Map-Weaver's Quill", version="0.0.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    app.state.jobs = JobService(project_store().path)
+    try:
+        yield
+    finally:
+        await run_in_threadpool(app.state.jobs.close)
+
+
+app = FastAPI(lifespan=lifespan, title="Map-Weaver's Quill", version="0.0.0")
 provider = MockProvider()
 
 
@@ -222,3 +235,62 @@ async def flattened_image(request: Request) -> Response:
         raise HTTPException(
             503, "Could not export artwork. Check local assets and retry."
         ) from error
+
+
+async def job_body(request: Request) -> bytes:
+    if request.headers.get("content-type", "").split(";")[0].strip() != "application/json":
+        raise HTTPException(415, "Use application/json.")
+    origin = request.headers.get("origin")
+    if origin and origin not in {
+        "http://127.0.0.1:5173",
+        "http://localhost:5173",
+        "http://127.0.0.1:8000",
+        "http://localhost:8000",
+    }:
+        raise HTTPException(403, "Only the local editor may manage generation jobs.")
+    body = bytearray()
+    async for chunk in request.stream():
+        body.extend(chunk)
+        if len(body) > 4 * 1024 * 1024:
+            raise HTTPException(413, "Generation request exceeds 4 MiB.")
+    return bytes(body)
+
+
+@app.post("/api/jobs/{job_id}/cancel", response_model=GenerationJob)
+async def cancel_job(job_id: UUID, request: Request) -> GenerationJob:
+    await job_body(request)
+    try:
+        return await run_in_threadpool(request.app.state.jobs.cancel, job_id)
+    except (OSError, sqlite3.Error) as error:
+        raise HTTPException(503, "Could not cancel the job. Retry.") from error
+
+
+@app.post("/api/jobs/{job_id}/{target}", response_model=GenerationJob, status_code=202)
+async def submit_job(job_id: UUID, target: str, request: Request) -> GenerationJob:
+    body = await job_body(request)
+    try:
+        if target == "background":
+            data: BackgroundRequest | RoomImageRequest = BackgroundRequest.model_validate_json(body)
+        elif target == "room":
+            data = RoomImageRequest.model_validate_json(body)
+        else:
+            raise HTTPException(404, "Unknown generation target.")
+        return await run_in_threadpool(request.app.state.jobs.submit, job_id, target, data)
+    except JobConflict as error:
+        raise HTTPException(409, str(error)) from error
+    except JobQueueFull as error:
+        raise HTTPException(429, str(error)) from error
+    except ValidationError as error:
+        raise HTTPException(422, "Invalid generation request.") from error
+    except (OSError, sqlite3.Error) as error:
+        raise HTTPException(503, "Could not store generation job. Retry.") from error
+
+
+@app.get("/api/jobs/{job_id}", response_model=GenerationJob)
+async def read_job(job_id: UUID, request: Request) -> GenerationJob:
+    try:
+        return await run_in_threadpool(request.app.state.jobs.get, job_id)
+    except KeyError as error:
+        raise HTTPException(404, "Generation job not found.") from error
+    except (OSError, sqlite3.Error) as error:
+        raise HTTPException(503, "Could not read the generation job. Retry.") from error

@@ -9,6 +9,7 @@ from quill.backgrounds import BackgroundRequest, BackgroundResult
 from quill.doors import DoorRequest, DoorResult
 from quill.exports import ExportRequest
 from quill.geometry import GeometryRequest, GeometryResult
+from quill.jobs import GenerationJob
 from quill.models import Project
 from quill.projects import ProjectList, SaveRequest
 from quill.providers import (
@@ -23,6 +24,7 @@ from quill.walls import WallDerivationRequest, WallDerivationResult
 
 
 class RasterContracts(BaseModel):
+    job: GenerationJob
     exportRequest: ExportRequest
     roomRequest: RoomImageRequest
     request: BackgroundRequest

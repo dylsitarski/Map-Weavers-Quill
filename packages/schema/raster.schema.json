@@ -196,6 +196,56 @@
       "title": "ExportRequest",
       "type": "object"
     },
+    "GenerationJob": {
+      "additionalProperties": false,
+      "properties": {
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "result": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BackgroundResult"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "status": {
+          "enum": [
+            "queued",
+            "running",
+            "succeeded",
+            "failed",
+            "cancelled"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "status"
+      ],
+      "title": "GenerationJob",
+      "type": "object"
+    },
     "GenerationRecord": {
       "additionalProperties": false,
       "properties": {
@@ -1180,6 +1230,9 @@
     "exportRequest": {
       "$ref": "#/$defs/ExportRequest"
     },
+    "job": {
+      "$ref": "#/$defs/GenerationJob"
+    },
     "request": {
       "$ref": "#/$defs/BackgroundRequest"
     },
@@ -1191,6 +1244,7 @@
     }
   },
   "required": [
+    "job",
     "exportRequest",
     "roomRequest",
     "request",

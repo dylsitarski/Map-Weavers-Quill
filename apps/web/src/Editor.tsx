@@ -808,7 +808,6 @@ export function Editor({ status }: { status: string }) {
                 key={room.id}
                 points={points(room.polygon)}
                 closed
-                fill="#6f927c99"
                 stroke="#234d39"
                 strokeWidth={2}
               />

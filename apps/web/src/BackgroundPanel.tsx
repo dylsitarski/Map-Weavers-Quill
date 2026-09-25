@@ -6,7 +6,10 @@ import type {
   RasterLayer,
   Room,
 } from '../../../packages/schema/project';
-import type { BackgroundResult } from '../../../packages/schema/raster';
+import type {
+  BackgroundResult,
+  GenerationJob,
+} from '../../../packages/schema/raster';
 import schema from '../../../packages/schema/raster.schema.json';
 
 const ajv = new Ajv2020({ strict: false });
@@ -15,6 +18,18 @@ const valid = ajv.compile<BackgroundResult>({
   $defs: schema.$defs,
   $ref: '#/$defs/BackgroundResult',
 });
+const validJob = ajv.compile<GenerationJob>({
+  $defs: schema.$defs,
+  $ref: '#/$defs/GenerationJob',
+});
+function cancelJob(id: string) {
+  void fetch(`/api/jobs/${id}/cancel`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: '{}',
+    keepalive: true,
+  }).catch(() => {});
+}
 export function BackgroundPanel(p: {
   preview: (layer: RasterLayer | null) => void;
   active: boolean;
@@ -32,6 +47,8 @@ export function BackgroundPanel(p: {
   const [prompt, setPrompt] = useState('Stone dungeon floor');
   const [seed, setSeed] = useState(0);
   const [working, setWorking] = useState(false);
+  const [jobStatus, setJobStatus] = useState('queued');
+  const jobId = useRef<string | null>(null);
   const [error, setError] = useState('');
   const [loaded, setLoaded] = useState(false);
   const [proposal, setProposal] = useState<{
@@ -47,12 +64,15 @@ export function BackgroundPanel(p: {
     () => () => {
       sequence.current++;
       controller.current?.abort();
+      if (jobId.current) cancelJob(jobId.current);
     },
     [],
   );
   function reject() {
     sequence.current++;
     controller.current?.abort();
+    if (jobId.current) cancelJob(jobId.current);
+    jobId.current = null;
     setProposal(null);
     setWorking(false);
     setError('');
@@ -64,8 +84,11 @@ export function BackgroundPanel(p: {
     const abort = new AbortController();
     controller.current = abort;
     setWorking(true);
+    setJobStatus('queued');
+    const id = crypto.randomUUID();
+    jobId.current = id;
     try {
-      const response = await fetch(`/api/generation/${target}`, {
+      const response = await fetch(`/api/jobs/${id}/${target}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(
@@ -75,15 +98,42 @@ export function BackgroundPanel(p: {
         ),
         signal: AbortSignal.any([abort.signal, AbortSignal.timeout(15000)]),
       });
-      const data = await response.json().catch(() => null);
+      let data = await response.json().catch(() => null);
       if (!response.ok)
         throw new Error(
           typeof data?.detail === 'string'
             ? data.detail
             : 'Background generation failed. Retry.',
         );
+      if (!validJob(data))
+        throw new Error('The server returned an invalid job.');
+      while (data.status === 'queued' || data.status === 'running') {
+        if (abort.signal.aborted) return;
+        if (attempt === sequence.current) setJobStatus(data.status);
+        await new Promise<void>((resolve, reject) => {
+          const cancel = () => {
+            window.clearTimeout(timer);
+            reject(new Error('Cancelled'));
+          };
+          const timer = window.setTimeout(() => {
+            abort.signal.removeEventListener('abort', cancel);
+            resolve();
+          }, 250);
+          abort.signal.addEventListener('abort', cancel, { once: true });
+        });
+        const poll = await fetch(`/api/jobs/${id}`, {
+          signal: AbortSignal.any([abort.signal, AbortSignal.timeout(15000)]),
+        });
+        data = await poll.json().catch(() => null);
+        if (!poll.ok || !validJob(data))
+          throw new Error(`Could not read job ${id}. Retry generation.`);
+      }
+      if (data.status !== 'succeeded')
+        throw new Error(data.error ?? `Generation ${data.status}.`);
+      data = data.result;
       if (!valid(data))
         throw new Error('The server returned an invalid background proposal.');
+      if (attempt === sequence.current) jobId.current = null;
       if (attempt === sequence.current)
         setProposal({
           result: data,
@@ -93,6 +143,10 @@ export function BackgroundPanel(p: {
           roomId: p.room?.id,
         });
     } catch (failure) {
+      if (attempt === sequence.current && jobId.current) {
+        cancelJob(jobId.current);
+        jobId.current = null;
+      }
       if (attempt === sequence.current)
         setError(
           failure instanceof Error ? failure.message : 'Generation failed.',
@@ -174,7 +228,11 @@ export function BackgroundPanel(p: {
       {p.count >= 128 && <p>Generation history limit reached (128 records).</p>}
       {working && (
         <>
-          <p>Generating preview…</p>
+          <p>
+            {jobStatus === 'queued'
+              ? 'Queued for generation…'
+              : 'Generating preview…'}
+          </p>
           <button type="button" onClick={reject}>
             Cancel preview
           </button>
