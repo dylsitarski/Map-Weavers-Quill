@@ -431,7 +431,7 @@ The application MUST:
 
 Development MUST begin with a deterministic mock image provider. It enables tests without network access, credentials, GPUs, or variable model behavior.
 
-The first real adapter SHOULD target one hosted image-editing API. The second real adapter SHOULD target a local workflow API such as ComfyUI. Direct in-process Diffusers support MAY follow later because it complicates GPU packaging and dependency isolation.
+The first real adapter targets local ComfyUI with SDXL to avoid recurring API costs during testing (ADR-0025). Hosted image editing is deferred to a second-provider increment. The mock remains the offline CI default. Direct in-process Diffusers support MAY follow later because it complicates GPU packaging and dependency isolation.
 
 ### 8.5 Provider configuration and secrets
 
@@ -796,15 +796,25 @@ Exit criteria:
 
 ### Milestone 3: First real image provider
 
-**Goal:** Produce useful room imagery through one real backend.
+**Goal:** Produce useful room imagery through local ComfyUI/SDXL without per-image API charges.
+
+Owner test hardware: Linux, RTX 3060 Ti (8 GB VRAM), approximately 32 GB RAM.
+ComfyUI runs in a separate process and Python environment. Hosted integration is
+deferred; relevant Milestone 5 local-provider tasks move here (ADR-0025).
 
 Tasks:
 
 1. Implement provider configuration and secret handling. Server-only configuration,
    credential loading and a shared mock factory are implemented (ADR-0024); hosted
    credential use and provider-specific configuration remain with the adapter.
-2. Implement one hosted image adapter with inpainting or edit support.
+2. Implement the local ComfyUI adapter and a versioned SDXL generation/masked-edit workflow.
+   Standalone adapter and smoke command are implemented; actual GPU validation and editor
+   integration remain pending (ADR-0025, docs/COMFYUI.md).
 3. Add provider health, capability display, dimension normalization, and error mapping.
+   Readiness/error handling exist in the standalone adapter; UI integration remains pending.
+   First make persistence, masks, crop transforms and exports resolution-aware so generated
+   detail is retained. Preserve existing 480x320 mock projects; never silently downsample
+   real assets to that test profile.
 4. Develop persistent map-style and prompt-wrapper behavior.
 5. Record reproducibility metadata and cost/usage data when the provider supplies it.
 6. Test continuity across adjacent room generations.
@@ -845,17 +855,20 @@ Exit criteria:
 - Two lights have the correct positions, colors, and radii.
 - Reimport behavior is explicit and cannot accidentally duplicate content without warning.
 
-### Milestone 5: Local/open-model backend
+### Milestone 5: Second provider and model swappability
 
-**Goal:** Demonstrate true model swappability.
+**Goal:** Demonstrate true model swappability with a second backend.
+
+Sequence adjustment: ComfyUI/SDXL is now first, in Milestone 3 (ADR-0025).
+The hosted adapter is deferred here; no paid service is required for initial testing.
 
 Tasks:
 
-1. Define a versioned reference workflow input/output contract.
-2. Implement a ComfyUI-compatible adapter.
-3. Supply at least one documented inpainting workflow using a legally redistributable or user-installed model path.
-4. Add workflow/model/license metadata.
-5. Run the same provider contract suite used by the hosted adapter.
+1. Reuse the versioned local workflow/input-output contracts established in Milestone 3.
+2. Implement a second adapter, initially a hosted image-editing API when cost is acceptable.
+3. Compare the same masked-room workflow and protect pixels consistently across backends.
+4. Add hosted usage/cost metadata and retain local workflow/model/license metadata.
+5. Run the same provider contract suite for both adapters.
 6. Document GPU, memory, installation, and fallback expectations without bundling large weights.
 
 Exit criteria:
@@ -1025,7 +1038,7 @@ These questions should be resolved near the stated milestone, not guessed by an 
 | Decision | Needed by | Default if owner delegates |
 |---|---|---|
 | First supported Foundry major version | Milestone 4 | Select the latest stable version after compatibility research |
-| First hosted image provider | Milestone 3 | Choose based on inpainting quality, API stability, privacy, and cost |
+| First hosted image provider | Milestone 5 (deferred) | Local ComfyUI/SDXL is first; revisit hosted inpainting when cost is acceptable |
 | Minimum supported Linux distribution(s) and packaging format(s) | Milestone 8 | Support Linux first; select an initial tested distribution and portable packaging route, then add Windows 11 |
 | Desktop wrapper vs local web service | Milestone 8 | Local web service first; evaluate Tauri |
 | Public noncommercial software license | Before the first public release | Choose a license that clearly permits free redistribution while expressing the intended noncommercial restriction; do not describe it as OSI open source unless the selected license qualifies |
@@ -1039,7 +1052,7 @@ As of this manifest version:
 - Milestone 0 is complete: strict Python structural models, generated JSON Schema with drift checking, continuous coordinate transforms, two valid project fixtures, and five invalid fixtures are implemented.
 - The unreleased structural schema now covers every planned entity category, namespaced metadata, style, and generation provenance. Polygon topology and cross-entity validation for the supported rooms/walls/doors editor profile are implemented before persistence; unsupported future entity profiles are rejected.
 - React/TypeScript and FastAPI shells, generated TypeScript declarations, cross-runtime fixture validation, image-provider contracts, an offline mock, Python lint/format/type checks, and an Ubuntu CI workflow are implemented. Dependency auditing is configured but requires network access. See README.md and docs/adr for current scope and limitations.
-- No AI provider, Foundry version, or public model is yet committed.
+- Local ComfyUI/SDXL is selected as the first real image backend (ADR-0025). Hosted provider and Foundry version remain undecided.
 - The project name is **Map-Weaver's Quill**.
 - Native geometry uses a bottom-left origin, +y upward, and counter-clockwise angles; target adapters own all coordinate conversion.
 - Distribution is planned as a public, free, noncommercial release, with Linux prioritized before Windows 11.
@@ -1050,7 +1063,7 @@ As of this manifest version:
 
 - Milestone 2 is complete for the supported local mock profile. Its first increment adds SHA-256-addressed PNG assets in SQLite, one base-background raster layer, offline mock preview/accept/reject/regenerate, stale-preview rejection, undoable visibility/opacity and native save/reopen with generation provenance (ADR-0016). Cancellation now uses the durable job workflow described below. Room crops, binary polygon masks, enforced outside-mask preservation, independent room artwork and validated room/layer bindings are implemented (ADR-0017). Geometry edits clear affected art with undo. Artwork ordering, visibility and opacity controls are implemented with undo/redo and save/open. Flattened PNG/lossless WebP export is implemented at the canonical 480 × 320 raster resolution (ADR-0018), respecting accepted layer order/visibility/opacity. Durable queued generation, polling, idempotent cancellation and interrupted-job recovery are implemented (ADR-0019). Active synchronous mock computation is not forcibly interrupted; late output cannot publish. Explicit browser preview recovery with project-fingerprint validation is implemented (ADR-0020). See docs/MILESTONE_2_ACCEPTANCE.md for the exit-criteria review. The room style-override inspector, map-style inheritance and deterministic provider prompt/provenance are implemented (ADR-0021). Persistent map background prompts and editable map-wide style defaults now complete the map-level authoring workflow (ADR-0022), including undo after Save and inherited room defaults. Real-provider interruption and model-specific prompt tuning belong to Milestone 3.
 
-- Milestone 3 is in progress: server-only provider configuration, bounded secret-file/environment loading, startup validation and a shared discovery/generation factory are implemented (ADR-0024). The mock remains the only adapter; no hosted generation, billing, or geometry-aware exteriors are implemented yet. Next is hosted image-edit provider selection and integration.
+- Milestone 3 is in progress: server-only provider configuration, bounded secret-file/environment loading, startup validation and a shared discovery/generation factory are implemented (ADR-0024). The editor still uses mock. A standalone local ComfyUI/SDXL adapter, full-resolution smoke command, safe error mapping and offline protocol tests are implemented (ADR-0025). No real GPU run is yet verified. Next: resolution-aware editor storage/composition and queued adapter integration, with a hardware smoke test on the owner’s desktop. Hosted generation and geometry-aware exteriors remain unimplemented.
 
 ## 23. First implementation ticket
 

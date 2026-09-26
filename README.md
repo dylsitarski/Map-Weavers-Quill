@@ -311,6 +311,21 @@ Restart the server after changes. Do not use `VITE_` variables for credentials.
 `make dev` strips `MWQ_IMAGE_*` from its frontend child. Keys are not exposed by provider
 discovery or included in generated project/job data. See [ADR-0024](docs/adr/0024-server-provider-configuration.md).
 
-Next is selection and integration of a hosted image-edit provider. Real imagery,
-provider-specific dimension conversion, cost reporting and layout-aware exteriors
-remain unimplemented; Milestone 3 is in progress.
+The sequence has changed to local ComfyUI/SDXL first (ADR-0025), avoiding per-image
+API charges during development. Hosted integration is deferred to Milestone 5.
+Milestone 3 is in progress.
+
+### Local ComfyUI / SDXL increment
+
+A standalone adapter now supports SDXL generation and masked editing through local
+ComfyUI, with full-resolution PNG output, metadata, readiness checks and offline
+protocol tests. Run `make comfy-check` after installing ComfyUI and the SDXL base
+checkpoint separately. See [docs/COMFYUI.md](docs/COMFYUI.md) for Linux setup and the
+explicit GPU smoke command. No model weights, PyTorch or new dependencies are bundled.
+
+The editor still uses mock: its 480x320 persistence profile must become resolution-aware
+before integration, so real generated detail is retained. The standalone workflow uses
+SDXL base with a latent mask, not a dedicated inpainting fine-tune. Actual GPU execution,
+visual continuity and performance on the target RTX 3060 Ti (8 GB) remain unverified.
+Next: resolution-aware assets/masks/exports, then queued editor previews and save/open
+with ComfyUI. Building layout conditioning remains planned separately under ADR-0023.

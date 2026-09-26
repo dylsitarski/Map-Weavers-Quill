@@ -35,3 +35,7 @@ doctor:
 
 browser:
 	PYTHON=$(PYTHON) npm run test:browser
+
+.PHONY: comfy-check
+comfy-check:
+	PYTHONPATH=apps/server $(PYTHON) scripts/comfy_smoke.py --check

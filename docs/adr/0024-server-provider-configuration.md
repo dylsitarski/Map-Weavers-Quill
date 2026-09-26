@@ -1,6 +1,7 @@
 # ADR-0024: Server-only image provider configuration
 
-Status: Accepted; Milestone 3 foundation implemented. Hosted adapter selection remains open.
+Status: Accepted; Milestone 3 foundation implemented. Hosted-first sequencing is
+superseded by ADR-0025: local ComfyUI/SDXL comes first.
 
 ## Decision
 
@@ -44,7 +45,7 @@ redaction, malformed/oversized inputs, startup failure before queue initializati
 configuration snapshot behavior, discovery allowlisting and frontend-child isolation.
 Existing generation, persistence and job tests continue to exercise the factory path.
 
-Next: choose one hosted image-edit provider, document its model/capabilities, dimension
+Original next step (deferred by ADR-0025): choose one hosted image-edit provider, document its model/capabilities, dimension
 and mask conversions, timeout/retry behavior, data handling and cost expectations; then
 implement it behind this factory with mocked HTTP contract tests. Do not enable billing
 or send user maps as part of automated verification. Layout conditioning and explicit
