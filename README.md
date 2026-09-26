@@ -296,3 +296,21 @@ receives prompt/style/seed but no room layout. Existing toggles reveal whatever 
 pixels are present. Milestone 3 will add layout context and explicit building/open-air
 intent so a path can lead to the cottage you actually placed. See
 [ADR-0023](docs/adr/0023-exterior-background-and-room-interiors.md).
+
+### Milestone 3: Provider configuration foundation
+
+Generation and discovery now share a server-only provider factory. The default is
+`MWQ_IMAGE_PROVIDER=mock`; unsupported names fail API startup. No hosted adapter is
+implemented yet, so the editor still produces offline patterns and needs no API key.
+
+The server accepts either `MWQ_IMAGE_API_KEY` or `MWQ_IMAGE_API_KEY_FILE` (not both) in
+preparation for the hosted adapter. The mock does not use them. Prefer a private key file
+outside the repository and data directory, with owner-only permissions (`chmod 600` on
+Linux). Export the variables before starting the API; `.env` is not loaded automatically.
+Restart the server after changes. Do not use `VITE_` variables for credentials.
+`make dev` strips `MWQ_IMAGE_*` from its frontend child. Keys are not exposed by provider
+discovery or included in generated project/job data. See [ADR-0024](docs/adr/0024-server-provider-configuration.md).
+
+Next is selection and integration of a hosted image-edit provider. Real imagery,
+provider-specific dimension conversion, cost reporting and layout-aware exteriors
+remain unimplemented; Milestone 3 is in progress.

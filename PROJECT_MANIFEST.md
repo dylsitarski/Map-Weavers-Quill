@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 13706)
+Total output lines: 1074
+
 # Map-Weaver's Quill: Project Manifest and Implementation Plan
 
 **Document status:** Canonical implementation brief  
@@ -528,136 +531,7 @@ Export profiles decide which layers are flattened and which remain metadata.
 The base environmental raster MUST remain beneath the artwork. Room, object and
 effect raster layers MUST be user-reorderable relative to one another, including
 objects below rooms. Editor guides, region outlines and selection controls remain
-separate overlays above artwork; they MUST NOT become generated image content.
-Wall/door collision and visibility behavior are geometry, independent of visual order.
-
-Layer reordering MUST be an undoable document operation, persist across save/open,
-and be respected by preview and flattened export. Regeneration MUST preserve the
-target layer's order, visibility and opacity while replacing its image revision.
-Reordering MUST NOT alter geometry, collision, region membership or gameplay rules.
-Opaque pixels hide lower layers; revealing them requires transparency or a mask.
-The existing raster `zIndex` field represents raster order. The Layers tab manages
-background and room artwork ordering, visibility and opacity; object compositing remains
-planned. These artwork settings persist through File Save/Open and flattened export.
-
-### 10.2.1 Scope semantics
-
-- **Map:** selects the base background as the target for generation or
-  regeneration across map bounds. It does not target the flattened scene or all
-  entities. Other layers may supply suitable context but MUST NOT be replaced by this action.
-  Planned geometry-aware generation depicts terrain and building exteriors beneath room
-  interiors; it must receive placed footprints and relevant descriptions (ADR-0023).
-- **Room:** bounded architectural geometry and an associated masked render layer;
-  imagery may be regenerated without silently changing boundaries or separate assets.
-- **Object:** independent visual asset and optional gameplay properties. Use objects
-  for visual features such as rugs, vegetation and hazard imagery; place their
-  layers as needed relative to rooms and other objects.
-- **Region:** semantic/gameplay area such as a hazard, difficult terrain or annotation.
-  Its visual style controls editor visualization, not AI-generated artwork. A visual
-  object and a region may describe the same place, but neither automatically creates
-  the other and their geometry is not automatically linked.
-- **Light:** source parameters and exportable lighting behavior; a visible fixture
-  is a separate object. Background regeneration preserves light entities.
-- **Sound:** audio source/area, asset and playback properties; no raster layer required.
-
-Scopes identify editing targets; layers determine visual composition. Selecting a
-scope does not invoke AI. Future generation still follows preview, accept/reject,
-revision checks and undo. Mock background generation is implemented; geometry-aware
-exterior generation remains planned. Hiding room artwork should reveal the exterior
-background beneath it without removing the room, its walls/doors or gameplay data.
-The background must retain complete exterior pixels under interiors. Do not bake room
-interiors into that background or infer a roof for every room polygon. Building grouping
-and open-air intent require explicit design; Regions remain semantic areas. See ADR-0023.
-
-### 10.3 Undo and redo
-
-- All document mutations MUST use a command or transaction abstraction.
-- An accepted generation is one undoable command.
-- Provider invocation itself is not undone; applying its result is.
-- Selection, viewport movement, and panel state SHOULD NOT pollute document history.
-- A compound natural-language command MUST apply atomically.
-
-### 10.4 Accessibility and usability
-
-The accepted editor layout and future control placement are recorded in
-[`docs/INTERFACE.md`](docs/INTERFACE.md). The owner's scheme uses a full-window
-canvas, global top bar, left scope rail with adjacent tools, collapsible persistent
-information at upper-right, and temporary feedback at bottom-left. Panels MUST
-overlay the canvas without moving it. Page scrolling is disabled; wheel input zooms
-except over scrollable panels/textareas, where it scrolls without changing map zoom.
-The right panel has Information (selection), Layers (ordering), and AI (prompts) tabs.
-
-- Core tools MUST have keyboard-accessible actions.
-- Color alone MUST NOT communicate selection, validation errors, or door state.
-- Destructive actions MUST be reversible through undo or confirmation.
-- Long operations MUST expose progress or an indeterminate busy state.
-- The editor SHOULD remain responsive while generation occurs.
-
-## 11. Foundry integration
-
-### 11.1 Export boundary
-
-The editor MUST export a portable bundle rather than treating Foundry JSON as native state:
-
-```text
-ruined-abbey.map-weavers-quill-export.zip
-  manifest.json
-  scene.webp
-  scene-data.json
-  assets/
-```
-
-The bundle manifest MUST declare:
-
-- export schema version;
-- project and revision identifiers;
-- target Foundry compatibility range;
-- map dimensions and grid settings;
-- asset paths and hashes;
-- coordinate convention;
-- the project map height required for coordinate conversion;
-- the target coordinate convention and transform revision used by the exporter;
-- contained feature types.
-
-### 11.2 Importer responsibilities
-
-The Foundry companion module MUST:
-
-- validate bundle version and checksums;
-- copy or register assets through supported Foundry APIs;
-- create a Scene with the correct background, dimensions, grid, distance, and units;
-- create walls and encode doors through the target Foundry document API;
-- create ambient lights;
-- consume only coordinates already converted by the version-specific Foundry export adapter; it MUST NOT reinterpret native project coordinates independently;
-- report unsupported region behaviors without discarding the rest of the import;
-- avoid duplicate import when the same project revision is reprocessed, or clearly offer update/copy behavior.
-
-### 11.3 Compatibility strategy
-
-- Support one explicitly selected Foundry major version first.
-- Isolate version-specific conversion in adapter modules.
-- Keep golden export fixtures and an importer smoke-test checklist for each supported version.
-- Do not promise compatibility with an untested Foundry version.
-- Add regions, sounds, notes, and advanced behaviors only after walls, doors, and lights are dependable.
-
-## 12. API outline
-
-The precise OpenAPI document will be generated from FastAPI. Initial endpoints SHOULD include:
-
-| Method | Path | Purpose |
-|---|---|---|
-| `POST` | `/api/projects` | Create project |
-| `GET` | `/api/projects/{id}` | Read current project |
-| `PATCH` | `/api/projects/{id}` | Apply validated command with base revision |
-| `POST` | `/api/projects/{id}/validate` | Validate document and geometry |
-| `POST` | `/api/projects/{id}/save` | Force snapshot |
-| `GET` | `/api/providers` | List provider descriptors and capabilities |
-| `POST` | `/api/providers/{id}/health` | Test provider configuration |
-| `POST` | `/api/projects/{id}/generations` | Start generation job |
-| `GET` | `/api/generations/{jobId}` | Read job status/result |
-| `DELETE` | `/api/generations/{jobId}` | Cancel job |
-| `POST` | `/api/projects/{id}/exports/foundry` | Build export bundle |
-| `GET` | `/api/assets/{hash}` | Retrieve immutable asset |
+separate overlays above artwork; they MUST NOT become generated image c…1706 tokens truncated…ssets/{hash}` | Retrieve immutable asset |
 
 Mutating calls MUST include `baseRevision`. Revision conflicts MUST return a typed conflict response rather than silently overwriting changes.
 
@@ -800,7 +674,9 @@ Exit criteria:
 
 Tasks:
 
-1. Implement provider configuration and secret handling.
+1. Implement provider configuration and secret handling. Server-only configuration,
+   credential loading and a shared mock factory are implemented (ADR-0024); hosted
+   credential use and provider-specific configuration remain with the adapter.
 2. Implement one hosted image adapter with inpainting or edit support.
 3. Add provider health, capability display, dimension normalization, and error mapping.
 4. Develop persistent map-style and prompt-wrapper behavior.
@@ -1047,6 +923,8 @@ As of this manifest version:
 - Milestone 1 is complete for the current editor scope. The React/Konva viewport implements pan/zoom/resize, grid/snapping, rectangle and polygon room proposals, single-room selection, movement, vertex editing, a name/prompt/geometry inspector and deletion. Geometry changes use stateless Shapely validation; accepted additions, edits and deletions support undo/redo. File New/Save/Open now persists native snapshots locally; refresh discards only unsaved session changes, and saved projects can be reopened. Read-only derived walls now split intersections, deduplicate shared boundaries, retain IDs for unchanged endpoints and expose source-room provenance. See ADR-0013 for the versioned API, limits and asynchronous inspection behavior. Constrained doors now support placement, inspection, editing/deletion and atomic room/wall/door undo snapshots. Attachments follow whole-room translations and compatible wall splits; orphaning or ambiguous edits are rejected (ADR-0014). Atomic SQLite persistence and cross-entity validation for the supported rooms/walls/doors profile are implemented (ADR-0015). Unsupported future entity collections and map profiles are explicitly rejected. All Milestone 1 exit criteria are demonstrated by [Ubuntu CI](https://github.com/dylsitarski/Map-Weavers-Quill/actions/runs/36094044452) on code commit `200338f`, including connected rooms plus a door, native and pixel-identical save/reopen, invalid-data rejection, and 50 scene commands through undo/redo. See ADR-0009 and ADR-0011.
 
 - Milestone 2 is complete for the supported local mock profile. Its first increment adds SHA-256-addressed PNG assets in SQLite, one base-background raster layer, offline mock preview/accept/reject/regenerate, stale-preview rejection, undoable visibility/opacity and native save/reopen with generation provenance (ADR-0016). Cancellation now uses the durable job workflow described below. Room crops, binary polygon masks, enforced outside-mask preservation, independent room artwork and validated room/layer bindings are implemented (ADR-0017). Geometry edits clear affected art with undo. Artwork ordering, visibility and opacity controls are implemented with undo/redo and save/open. Flattened PNG/lossless WebP export is implemented at the canonical 480 × 320 raster resolution (ADR-0018), respecting accepted layer order/visibility/opacity. Durable queued generation, polling, idempotent cancellation and interrupted-job recovery are implemented (ADR-0019). Active synchronous mock computation is not forcibly interrupted; late output cannot publish. Explicit browser preview recovery with project-fingerprint validation is implemented (ADR-0020). See docs/MILESTONE_2_ACCEPTANCE.md for the exit-criteria review. The room style-override inspector, map-style inheritance and deterministic provider prompt/provenance are implemented (ADR-0021). Persistent map background prompts and editable map-wide style defaults now complete the map-level authoring workflow (ADR-0022), including undo after Save and inherited room defaults. Real-provider interruption and model-specific prompt tuning belong to Milestone 3.
+
+- Milestone 3 is in progress: server-only provider configuration, bounded secret-file/environment loading, startup validation and a shared discovery/generation factory are implemented (ADR-0024). The mock remains the only adapter; no hosted generation, billing, or geometry-aware exteriors are implemented yet. Next is hosted image-edit provider selection and integration.
 
 ## 23. First implementation ticket
 

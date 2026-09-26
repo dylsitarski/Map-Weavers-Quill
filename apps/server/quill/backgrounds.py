@@ -9,7 +9,8 @@ from pydantic import Field
 
 from quill.models import Bounds, Contract, GenerationRecord, MapStyle, Point, RasterLayer
 from quill.projects import project_store
-from quill.providers import GenerateRequest, MockProvider
+from quill.provider_config import create_provider
+from quill.providers import GenerateRequest
 
 
 class BackgroundRequest(Contract):
@@ -39,7 +40,7 @@ def generate_background(request: BackgroundRequest) -> BackgroundResult:
         prompt += (
             f"\nCamera: {request.style.camera}. Baked lighting: {request.style.bakedLighting}."
         )
-    provider = MockProvider()
+    provider = create_provider()
     result = asyncio.run(
         provider.generate(
             GenerateRequest(
@@ -73,7 +74,7 @@ def generate_background(request: BackgroundRequest) -> BackgroundResult:
             revision=0,
             label="Mock background",
             metadata={"quill.generation": {"target": "map"}},
-            providerId="mock",
+            providerId=result.providerId,
             capability="text_to_image",
             prompt=prompt,
             inputHashes=[],

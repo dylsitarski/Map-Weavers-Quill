@@ -20,11 +20,17 @@ class LauncherTests(unittest.TestCase):
 
         with (
             patch("signal.signal", side_effect=lambda sig, fn: handlers.update({sig: fn})),
-            patch("subprocess.Popen", side_effect=children),
+            patch("os.environ", {"MWQ_IMAGE_API_KEY": "synthetic-secret", "PATH": "/bin"}),
+            patch("subprocess.Popen", side_effect=children) as spawn,
             patch("time.sleep", side_effect=terminate),
             patch("os.killpg", side_effect=terminate) as kill,
         ):
             runpy.run_path(str(Path(__file__).resolve().parents[1] / "scripts/dev.py"))
         self.assertEqual([call.args[0] for call in kill.call_args_list], [101, 102])
+        self.assertEqual(
+            spawn.call_args_list[0].kwargs["env"]["MWQ_IMAGE_API_KEY"], "synthetic-secret"
+        )
+        self.assertNotIn("MWQ_IMAGE_API_KEY", spawn.call_args_list[1].kwargs["env"])
+        self.assertEqual(spawn.call_args_list[1].kwargs["env"]["PATH"], "/bin")
         for child in children:
             child.wait.assert_called_once_with(timeout=5)

@@ -17,13 +17,15 @@ from quill.geometry import GeometryRequest, GeometryResult, validate_geometry
 from quill.jobs import GenerationJob, JobConflict, JobQueueFull, JobService
 from quill.models import Project
 from quill.projects import ProjectList, SaveConflict, SaveRequest, project_store
-from quill.providers import MockProvider, ProviderDescriptor
+from quill.provider_config import create_provider, provider_config
+from quill.providers import ProviderDescriptor
 from quill.room_images import RoomImageRequest, generate_room
 from quill.walls import WallDerivationRequest, WallDerivationResult, derive_walls
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    provider_config()  # Fail before opening the queue when configuration is invalid.
     app.state.jobs = JobService(project_store().path)
     try:
         yield
@@ -32,7 +34,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(lifespan=lifespan, title="Map-Weaver's Quill", version="0.0.0")
-provider = MockProvider()
 
 
 @app.get("/health")
@@ -43,7 +44,7 @@ def health() -> dict[str, str]:
 
 @app.get("/api/providers", response_model=list[ProviderDescriptor])
 def providers() -> list[ProviderDescriptor]:
-    return [provider.descriptor()]
+    return [create_provider().descriptor()]
 
 
 @app.post("/api/geometry/validate", response_model=GeometryResult)

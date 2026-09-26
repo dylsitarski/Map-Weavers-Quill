@@ -11,7 +11,8 @@ from quill.backgrounds import BackgroundResult
 from quill.exports import composite_artwork
 from quill.models import Bounds, Contract, GenerationRecord, Point, Project, RasterLayer
 from quill.projects import project_store, validate_project
-from quill.providers import InpaintRequest, MockProvider
+from quill.provider_config import create_provider
+from quill.providers import InpaintRequest
 from quill.raster import HEIGHT, WIDTH, image, masked_layer, png, polygon_mask
 from quill.styles import room_style_prompt
 
@@ -45,7 +46,7 @@ def generate_room(request: RoomImageRequest) -> BackgroundResult:
     source = composite_artwork(project, store)
     # Eight pixels of protected surrounding context; crop never changes the mask.
     crop = (max(0, box[0] - 8), max(0, box[1] - 8), min(WIDTH, box[2] + 8), min(HEIGHT, box[3] + 8))
-    provider = MockProvider()
+    provider = create_provider()
     source_hash, mask_hash = store.put_asset(png(source)), store.put_asset(png(mask))
     result = asyncio.run(
         provider.inpaint(
@@ -86,7 +87,7 @@ def generate_room(request: RoomImageRequest) -> BackgroundResult:
             revision=0,
             label=f"Mock room: {room.label}",
             metadata={"quill.generation": {"target": "room", "roomId": str(room.id)}},
-            providerId="mock",
+            providerId=result.providerId,
             capability="inpainting",
             prompt=prompt,
             inputHashes=[source_hash, mask_hash],

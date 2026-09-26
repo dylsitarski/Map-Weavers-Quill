@@ -9,6 +9,7 @@ from pathlib import Path
 
 root = Path(__file__).resolve().parents[1]
 env = dict(os.environ, PYTHONPATH=str(root / "apps/server"))
+web_env = {key: value for key, value in os.environ.items() if not key.startswith("MWQ_IMAGE_")}
 processes: list[subprocess.Popen[bytes]] = []
 stopping = False
 
@@ -38,7 +39,9 @@ try:
             start_new_session=True,
         )
     )
-    processes.append(subprocess.Popen(["npm", "run", "dev"], cwd=root, start_new_session=True))
+    processes.append(
+        subprocess.Popen(["npm", "run", "dev"], cwd=root, env=web_env, start_new_session=True)
+    )
     while not stopping and all(p.poll() is None for p in processes):
         time.sleep(0.2)
     if not stopping:
