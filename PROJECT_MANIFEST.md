@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 13706)
-Total output lines: 1074
-
 # Map-Weaver's Quill: Project Manifest and Implementation Plan
 
 **Document status:** Canonical implementation brief  
@@ -531,7 +528,136 @@ Export profiles decide which layers are flattened and which remain metadata.
 The base environmental raster MUST remain beneath the artwork. Room, object and
 effect raster layers MUST be user-reorderable relative to one another, including
 objects below rooms. Editor guides, region outlines and selection controls remain
-separate overlays above artwork; they MUST NOT become generated image c…1706 tokens truncated…ssets/{hash}` | Retrieve immutable asset |
+separate overlays above artwork; they MUST NOT become generated image content.
+Wall/door collision and visibility behavior are geometry, independent of visual order.
+
+Layer reordering MUST be an undoable document operation, persist across save/open,
+and be respected by preview and flattened export. Regeneration MUST preserve the
+target layer's order, visibility and opacity while replacing its image revision.
+Reordering MUST NOT alter geometry, collision, region membership or gameplay rules.
+Opaque pixels hide lower layers; revealing them requires transparency or a mask.
+The existing raster `zIndex` field represents raster order. The Layers tab manages
+background and room artwork ordering, visibility and opacity; object compositing remains
+planned. These artwork settings persist through File Save/Open and flattened export.
+
+### 10.2.1 Scope semantics
+
+- **Map:** selects the base background as the target for generation or
+  regeneration across map bounds. It does not target the flattened scene or all
+  entities. Other layers may supply suitable context but MUST NOT be replaced by this action.
+  Planned geometry-aware generation depicts terrain and building exteriors beneath room
+  interiors; it must receive placed footprints and relevant descriptions (ADR-0023).
+- **Room:** bounded architectural geometry and an associated masked render layer;
+  imagery may be regenerated without silently changing boundaries or separate assets.
+- **Object:** independent visual asset and optional gameplay properties. Use objects
+  for visual features such as rugs, vegetation and hazard imagery; place their
+  layers as needed relative to rooms and other objects.
+- **Region:** semantic/gameplay area such as a hazard, difficult terrain or annotation.
+  Its visual style controls editor visualization, not AI-generated artwork. A visual
+  object and a region may describe the same place, but neither automatically creates
+  the other and their geometry is not automatically linked.
+- **Light:** source parameters and exportable lighting behavior; a visible fixture
+  is a separate object. Background regeneration preserves light entities.
+- **Sound:** audio source/area, asset and playback properties; no raster layer required.
+
+Scopes identify editing targets; layers determine visual composition. Selecting a
+scope does not invoke AI. Future generation still follows preview, accept/reject,
+revision checks and undo. Mock background generation is implemented; geometry-aware
+exterior generation remains planned. Hiding room artwork should reveal the exterior
+background beneath it without removing the room, its walls/doors or gameplay data.
+The background must retain complete exterior pixels under interiors. Do not bake room
+interiors into that background or infer a roof for every room polygon. Building grouping
+and open-air intent require explicit design; Regions remain semantic areas. See ADR-0023.
+
+### 10.3 Undo and redo
+
+- All document mutations MUST use a command or transaction abstraction.
+- An accepted generation is one undoable command.
+- Provider invocation itself is not undone; applying its result is.
+- Selection, viewport movement, and panel state SHOULD NOT pollute document history.
+- A compound natural-language command MUST apply atomically.
+
+### 10.4 Accessibility and usability
+
+The accepted editor layout and future control placement are recorded in
+[`docs/INTERFACE.md`](docs/INTERFACE.md). The owner's scheme uses a full-window
+canvas, global top bar, left scope rail with adjacent tools, collapsible persistent
+information at upper-right, and temporary feedback at bottom-left. Panels MUST
+overlay the canvas without moving it. Page scrolling is disabled; wheel input zooms
+except over scrollable panels/textareas, where it scrolls without changing map zoom.
+The right panel has Information (selection), Layers (ordering), and AI (prompts) tabs.
+
+- Core tools MUST have keyboard-accessible actions.
+- Color alone MUST NOT communicate selection, validation errors, or door state.
+- Destructive actions MUST be reversible through undo or confirmation.
+- Long operations MUST expose progress or an indeterminate busy state.
+- The editor SHOULD remain responsive while generation occurs.
+
+## 11. Foundry integration
+
+### 11.1 Export boundary
+
+The editor MUST export a portable bundle rather than treating Foundry JSON as native state:
+
+```text
+ruined-abbey.map-weavers-quill-export.zip
+  manifest.json
+  scene.webp
+  scene-data.json
+  assets/
+```
+
+The bundle manifest MUST declare:
+
+- export schema version;
+- project and revision identifiers;
+- target Foundry compatibility range;
+- map dimensions and grid settings;
+- asset paths and hashes;
+- coordinate convention;
+- the project map height required for coordinate conversion;
+- the target coordinate convention and transform revision used by the exporter;
+- contained feature types.
+
+### 11.2 Importer responsibilities
+
+The Foundry companion module MUST:
+
+- validate bundle version and checksums;
+- copy or register assets through supported Foundry APIs;
+- create a Scene with the correct background, dimensions, grid, distance, and units;
+- create walls and encode doors through the target Foundry document API;
+- create ambient lights;
+- consume only coordinates already converted by the version-specific Foundry export adapter; it MUST NOT reinterpret native project coordinates independently;
+- report unsupported region behaviors without discarding the rest of the import;
+- avoid duplicate import when the same project revision is reprocessed, or clearly offer update/copy behavior.
+
+### 11.3 Compatibility strategy
+
+- Support one explicitly selected Foundry major version first.
+- Isolate version-specific conversion in adapter modules.
+- Keep golden export fixtures and an importer smoke-test checklist for each supported version.
+- Do not promise compatibility with an untested Foundry version.
+- Add regions, sounds, notes, and advanced behaviors only after walls, doors, and lights are dependable.
+
+## 12. API outline
+
+The precise OpenAPI document will be generated from FastAPI. Initial endpoints SHOULD include:
+
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/api/projects` | Create project |
+| `GET` | `/api/projects/{id}` | Read current project |
+| `PATCH` | `/api/projects/{id}` | Apply validated command with base revision |
+| `POST` | `/api/projects/{id}/validate` | Validate document and geometry |
+| `POST` | `/api/projects/{id}/save` | Force snapshot |
+| `GET` | `/api/providers` | List provider descriptors and capabilities |
+| `POST` | `/api/providers/{id}/health` | Test provider configuration |
+| `POST` | `/api/projects/{id}/generations` | Start generation job |
+| `GET` | `/api/generations/{jobId}` | Read job status/result |
+| `DELETE` | `/api/generations/{jobId}` | Cancel job |
+| `POST` | `/api/projects/{id}/exports/foundry` | Build export bundle |
+| `GET` | `/api/assets/{hash}` | Retrieve immutable asset |
 
 Mutating calls MUST include `baseRevision`. Revision conflicts MUST return a typed conflict response rather than silently overwriting changes.
 
