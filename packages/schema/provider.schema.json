@@ -344,6 +344,29 @@
       ],
       "title": "ProviderError",
       "type": "object"
+    },
+    "ProviderReadiness": {
+      "additionalProperties": false,
+      "properties": {
+        "descriptor": {
+          "$ref": "#/$defs/ProviderDescriptor"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "ready": {
+          "title": "Ready",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "descriptor",
+        "ready",
+        "message"
+      ],
+      "title": "ProviderReadiness",
+      "type": "object"
     }
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -360,11 +383,15 @@
     "inpaint": {
       "$ref": "#/$defs/InpaintRequest"
     },
+    "readiness": {
+      "$ref": "#/$defs/ProviderReadiness"
+    },
     "result": {
       "$ref": "#/$defs/GenerationResult"
     }
   },
   "required": [
+    "readiness",
     "descriptor",
     "generate",
     "inpaint",

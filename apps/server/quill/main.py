@@ -17,8 +17,8 @@ from quill.geometry import GeometryRequest, GeometryResult, validate_geometry
 from quill.jobs import GenerationJob, JobConflict, JobQueueFull, JobService
 from quill.models import Project
 from quill.projects import ProjectList, SaveConflict, SaveRequest, project_store
-from quill.provider_config import create_provider, provider_config
-from quill.providers import ProviderDescriptor
+from quill.provider_config import check_provider, create_provider, provider_config
+from quill.providers import ProviderDescriptor, ProviderFailure, ProviderReadiness
 from quill.room_images import RoomImageRequest, generate_room
 from quill.walls import WallDerivationRequest, WallDerivationResult, derive_walls
 
@@ -45,6 +45,24 @@ def health() -> dict[str, str]:
 @app.get("/api/providers", response_model=list[ProviderDescriptor])
 def providers() -> list[ProviderDescriptor]:
     return [create_provider().descriptor()]
+
+
+@app.get("/api/providers/readiness", response_model=ProviderReadiness)
+async def provider_readiness() -> ProviderReadiness:
+    provider = create_provider()
+    try:
+        await check_provider(provider)
+        return ProviderReadiness(
+            descriptor=provider.descriptor(),
+            ready=True,
+            message="Ready" if provider.descriptor().id != "mock" else "Offline test pattern",
+        )
+    except ProviderFailure as error:
+        return ProviderReadiness(
+            descriptor=provider.descriptor(),
+            ready=False,
+            message=error.error.message,
+        )
 
 
 @app.post("/api/geometry/validate", response_model=GeometryResult)
@@ -125,6 +143,8 @@ async def save_project(request: Request) -> Project:
 
 @app.post("/api/generation/background", response_model=BackgroundResult)
 async def background(request: Request) -> BackgroundResult:
+    if provider_config().provider_id != "mock":
+        raise HTTPException(409, "Use queued generation for this provider.")
     if request.headers.get("content-type", "").split(";")[0].strip() != "application/json":
         raise HTTPException(415, "Use application/json.")
     origin = request.headers.get("origin")
@@ -173,6 +193,8 @@ def asset(asset_hash: str) -> Response:
 
 @app.post("/api/generation/room", response_model=BackgroundResult)
 async def room_image(request: Request) -> BackgroundResult:
+    if provider_config().provider_id != "mock":
+        raise HTTPException(409, "Use queued generation for this provider.")
     if request.headers.get("content-type", "").split(";")[0].strip() != "application/json":
         raise HTTPException(415, "Use application/json.")
     origin = request.headers.get("origin")

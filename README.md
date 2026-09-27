@@ -69,7 +69,7 @@ are implemented and run before persistence (ADR-0015).
 
 The accepted UI scheme and future feature placement are in [docs/INTERFACE.md](docs/INTERFACE.md).
 The left rail selects the Map background or toggles persistent Room tools. Map
-targets the base environmental image without opening a left panel; AI contains mock preview controls.
+targets the base environmental image without opening a left panel; AI contains provider-backed preview controls.
 Global menus live along the top, and the
 right panel at upper-right collapses and has Information, Layers and AI tabs.
 Information contains selection details only. Layers replaces the room list and
@@ -189,7 +189,7 @@ return a conflict instead of overwriting another session. A failed or interrupte
 save leaves the previous committed version available.
 
 This first persistence profile supports 1200 × 800 maps, a 50-unit grid, rooms,
-derived walls, doors, one base background, independently masked room artwork and mock generation records.
+derived walls, doors, one base background, independently masked room artwork and mock/SDXL generation records.
 Unsupported dimensions, wall overrides, non-room artwork layers, lights, objects,
 regions and sounds are rejected rather than stripped.
 All supported IDs, references, polygons and door openings are checked. Save requests
@@ -201,6 +201,9 @@ local to this editor. See ADR-0015.
 
 ## Milestone 2: First raster increment
 
+The examples in this section describe the default mock provider. For real local
+SDXL generation, use the Milestone 3 setup below.
+
 Select **Map → AI → Generate preview**. The offline mock produces a deterministic
 480 × 320 checker pattern from the prompt and seed, scaled across the 1200 × 800 map.
 This is a pipeline test, not AI artwork. Accept background creates/replaces only
@@ -211,8 +214,8 @@ the layer's ID. Room and door geometry remain independent.
 
 Any document/history change makes a preview stale, including an edit followed by
 Undo. Regenerate before accepting. Cancel preview abandons the response; the fast
-mock computation may still finish on the server. This increment is not a persistent
-job queue and does not claim provider-side cancellation.
+computation may still finish on the server. The durable queue described below
+prevents cancelled jobs from publishing results; provider-side interruption is not implemented.
 
 PNG bytes are SHA-256 addressed in the same local SQLite database. Save/open verify
 that referenced assets exist and match their hashes; missing/corrupt assets reject
@@ -229,7 +232,7 @@ Room previews use an eight-pixel context margin and a binary polygon mask at the
 canonical 480 × 320 resolution (2.5 map units per pixel). Coverage is evaluated at
 pixel centers; outside-mask RGBA pixels are transparent, and compositing preserves
 all outside-mask pixels exactly, even if the provider paints outside the mask.
-This is still the deterministic offline mock, not AI imagery.
+This describes the default mock profile; SDXL uses resolution-aware aligned crops (ADR-0027).
 
 Moving/reshaping a room clears its outdated art in the same undoable transaction;
 undo restores both. Changing its name or prompt preserves art. Deleting a room also
@@ -273,7 +276,7 @@ The Milestone 2 acceptance review is in docs/MILESTONE_2_ACCEPTANCE.md. Mileston
 Room AI style fields (Environment, Render style, Palette) override map defaults when
 nonblank. Apply prompt and style is undoable, preserves existing art, and invalidates
 pending previews. Generate again to use the new style. The assembled provider prompt
-and resolved style are saved in generation provenance. Output remains a mock pattern.
+and resolved style are saved in generation provenance. The default mock produces a test pattern; configured SDXL produces AI artwork.
 
 ### Map prompt and style defaults
 
@@ -300,8 +303,8 @@ intent so a path can lead to the cottage you actually placed. See
 ### Milestone 3: Provider configuration foundation
 
 Generation and discovery now share a server-only provider factory. The default is
-`MWQ_IMAGE_PROVIDER=mock`; unsupported names fail API startup. No hosted adapter is
-implemented yet, so the editor still produces offline patterns and needs no API key.
+`MWQ_IMAGE_PROVIDER=mock`; unsupported names fail API startup. The local SDXL adapter is also available as `comfyui-sdxl` (see below). Neither needs
+an API key; no hosted adapter is implemented yet.
 
 The server accepts either `MWQ_IMAGE_API_KEY` or `MWQ_IMAGE_API_KEY_FILE` (not both) in
 preparation for the hosted adapter. The mock does not use them. Prefer a private key file
@@ -323,7 +326,7 @@ protocol tests. Run `make comfy-check` after installing ComfyUI and the SDXL bas
 checkpoint separately. See [docs/COMFYUI.md](docs/COMFYUI.md) for Linux setup and the
 explicit GPU smoke command. No model weights, PyTorch or new dependencies are bundled.
 
-The editor still uses mock. Storage, masks, composition and exports now support both
+The editor defaults to mock. Storage, masks, composition and exports support both
 legacy 480 × 320 assets and a 960 × 640 SDXL map profile, preserving the native map's
 3:2 proportions. Mixed-resolution layers retain their original files; exports use
 the highest stored resolution, including hidden layers when choosing dimensions.
@@ -332,5 +335,18 @@ See [ADR-0026](docs/adr/0026-resolution-aware-raster-assets.md).
 The owner reports SDXL working locally. Adapter-specific GPU timing, visual continuity
 and peak memory remain to be recorded. The standalone workflow uses SDXL base with a
 latent mask, not a dedicated inpainting fine-tune. Flux Fill is deferred.
-Next: connect ComfyUI to queued editor previews and save/open. Building layout
-conditioning remains planned separately under ADR-0023.
+Queued SDXL editor integration is implemented (ADR-0027). With ComfyUI running,
+stop the old Quill server, then run:
+
+```sh
+export MWQ_IMAGE_PROVIDER=comfyui-sdxl
+export MWQ_IMAGE_COMFY_CHECKPOINT=sd_xl_base_1.0.safetensors
+make dev
+```
+
+Map → AI shows readiness and capabilities. Use Generate preview and Accept as usual;
+room artwork uses aligned context crops and preserves pixels outside its geometry.
+Accepted results retain workflow/model provenance through undo and Save/Open.
+Cancel discards the preview but may leave GPU work running; see docs/COMFYUI.md.
+Next: the owner-run adjacent-room visual/performance trial, then model/context tuning.
+Building layout conditioning remains planned separately under ADR-0023.

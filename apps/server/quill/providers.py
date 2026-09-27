@@ -33,6 +33,12 @@ class ProviderDescriptor(Contract):
     local: bool
 
 
+class ProviderReadiness(Contract):
+    descriptor: ProviderDescriptor
+    ready: bool
+    message: str
+
+
 class GenerateRequest(Contract):
     contractVersion: Literal["0.1.0"] = "0.1.0"
     requestId: Annotated[str, Field(min_length=1)]

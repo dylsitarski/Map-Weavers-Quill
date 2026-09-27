@@ -51,6 +51,8 @@ export type Requestid1 = string;
 export type Seed1 = number;
 export type Sourceref = string;
 export type Width1 = number;
+export type Message1 = string;
+export type Ready = boolean;
 export type Assethash = string;
 export type Contractversion3 = "0.1.0";
 export type Height2 = number;
@@ -64,6 +66,7 @@ export interface ProviderContracts {
   error: ProviderError;
   generate: GenerateRequest;
   inpaint: InpaintRequest;
+  readiness: ProviderReadiness;
   result: GenerationResult;
   [k: string]: unknown;
 }
@@ -131,6 +134,11 @@ export interface Extensions1 {
 }
 export interface Parameters1 {
   [k: string]: number;
+}
+export interface ProviderReadiness {
+  descriptor: ProviderDescriptor;
+  message: Message1;
+  ready: Ready;
 }
 export interface GenerationResult {
   assetHash: Assethash;

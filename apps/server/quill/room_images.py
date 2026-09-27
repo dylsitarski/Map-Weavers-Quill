@@ -1,4 +1,4 @@
-"""Context-cropped mock inpainting, emitted as independently masked room art."""
+"""Provider inpainting with aligned context crops and independently masked room art."""
 
 import asyncio
 from typing import Annotated, Literal
@@ -11,7 +11,12 @@ from quill.backgrounds import BackgroundResult
 from quill.exports import artwork_size, composite_artwork
 from quill.models import Bounds, Contract, GenerationRecord, Point, Project, RasterLayer
 from quill.projects import project_store, validate_project
-from quill.provider_config import create_provider
+from quill.provider_config import (
+    check_provider,
+    create_provider,
+    generation_details,
+    raster_profile,
+)
 from quill.providers import InpaintRequest
 from quill.raster import context_crop, image, masked_layer, png, polygon_mask
 from quill.styles import room_style_prompt
@@ -38,14 +43,16 @@ def generate_room(request: RoomImageRequest) -> BackgroundResult:
     if len(room.prompt) > 4000:
         raise ValueError("Room generation prompts support at most 4000 characters.")
     prompt, effective_style = room_style_prompt(room, project.map.style)
-    size = artwork_size(project, store)
+    provider = create_provider()
+    profile, alignment = raster_profile(provider)
+    size = max(artwork_size(project, store), profile, key=lambda size: size[0])
     mask = polygon_mask(room.polygon, size)
     # Keep the same native 20-unit context margin at either pixel density.
-    crop = context_crop(mask, margin=round(20 * size[0] / 1200))
-    provider = create_provider()
+    crop = context_crop(mask, margin=round(20 * size[0] / 1200), alignment=alignment)
     descriptor = provider.descriptor()
     if crop[2] - crop[0] > descriptor.maxWidth or crop[3] - crop[1] > descriptor.maxHeight:
         raise ValueError("This room crop exceeds the configured provider's dimension limits.")
+    asyncio.run(check_provider(provider))
     # Context includes current composited art, including previous target art.
     source = composite_artwork(project, store, size=size)
     source_hash, mask_hash = store.put_asset(png(source)), store.put_asset(png(mask))
@@ -90,7 +97,7 @@ def generate_room(request: RoomImageRequest) -> BackgroundResult:
             id=uuid4(),
             kind="generation",
             revision=0,
-            label=f"Mock room: {room.label}",
+            label=f"Room generation: {room.label}",
             metadata={"quill.generation": {"target": "room", "roomId": str(room.id)}},
             providerId=result.providerId,
             capability="inpainting",
@@ -99,6 +106,7 @@ def generate_room(request: RoomImageRequest) -> BackgroundResult:
             outputHash=output_hash,
             parameters={
                 "seed": request.seed,
+                **generation_details(provider),
                 "crop": list(crop),
                 "width": size[0],
                 "height": size[1],

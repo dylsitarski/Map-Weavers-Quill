@@ -1,4 +1,4 @@
-"""First raster workflow: deterministic mock background proposals."""
+"""Provider-backed background proposals; acceptance remains an editor operation."""
 
 import asyncio
 import json
@@ -9,8 +9,14 @@ from pydantic import Field
 
 from quill.models import Bounds, Contract, GenerationRecord, MapStyle, Point, RasterLayer
 from quill.projects import project_store
-from quill.provider_config import create_provider
+from quill.provider_config import (
+    check_provider,
+    create_provider,
+    generation_details,
+    raster_profile,
+)
 from quill.providers import GenerateRequest
+from quill.raster import image
 
 
 class BackgroundRequest(Contract):
@@ -41,18 +47,23 @@ def generate_background(request: BackgroundRequest) -> BackgroundResult:
             f"\nCamera: {request.style.camera}. Baked lighting: {request.style.bakedLighting}."
         )
     provider = create_provider()
+    size, _ = raster_profile(provider)
+    asyncio.run(check_provider(provider))
     result = asyncio.run(
         provider.generate(
             GenerateRequest(
                 requestId=str(uuid4()),
                 prompt=prompt,
                 seed=request.seed,
-                width=480,
-                height=320,
+                width=size[0],
+                height=size[1],
             )
         )
     )
-    asset_hash = project_store().put_asset(provider.assets[result.assetHash])
+    data = provider.assets[result.assetHash]
+    if (result.width, result.height) != size or image(data).size != size:
+        raise ValueError("Provider output dimensions do not match the requested background.")
+    asset_hash = project_store().put_asset(data)
     return BackgroundResult(
         layer=RasterLayer(
             id=uuid4(),
@@ -72,7 +83,7 @@ def generate_background(request: BackgroundRequest) -> BackgroundResult:
             id=uuid4(),
             kind="generation",
             revision=0,
-            label="Mock background",
+            label="Background generation",
             metadata={"quill.generation": {"target": "map"}},
             providerId=result.providerId,
             capability="text_to_image",
@@ -81,8 +92,9 @@ def generate_background(request: BackgroundRequest) -> BackgroundResult:
             outputHash=asset_hash,
             parameters={
                 "seed": request.seed,
-                "width": 480,
-                "height": 320,
+                **generation_details(provider),
+                "width": size[0],
+                "height": size[1],
                 "backgroundPrompt": request.prompt,
                 "promptTemplate": "map-style-v1" if request.style else "background-v0",
                 "mapStyle": request.style.model_dump(mode="json") if request.style else None,

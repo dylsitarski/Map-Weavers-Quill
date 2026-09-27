@@ -109,17 +109,17 @@ def validate_project(project: Project, *, derive_missing: bool = False) -> Proje
                 raise ValueError("A room references an unavailable or mismatched render layer.")
     for record in project.generations:
         if (
-            record.providerId != "mock"
+            record.providerId not in {"mock", "comfyui-sdxl"}
             or record.capability not in {"text_to_image", "inpainting"}
             or record.status != "succeeded"
             or record.outputHash is None
             or record.baseRevision > project.revision
         ):
-            raise ValueError("Unsupported mock generation provenance.")
+            raise ValueError("Unsupported generation provenance.")
         if (record.capability == "text_to_image" and record.inputHashes) or (
             record.capability == "inpainting" and len(record.inputHashes) != 2
         ):
-            raise ValueError("Invalid mock generation input references.")
+            raise ValueError("Invalid generation input references.")
     walls = derive_walls(
         WallDerivationRequest(
             width=project.map.width,

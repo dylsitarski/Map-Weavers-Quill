@@ -206,7 +206,7 @@ export function EditorPanels(p: Props) {
             aria-controls={name === 'Room' ? 'scope-panel' : undefined}
             title={
               name === 'Map'
-                ? 'Select the base background. Open AI for a mock preview.'
+                ? 'Select the base background. Open AI for a preview.'
                 : undefined
             }
             onClick={(e) => {
@@ -460,7 +460,7 @@ export function EditorPanels(p: Props) {
             ) : (
               <p>
                 {p.scope === 'Map'
-                  ? 'Base background selected. Open AI to generate a mock background preview.'
+                  ? 'Base background selected. Open AI to generate a background preview.'
                   : 'Select an item to inspect it.'}
               </p>
             )}
@@ -511,7 +511,7 @@ export function EditorPanels(p: Props) {
               <p>
                 {p.scope === 'Map'
                   ? 'Accepting a preview changes only the base background.'
-                  : 'Select a room to edit its prompt, or Map to target the base background. Apply a room prompt, then generate a mock preview.'}
+                  : 'Select a room to edit its prompt, or Map to target the base background. Apply a room prompt, then generate a preview.'}
               </p>
             )}
           </section>

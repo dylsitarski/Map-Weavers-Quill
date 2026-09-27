@@ -808,12 +808,11 @@ Tasks:
    credential loading and a shared mock factory are implemented (ADR-0024); hosted
    credential use and provider-specific configuration remain with the adapter.
 2. Implement the local ComfyUI adapter and a versioned SDXL generation/masked-edit workflow.
-   Standalone adapter and smoke command are implemented; actual GPU validation and editor
-   integration remain pending (ADR-0025, docs/COMFYUI.md).
+   Standalone adapter, smoke command and queued editor integration are implemented
+   (ADR-0025–0027, docs/COMFYUI.md); full hardware acceptance remains pending.
 3. Add provider health, capability display, dimension normalization, and error mapping.
-   Readiness/error handling exist in the standalone adapter; UI integration remains pending.
-   First make persistence, masks, crop transforms and exports resolution-aware so generated
-   detail is retained. Preserve existing 480x320 mock projects; never silently downsample
+   Readiness/capability UI, safe error mapping and aligned crops are implemented.
+   Persistence, masks, crop transforms and exports are resolution-aware, retaining detail. Preserve existing 480x320 mock projects; never silently downsample
    real assets to that test profile.
 4. Develop persistent map-style and prompt-wrapper behavior.
 5. Record reproducibility metadata and cost/usage data when the provider supplies it.
@@ -1063,7 +1062,7 @@ As of this manifest version:
 
 - Milestone 2 is complete for the supported local mock profile. Its first increment adds SHA-256-addressed PNG assets in SQLite, one base-background raster layer, offline mock preview/accept/reject/regenerate, stale-preview rejection, undoable visibility/opacity and native save/reopen with generation provenance (ADR-0016). Cancellation now uses the durable job workflow described below. Room crops, binary polygon masks, enforced outside-mask preservation, independent room artwork and validated room/layer bindings are implemented (ADR-0017). Geometry edits clear affected art with undo. Artwork ordering, visibility and opacity controls are implemented with undo/redo and save/open. Flattened PNG/lossless WebP export is implemented at the canonical 480 × 320 raster resolution (ADR-0018), respecting accepted layer order/visibility/opacity. Durable queued generation, polling, idempotent cancellation and interrupted-job recovery are implemented (ADR-0019). Active synchronous mock computation is not forcibly interrupted; late output cannot publish. Explicit browser preview recovery with project-fingerprint validation is implemented (ADR-0020). See docs/MILESTONE_2_ACCEPTANCE.md for the exit-criteria review. The room style-override inspector, map-style inheritance and deterministic provider prompt/provenance are implemented (ADR-0021). Persistent map background prompts and editable map-wide style defaults now complete the map-level authoring workflow (ADR-0022), including undo after Save and inherited room defaults. Real-provider interruption and model-specific prompt tuning belong to Milestone 3.
 
-- Milestone 3 is in progress: server-only provider configuration, bounded secret-file/environment loading, startup validation and a shared discovery/generation factory are implemented (ADR-0024). The editor still uses mock. A standalone local ComfyUI/SDXL adapter, full-resolution smoke command, safe error mapping and offline protocol tests are implemented (ADR-0025). The owner reports SDXL working locally; adapter-specific hardware measurements and visual acceptance remain outstanding. Resolution-aware storage, masks, crop transforms, mixed-resolution composition and lossless exports now support legacy 480 × 320 and SDXL 960 × 640 full-map assets (ADR-0026), with original bytes preserved. Next: queued ComfyUI editor integration and an end-to-end hardware acceptance test. Flux Fill is deferred. Hosted generation and geometry-aware exteriors remain unimplemented.
+- Milestone 3 is in progress: server-only provider configuration, bounded secret-file/environment loading, startup validation and a shared discovery/generation factory are implemented (ADR-0024). The editor defaults to mock and can now select comfyui-sdxl (ADR-0027). A standalone local ComfyUI/SDXL adapter, full-resolution smoke command, safe error mapping and offline protocol tests are implemented (ADR-0025). The owner reports SDXL working locally; adapter-specific hardware measurements and visual acceptance remain outstanding. Resolution-aware storage, masks, crop transforms, mixed-resolution composition and lossless exports now support legacy 480 × 320 and SDXL 960 × 640 full-map assets (ADR-0026), with original bytes preserved. Queued ComfyUI generation, readiness/capability display, aligned room crops, safe failures and persisted workflow provenance are implemented (ADR-0027). Offline tests cover the adapter-to-editor path. Next: an end-to-end hardware acceptance test with two adjacent rooms and recorded visual/performance results. Flux Fill is deferred. Hosted generation and geometry-aware exteriors remain unimplemented.
 
 ## 23. First implementation ticket
 

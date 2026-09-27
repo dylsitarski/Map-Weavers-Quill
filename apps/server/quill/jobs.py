@@ -11,6 +11,7 @@ from uuid import UUID
 from quill.backgrounds import BackgroundRequest, BackgroundResult, generate_background
 from quill.models import Contract
 from quill.projects import ProjectStore
+from quill.providers import ProviderFailure
 from quill.room_images import RoomImageRequest, generate_room
 
 
@@ -120,12 +121,17 @@ class JobService:
                     "UPDATE generation_jobs SET status='succeeded',result=? WHERE id=? AND status='running'",
                     (result.model_dump_json(), str(job_id)),
                 )
-        except Exception:
+        except Exception as error:
+            message = (
+                error.error.message
+                if isinstance(error, ProviderFailure)
+                else "Generation failed. Check the project and local assets, then retry."
+            )
             with closing(self.connect()) as db, db:
                 db.execute(
                     "UPDATE generation_jobs SET status='failed',error=? WHERE id=? AND status='running'",
                     (
-                        "Generation failed. Check the project and local assets, then retry.",
+                        message,
                         str(job_id),
                     ),
                 )

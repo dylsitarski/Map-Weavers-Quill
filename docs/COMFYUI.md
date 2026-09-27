@@ -1,9 +1,8 @@
 # Local SDXL / ComfyUI test
 
 Milestone 3 uses a local backend first to avoid per-image API charges. This increment
-provides a standalone adapter and GPU smoke test; the editor still uses mock.
-Resolution-aware editor storage is implemented (ADR-0026); queued editor integration
-is next. See ADR-0025.
+supports queued editor previews as well as the standalone GPU smoke command.
+The default remains mock; explicitly select comfyui-sdxl below. See ADR-0025–0027.
 
 ## Install separately on Linux
 
@@ -55,9 +54,9 @@ export MWQ_IMAGE_COMFY_TIMEOUT=600
 ```
 
 Only HTTP loopback hosts with an explicit port are accepted. The checkpoint must
-be a filename, not a directory. `.env` is not loaded automatically. Leave
-`MWQ_IMAGE_PROVIDER=mock` for the editor; `comfyui` is not an editor option yet.
-The standalone command constructs the adapter directly using the variables above.
+be a filename, not a directory. `.env` is not loaded automatically. Use
+`MWQ_IMAGE_PROVIDER=comfyui-sdxl` to enable the editor adapter. The standalone
+command constructs the adapter directly using the variables above.
 
 ## Run one real generation
 
@@ -128,5 +127,54 @@ PYTHONPATH=apps/server .venv/bin/python scripts/comfy_smoke.py \
 ```
 
 This remains a standalone test, not an import into the editor. Square smoke outputs
-are not full-map assets. Do not resize them to fit; queued integration will request
+are not full-map assets. Do not resize them to fit; the editor requests
 the correct dimensions directly. Existing mock projects need no migration.
+
+## Use SDXL in the editor
+
+Keep ComfyUI running in its own terminal. Stop Quill's previous `make dev` with
+Ctrl-C, then from the Quill repository run:
+
+```sh
+export MWQ_IMAGE_PROVIDER=comfyui-sdxl
+export MWQ_IMAGE_COMFY_CHECKPOINT=sd_xl_base_1.0.safetensors
+make dev
+```
+
+Open Map → AI. The panel identifies Local SDXL / ComfyUI and checks connectivity,
+core nodes and checkpoint availability without loading weights or queuing an image.
+If unavailable, fix the local setup and click **Check provider**. Generation stays
+disabled until the check succeeds. Each job also checks readiness before submission.
+A successful check does not guarantee enough GPU memory or the correct checkpoint
+architecture; use an SDXL base-compatible checkpoint with this fixed workflow.
+
+Apply the background prompt/style, then Generate preview → Accept background.
+For interiors, select a room, apply its prompt, generate and accept room artwork.
+Previews appear on the map; accepting is undoable, and File → Save retains accepted
+art and provenance. Save/Open and exports also work when later switching back to
+mock. Set `MWQ_IMAGE_PROVIDER=mock` and restart Quill to switch back.
+
+New SDXL backgrounds and room layers use 960 × 640 full-map storage. Room generation
+uses a crop expanded to multiples of 64 and pastes it back without stretching. Old
+mock layers retain their bytes; they are resampled only for composition/context.
+Room crops can be much smaller than typical SDXL training sizes: assess detail and
+continuity before deciding on larger context windows or a different inpainting model.
+Generation currently uses 20 Euler/normal steps, CFG 7 and denoise 1, batch one.
+These are fixed reference settings, not UI controls.
+
+Generation runs serially through Quill's durable queue. Cancel preview prevents a
+result from being published, but does not stop ComfyUI's GPU work. The worker remains
+occupied until completion or timeout (default 600 seconds); server shutdown may wait
+for that operation. Check ComfyUI's queue before retrying after a timeout. Quill does
+not issue global interrupts or automatic provider retries. ComfyUI retains uploaded
+images and outputs locally; asset cleanup is not yet automated.
+
+Accepted generation records include workflow version/hash, checkpoint filename,
+ComfyUI prompt ID, seed, sampler settings and crop dimensions, plus full-map input
+hashes and native crop placement. They contain no endpoint URL or credentials.
+The filename is not a checkpoint hash: capture the additional hardware evidence above.
+
+Next acceptance trial: generate a background and two adjacent room interiors, inspect
+outside-mask preservation and seams, accept, undo/redo, save/reopen, and export. Record
+runtime and peak VRAM. Automated tests use simulated ComfyUI responses; they do not
+establish visual quality or geometry-aligned building exteriors.

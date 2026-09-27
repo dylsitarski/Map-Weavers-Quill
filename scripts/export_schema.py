@@ -18,6 +18,7 @@ from quill.providers import (
     InpaintRequest,
     ProviderDescriptor,
     ProviderError,
+    ProviderReadiness,
 )
 from quill.room_images import RoomImageRequest
 from quill.walls import WallDerivationRequest, WallDerivationResult
@@ -32,6 +33,7 @@ class RasterContracts(BaseModel):
 
 
 class ProviderContracts(BaseModel):
+    readiness: ProviderReadiness
     descriptor: ProviderDescriptor
     generate: GenerateRequest
     inpaint: InpaintRequest

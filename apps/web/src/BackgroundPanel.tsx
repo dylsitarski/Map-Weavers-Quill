@@ -12,7 +12,6 @@ import type {
   GenerationJob,
 } from '../../../packages/schema/raster';
 import schema from '../../../packages/schema/raster.schema.json';
-
 import {
   forgetRecovery,
   previewSignature,
@@ -21,6 +20,7 @@ import {
   recoveryKey,
   rememberRecovery,
 } from './previewRecovery';
+import { useProviderReadiness } from './useProviderReadiness';
 
 const ajv = new Ajv2020({ strict: false });
 addFormats(ajv);
@@ -57,6 +57,13 @@ export function BackgroundPanel(p: {
   accept: (result: BackgroundResult) => void;
 }) {
   const target = p.room ? 'room' : 'background';
+  const provider = useProviderReadiness();
+  const canGenerate =
+    provider.state?.ready &&
+    provider.state.descriptor.capabilities.includes(
+      p.room ? 'inpainting' : 'text_to_image',
+    );
+  const localSdxl = provider.state?.descriptor.id === 'comfyui-sdxl';
   const key = recoveryKey(p.projectId, p.room?.id);
   const [recovery, setRecovery] = useState<{
     key: string;
@@ -265,9 +272,44 @@ export function BackgroundPanel(p: {
   return (
     <section aria-label={p.room ? 'Room generation' : 'Background generation'}>
       <h2>{p.room ? 'Room artwork' : 'Map background'}</h2>
-      <p>
-        Offline mock: generates a deterministic test pattern, not AI artwork.
-      </p>
+      <div>
+        <p>
+          {provider.checking
+            ? 'Checking image provider…'
+            : provider.state?.descriptor.id === 'mock'
+              ? 'Offline mock: generates a deterministic test pattern, not AI artwork.'
+              : localSdxl
+                ? 'Local SDXL · ComfyUI'
+                : 'Image provider unavailable'}
+        </p>
+        {provider.state && (
+          <p>
+            {provider.state.message} ·{' '}
+            {provider.state.descriptor.capabilities
+              .filter((c) => c === 'text_to_image' || c === 'inpainting')
+              .map((c) =>
+                c === 'text_to_image'
+                  ? 'Background generation'
+                  : 'Room editing',
+              )
+              .join(' · ')}
+          </p>
+        )}
+        {provider.error && <p role="alert">{provider.error}</p>}
+        <button
+          type="button"
+          disabled={provider.checking || working}
+          onClick={provider.refresh}
+        >
+          Check provider
+        </button>
+        {localSdxl && (
+          <p>
+            960 × 640 map artwork. Cancelling discards the preview; ComfyUI may
+            continue working.
+          </p>
+        )}
+      </div>
       {p.room ? (
         <p>Uses the applied room prompt: {p.room.prompt || '(empty)'}</p>
       ) : (
@@ -330,6 +372,7 @@ export function BackgroundPanel(p: {
         type="button"
         disabled={
           working ||
+          !canGenerate ||
           p.busy ||
           mapDraftDirty ||
           p.count >= 128 ||
