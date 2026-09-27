@@ -200,3 +200,41 @@ Pull and restart Quill with the same comfyui-sdxl selection. Generate fresh prev
 existing accepted images do not change automatically. Compare the same room/seed and
 record runtime/peak VRAM. A true orthographic layout is still a visual acceptance target,
 not a guarantee of the base SDXL model. Geometry conditioning remains future work.
+
+## Enable room wall/door guidance
+
+Scale information now accompanies every SDXL room request: the document's grid distance
+(default 5 feet per cell), room dimensions/area and working pixels per unit. This is model
+guidance, not a guarantee that furniture will have an exact footprint.
+
+For spatial wall/door guidance, download
+[control-lora-canny-rank128.safetensors](https://huggingface.co/stabilityai/control-lora/blob/main/control-LoRAs-rank128/control-lora-canny-rank128.safetensors)
+from Stability AI into **ComfyUI/models/controlnet/** (not checkpoints or loras).
+Check the model's published license before redistributing weights. Quill does not bundle it.
+Use an SDXL-compatible control model, not an SD 1.5 model. Restart ComfyUI after installation.
+
+Stop Quill and restart it with:
+
+```sh
+export MWQ_IMAGE_PROVIDER=comfyui-sdxl
+export MWQ_IMAGE_COMFY_CONTROLNET=control-lora-canny-rank128.safetensors
+make dev
+```
+
+Select a room → AI → Check provider. The panel should report wall and door guidance
+enabled. Missing configured weights/nodes cause an explicit readiness failure. Generate
+a new preview; the background generation path remains text-only even with this option.
+
+Quill creates an edge guide from existing walls with gaps at door positions, transforms
+it with the room crop and submits it through core ControlNet nodes. It adds no grid or
+furniture geometry. No custom nodes/preprocessor are required. Strength is initially 1
+throughout sampling. Both source and guide remain local to ComfyUI. The additional model
+increases GPU memory/work; the RTX 3060 Ti hardware trial has not been run here.
+
+Compare the same room/seed with and without guidance. Inspect door clearance, invented
+partitions and object size; ControlNet is guidance, not an exact architectural renderer.
+To disable it, `unset MWQ_IMAGE_COMFY_CONTROLNET` and restart Quill. The standalone smoke
+command checks configured model readiness but does not construct a project wall guide;
+use room generation in the editor for this trial. Background roof/entrance alignment,
+explicit building grouping, hard door-clearance enforcement and sized furniture placement
+remain future work. See ADR-0029.

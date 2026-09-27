@@ -5,11 +5,12 @@ from typing import Annotated, Literal
 from uuid import UUID, uuid4
 
 from PIL import Image
-from pydantic import Field
+from pydantic import Field, JsonValue
 
 from quill.backgrounds import BackgroundResult
 from quill.comfyui import ComfyProvider
 from quill.exports import artwork_size, composite_artwork
+from quill.layout_guidance import room_scale, scale_prompt, wall_guide, working_guide
 from quill.models import Bounds, Contract, GenerationRecord, Point, Project, RasterLayer
 from quill.projects import project_store, validate_project
 from quill.provider_config import (
@@ -20,7 +21,7 @@ from quill.provider_config import (
 )
 from quill.providers import InpaintRequest
 from quill.raster import context_crop, image, masked_layer, png, polygon_mask
-from quill.sdxl_authoring import NEGATIVE, TEMPLATE, RoomTransform, clean_context, prompt_text
+from quill.sdxl_authoring import NEGATIVE, RoomTransform, clean_context, prompt_text
 from quill.styles import room_style_prompt
 
 
@@ -67,6 +68,19 @@ def generate_room(request: RoomImageRequest) -> BackgroundResult:
         source_crop, mask_crop = transform.prepare(source_crop, mask_crop)
     if source_crop.width > descriptor.maxWidth or source_crop.height > descriptor.maxHeight:
         raise ValueError("Generation resolution exceeds provider limits.")
+    input_hashes = [source_hash, mask_hash]
+    layout_details: dict[str, JsonValue] = {}
+    extensions: dict[str, dict[str, JsonValue]] = {}
+    if transform:
+        controlled = isinstance(provider, ComfyProvider) and provider.config.controlnet is not None
+        scale = room_scale(project, room, size, transform)
+        prompt = scale_prompt(scale, controlled=controlled) + "\n" + prompt
+        layout_details = {"physicalScale": scale, "layoutConditioning": controlled}
+        if controlled:
+            guide = wall_guide(project, size)
+            input_hashes.append(store.put_asset(png(guide)))
+            control_ref = provider.put(png(working_guide(guide, crop, transform)))
+            extensions = {"quill.layout": {"controlRef": control_ref}}
     result = asyncio.run(
         provider.inpaint(
             InpaintRequest(
@@ -79,6 +93,7 @@ def generate_room(request: RoomImageRequest) -> BackgroundResult:
                 sourceRef=provider.put(png(source_crop)),
                 maskRef=provider.put(png(mask_crop)),
                 maskConvention="white-edit-black-preserve",
+                extensions=extensions,
             )
         )
     )
@@ -121,15 +136,16 @@ def generate_room(request: RoomImageRequest) -> BackgroundResult:
             providerId=result.providerId,
             capability="inpainting",
             prompt=prompt,
-            inputHashes=[source_hash, mask_hash],
+            inputHashes=input_hashes,
             outputHash=output_hash,
             parameters={
                 "seed": request.seed,
                 **generation_details(provider),
+                **layout_details,
                 "crop": list(crop),
                 "width": size[0],
                 "height": size[1],
-                "promptTemplate": TEMPLATE if sdxl else "room-style-v1",
+                "promptTemplate": "sdxl-room-layout-v1" if sdxl else "room-style-v1",
                 **(
                     {
                         "negativePrompt": NEGATIVE,

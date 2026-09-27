@@ -362,3 +362,13 @@ user prompts/style fields are preserved. See ADR-0028 and docs/COMFYUI.md.
 Pull and restart Quill, then regenerate previews to test this change. Room generation
 will use more GPU work than before. Visual quality and orthographic consistency still
 need assessment on the owner's hardware; no new model downloads are required.
+
+### Scale and room wall guidance
+
+SDXL room requests now include physical dimensions using the document grid (default
+5 feet per cell). Optional ControlNet guidance uses drawn/derived walls with gaps at
+door positions. Install the SDXL Control-LoRA and set MWQ_IMAGE_COMFY_CONTROLNET as
+described in [docs/COMFYUI.md](docs/COMFYUI.md). The AI panel reports whether guidance
+is enabled. This is soft conditioning; verify furniture scale, partitions and doorway
+clearance in previews. Background building alignment remains unimplemented (ADR-0023).
+See ADR-0029 for provenance, tests and limitations.

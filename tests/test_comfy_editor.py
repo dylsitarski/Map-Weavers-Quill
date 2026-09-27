@@ -272,3 +272,90 @@ class ComfyEditorTests(unittest.TestCase):
                     "MWQ_IMAGE_COMFY_URL": "https://remote.example:8188",
                 }
             )
+
+    def test_controlled_room_upload_workflow_provenance_and_missing_model(self):
+        with patch.dict(
+            os.environ, {"MWQ_IMAGE_COMFY_CONTROLNET": "control-lora-canny-rank128.safetensors"}
+        ):
+            provider_config.cache_clear()
+            original = self.fake.respond
+            missing = False
+
+            def respond(request):
+                response = original(request)
+                if request.url.path == "/object_info":
+                    info = response.json()
+                    info["ControlNetApplyAdvanced"] = {}
+                    info["ControlNetLoader"] = {
+                        "input": {
+                            "required": {
+                                "control_net_name": [
+                                    [] if missing else ["control-lora-canny-rank128.safetensors"]
+                                ]
+                            }
+                        }
+                    }
+                    return httpx.Response(200, json=info)
+                return response
+
+            with patch.object(
+                ComfyProvider,
+                "client",
+                lambda _: httpx.AsyncClient(
+                    base_url="http://127.0.0.1:8188", transport=httpx.MockTransport(respond)
+                ),
+            ):
+                with TestClient(app) as client:
+                    self.assertTrue(client.get("/api/providers/readiness").json()["ready"])
+                    self.assertIn(
+                        "control_image", client.get("/api/providers").json()[0]["capabilities"]
+                    )
+                    project = document()
+                    room = project.rooms[0]
+                    _, job = self.submit(
+                        client,
+                        "room",
+                        {
+                            "project": project.model_dump(mode="json"),
+                            "roomId": str(room.id),
+                            "seed": 1,
+                        },
+                    )
+                    self.assertEqual(job["status"], "succeeded", job)
+                    result = BackgroundResult.model_validate_json(json.dumps(job["result"]))
+                    self.assertEqual(len(result.generation.inputHashes), 3)
+                    self.assertEqual(
+                        result.generation.parameters["physicalScale"]["cellDistance"], 5
+                    )
+                    self.assertTrue(result.generation.parameters["layoutConditioning"])
+                    self.assertEqual(self.fake.calls.count("/upload/image"), 2)
+                    self.assertEqual(self.fake.graph["5"]["inputs"]["positive"], ["11", 0])
+                    self.assertEqual(self.fake.graph["5"]["inputs"]["negative"], ["11", 1])
+                    self.assertEqual(self.fake.graph["11"]["inputs"]["strength"], 1.0)
+                    self.assertEqual(
+                        self.fake.graph["10"]["inputs"]["image"][:14], "quill-control-"
+                    )
+                    self.assertIn("each grid cell is 5 ft", self.fake.graph["2"]["inputs"]["text"])
+                    self.assertEqual(self.fake.upload.size, (1024, 1024))
+                    room.renderLayerId = result.layer.id
+                    project.layers = [result.layer]
+                    project.generations = [result.generation]
+                    saved = self.store.save(SaveRequest(project=project, expectedRevision=None))
+                    self.assertEqual(self.store.open(saved.projectId), saved)
+                    # Persisted full-map control is distinct from the source and mask.
+                    guide = image(self.store.get_asset(result.generation.inputHashes[2]))
+                    self.assertEqual(guide.size, (960, 640))
+                    self.assertEqual(guide.getpixel((80, 560)), (255, 255, 255, 255))
+                    missing = True
+                    self.assertFalse(client.get("/api/providers/readiness").json()["ready"])
+                    _, failed = self.submit(
+                        client,
+                        "room",
+                        {
+                            "project": project.model_dump(mode="json"),
+                            "roomId": str(room.id),
+                            "seed": 2,
+                        },
+                    )
+                    self.assertEqual(failed["status"], "failed")
+                    self.assertEqual(self.fake.calls.count("/prompt"), 1)

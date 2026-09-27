@@ -309,3 +309,30 @@ class ComfyTests(unittest.IsolatedAsyncioTestCase):
         for timeout in (0, float("nan"), float("inf"), 1801):
             with self.assertRaises(ValueError):
                 ComfyConfig(timeout=timeout)
+
+    async def test_layout_extension_rejects_unknown_fields_and_missing_assets_before_upload(self):
+        provider = ComfyProvider(
+            ComfyConfig(controlnet="control.safetensors"),
+            transport=httpx.MockTransport(self.respond),
+        )
+        source = provider.put(png((10, 20, 30)))
+        mask = provider.put(png(255, mode="L"))
+        for extension in (
+            {"quill.layout": {"controlRef": "missing"}},
+            {"quill.layout": {"controlRef": source, "workflow": "untrusted"}},
+            {"other.layout": {"controlRef": source}},
+        ):
+            with self.assertRaises(ProviderFailure):
+                await provider.inpaint(
+                    InpaintRequest(
+                        **self.request.model_dump(exclude={"extensions"}),
+                        sourceRef=source,
+                        maskRef=mask,
+                        maskConvention="white-edit-black-preserve",
+                        extensions=extension,
+                    )
+                )
+        self.assertEqual(self.calls, [])
+        for name in ("../control.safetensors", "control.ckpt", "/control.safetensors"):
+            with self.assertRaises(ValueError):
+                ComfyConfig(controlnet=name)

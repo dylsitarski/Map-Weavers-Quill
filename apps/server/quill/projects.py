@@ -117,7 +117,14 @@ def validate_project(project: Project, *, derive_missing: bool = False) -> Proje
         ):
             raise ValueError("Unsupported generation provenance.")
         if (record.capability == "text_to_image" and record.inputHashes) or (
-            record.capability == "inpainting" and len(record.inputHashes) != 2
+            record.capability == "inpainting"
+            and len(record.inputHashes)
+            != (
+                3
+                if record.providerId == "comfyui-sdxl"
+                and record.parameters.get("layoutConditioning") is True
+                else 2
+            )
         ):
             raise ValueError("Invalid generation input references.")
     walls = derive_walls(

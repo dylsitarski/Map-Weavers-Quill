@@ -303,6 +303,16 @@ export function BackgroundPanel(p: {
         >
           Check provider
         </button>
+        {localSdxl && !p.room && (
+          <p>Backgrounds do not yet follow drawn buildings or entrances.</p>
+        )}
+        {localSdxl && p.room && (
+          <p>
+            {provider.state?.descriptor.capabilities.includes('control_image')
+              ? 'Wall and door guidance enabled. Physical scale is included; inspect the preview for accuracy.'
+              : 'Wall and door guidance is not enabled. Configure the SDXL ControlNet model to use the drawn layout.'}
+          </p>
+        )}
         {localSdxl && (
           <p>
             960 × 640 map artwork. Cancelling discards the preview; ComfyUI may
