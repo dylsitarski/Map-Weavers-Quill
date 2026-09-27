@@ -350,3 +350,15 @@ Accepted results retain workflow/model provenance through undo and Save/Open.
 Cancel discards the preview but may leave GPU work running; see docs/COMFYUI.md.
 Next: the owner-run adjacent-room visual/performance trial, then model/context tuning.
 Building layout conditioning remains planned separately under ADR-0023.
+
+### SDXL quality correction after the first trial
+
+Room crops now generate at a 1024 × 1024 working resolution with proportional scaling
+and protected square padding, then return to the original map location and exact mask.
+Fresh room context excludes previous target artwork and known mock outputs. SDXL-specific
+positive/negative prompts emphasize overhead terrain or roof-removed interiors; original
+user prompts/style fields are preserved. See ADR-0028 and docs/COMFYUI.md.
+
+Pull and restart Quill, then regenerate previews to test this change. Room generation
+will use more GPU work than before. Visual quality and orthographic consistency still
+need assessment on the owner's hardware; no new model downloads are required.

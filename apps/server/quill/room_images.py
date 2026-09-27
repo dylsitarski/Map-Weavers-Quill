@@ -8,6 +8,7 @@ from PIL import Image
 from pydantic import Field
 
 from quill.backgrounds import BackgroundResult
+from quill.comfyui import ComfyProvider
 from quill.exports import artwork_size, composite_artwork
 from quill.models import Bounds, Contract, GenerationRecord, Point, Project, RasterLayer
 from quill.projects import project_store, validate_project
@@ -19,6 +20,7 @@ from quill.provider_config import (
 )
 from quill.providers import InpaintRequest
 from quill.raster import context_crop, image, masked_layer, png, polygon_mask
+from quill.sdxl_authoring import NEGATIVE, TEMPLATE, RoomTransform, clean_context, prompt_text
 from quill.styles import room_style_prompt
 
 
@@ -44,6 +46,9 @@ def generate_room(request: RoomImageRequest) -> BackgroundResult:
         raise ValueError("Room generation prompts support at most 4000 characters.")
     prompt, effective_style = room_style_prompt(room, project.map.style)
     provider = create_provider()
+    sdxl = isinstance(provider, ComfyProvider)
+    if sdxl:
+        prompt = prompt_text(room.prompt, effective_style, room=True)
     profile, alignment = raster_profile(provider)
     size = max(artwork_size(project, store), profile, key=lambda size: size[0])
     mask = polygon_mask(room.polygon, size)
@@ -53,27 +58,36 @@ def generate_room(request: RoomImageRequest) -> BackgroundResult:
     if crop[2] - crop[0] > descriptor.maxWidth or crop[3] - crop[1] > descriptor.maxHeight:
         raise ValueError("This room crop exceeds the configured provider's dimension limits.")
     asyncio.run(check_provider(provider))
-    # Context includes current composited art, including previous target art.
-    source = composite_artwork(project, store, size=size)
+    context, excluded = clean_context(project, room.id) if sdxl else (project, [])
+    source = composite_artwork(context, store, size=size)
     source_hash, mask_hash = store.put_asset(png(source)), store.put_asset(png(mask))
+    source_crop, mask_crop = source.crop(crop).convert("RGB"), mask.crop(crop)
+    transform = RoomTransform(*source_crop.size) if sdxl else None
+    if transform:
+        source_crop, mask_crop = transform.prepare(source_crop, mask_crop)
+    if source_crop.width > descriptor.maxWidth or source_crop.height > descriptor.maxHeight:
+        raise ValueError("Generation resolution exceeds provider limits.")
     result = asyncio.run(
         provider.inpaint(
             InpaintRequest(
                 requestId=str(uuid4()),
                 prompt=prompt,
                 seed=request.seed,
-                width=crop[2] - crop[0],
-                height=crop[3] - crop[1],
-                sourceRef=provider.put(png(source.crop(crop).convert("RGB"))),
-                maskRef=provider.put(png(mask.crop(crop))),
+                negativePrompt=NEGATIVE if sdxl else None,
+                width=source_crop.width,
+                height=source_crop.height,
+                sourceRef=provider.put(png(source_crop)),
+                maskRef=provider.put(png(mask_crop)),
                 maskConvention="white-edit-black-preserve",
             )
         )
     )
     output = image(provider.assets[result.assetHash])
-    expected = (crop[2] - crop[0], crop[3] - crop[1])
+    expected = source_crop.size
     if output.size != expected or (result.width, result.height) != expected:
         raise ValueError("Provider output dimensions do not match the requested room crop.")
+    if transform:
+        output = transform.restore(output)
     generated = Image.new("RGBA", size)
     generated.paste(output, crop[:2])
     # Enforce outside-mask preservation ourselves, regardless of provider behavior.
@@ -84,7 +98,12 @@ def generate_room(request: RoomImageRequest) -> BackgroundResult:
             kind="raster",
             revision=0,
             label=f"{room.label} artwork",
-            metadata={"quill.render": {"role": "room", "roomId": str(room.id)}},
+            metadata={
+                "quill.render": {
+                    "role": "room",
+                    "roomId": str(room.id),
+                }
+            },
             assetHash=output_hash,
             bounds=Bounds(origin=Point(x=0.0, y=0.0), width=1200.0, height=800.0),
             rotation=0.0,
@@ -110,7 +129,16 @@ def generate_room(request: RoomImageRequest) -> BackgroundResult:
                 "crop": list(crop),
                 "width": size[0],
                 "height": size[1],
-                "promptTemplate": "room-style-v1",
+                "promptTemplate": TEMPLATE if sdxl else "room-style-v1",
+                **(
+                    {
+                        "negativePrompt": NEGATIVE,
+                        "roomTransform": transform.metadata(),
+                        "excludedContextLayers": [str(item) for item in excluded],
+                    }
+                    if transform
+                    else {}
+                ),
                 "roomPrompt": room.prompt,
                 "styleOverrides": dict(room.styleOverrides),
                 "effectiveStyle": {key: value for key, value in effective_style.items()},

@@ -155,10 +155,13 @@ art and provenance. Save/Open and exports also work when later switching back to
 mock. Set `MWQ_IMAGE_PROVIDER=mock` and restart Quill to switch back.
 
 New SDXL backgrounds and room layers use 960 × 640 full-map storage. Room generation
-uses a crop expanded to multiples of 64 and pastes it back without stretching. Old
+uses a crop expanded to multiples of 64, pads it to a square and generates at
+1024 × 1024. It then restores the crop size and reapplies the original room mask
+(ADR-0028), preserving proportions and native placement. Old
 mock layers retain their bytes; they are resampled only for composition/context.
-Room crops can be much smaller than typical SDXL training sizes: assess detail and
-continuity before deciding on larger context windows or a different inpainting model.
+Room generation now uses more GPU work than the previous small-crop implementation.
+Assess detail and continuity; very narrow rooms and base-model inpainting still have
+quality limitations.
 Generation currently uses 20 Euler/normal steps, CFG 7 and denoise 1, batch one.
 These are fixed reference settings, not UI controls.
 
@@ -178,3 +181,22 @@ Next acceptance trial: generate a background and two adjacent room interiors, in
 outside-mask preservation and seams, accept, undo/redo, save/reopen, and export. Record
 runtime and peak VRAM. Automated tests use simulated ComfyUI responses; they do not
 establish visual quality or geometry-aligned building exteriors.
+
+## Quality iteration after the first owner trial
+
+ADR-0028 addresses abstract small-room output with the 1024 × 1024 working transform.
+Room context excludes the target's previous art and known mock outputs; it retains
+real neighbouring art. Existing checkerboard layers may remain visible on the editor
+until hidden/replaced, but known mock outputs are excluded from new SDXL room context.
+Unknown-provenance layers are retained rather than guessed from appearance.
+
+SDXL now receives camera-first, plain-language prompts and negative prompts for
+perspective, text, grids and abstract patterns. Room guidance specifies roof-removed
+interiors; backgrounds specify roofs/terrain from above. Existing prompt/style fields
+are preserved. Override a room's Environment if it inherits unsuitable forest/exterior
+instructions. No new weights, custom nodes or configuration are needed.
+
+Pull and restart Quill with the same comfyui-sdxl selection. Generate fresh previews;
+existing accepted images do not change automatically. Compare the same room/seed and
+record runtime/peak VRAM. A true orthographic layout is still a visual acceptance target,
+not a guarantee of the base SDXL model. Geometry conditioning remains future work.
