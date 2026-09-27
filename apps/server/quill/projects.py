@@ -13,7 +13,7 @@ from pydantic import Field
 
 from quill.doors import validate_doors
 from quill.models import Contract, Project
-from quill.raster import image, polygon_mask
+from quill.raster import image, polygon_mask, validate_size
 from quill.walls import RoomBoundary, WallDerivationRequest, derive_walls
 
 
@@ -180,11 +180,12 @@ class ProjectStore:
 
     @staticmethod
     def validate_asset(data: bytes) -> str:
-        if len(data) > 2 * 1024 * 1024:
-            raise ValueError("Raster asset exceeds 2 MiB.")
+        if len(data) > 8 * 1024 * 1024:
+            raise ValueError("Raster asset exceeds 8 MiB.")
         with Image.open(BytesIO(data)) as image:
-            if image.format != "PNG" or image.size != (480, 320):
-                raise ValueError("Expected a 480 × 320 PNG background.")
+            if image.format != "PNG" or getattr(image, "is_animated", False):
+                raise ValueError("Expected a single-frame PNG raster asset.")
+            validate_size(image.size)
             image.verify()
         return hashlib.sha256(data).hexdigest()
 
@@ -227,7 +228,9 @@ class ProjectStore:
             if room.renderLayerId is not None:
                 layer = next(layer for layer in project.layers if layer.id == room.renderLayerId)
                 alpha = image(assets[layer.assetHash]).getchannel("A")
-                outside = ImageChops.multiply(alpha, ImageChops.invert(polygon_mask(room.polygon)))
+                outside = ImageChops.multiply(
+                    alpha, ImageChops.invert(polygon_mask(room.polygon, alpha.size))
+                )
                 if outside.getbbox() is not None:
                     raise ValueError("Room artwork contains pixels outside its current polygon.")
 

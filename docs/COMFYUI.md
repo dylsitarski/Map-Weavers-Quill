@@ -2,7 +2,8 @@
 
 Milestone 3 uses a local backend first to avoid per-image API charges. This increment
 provides a standalone adapter and GPU smoke test; the editor still uses mock.
-Full-resolution editor storage/integration is next. See ADR-0025.
+Resolution-aware editor storage is implemented (ADR-0026); queued editor integration
+is next. See ADR-0025.
 
 ## Install separately on Linux
 
@@ -12,7 +13,8 @@ its own virtual environment. Do not install ComfyUI's dependencies into Quill's 
 No custom nodes, paid partner nodes, account, or API key is needed for this workflow.
 
 The first target is the owner's RTX 3060 Ti (8 GB VRAM), 32 GB RAM, Linux desktop.
-A real run on that hardware is still required. No generation timing is promised.
+The owner reports SDXL working locally. Adapter-specific timing, peak memory and
+visual acceptance still need to be recorded. Flux Fill is deferred.
 
 Download `sd_xl_base_1.0.safetensors` from the
 [SDXL base model repository](https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/tree/main)
@@ -112,3 +114,19 @@ console for GPU errors. No automatic history/asset cleanup is implemented.
 
 Protocol tests run offline as part of `make check`; they do not demonstrate actual
 GPU performance, adjacent-room visual continuity or geometry-aware roof generation.
+
+## Editor resolution profile
+
+The map remains 1200 × 800 native units. Storage accepts legacy 480 × 320 PNGs and
+960 × 640 PNGs, preserving the map's 3:2 proportions. The latter is the initial
+SDXL editor target; both dimensions are multiples of 64. You can test this size
+through the standalone adapter now:
+
+```sh
+PYTHONPATH=apps/server .venv/bin/python scripts/comfy_smoke.py \
+  --generate --width 960 --height 640 --output data/comfy-map-960.png
+```
+
+This remains a standalone test, not an import into the editor. Square smoke outputs
+are not full-map assets. Do not resize them to fit; queued integration will request
+the correct dimensions directly. Existing mock projects need no migration.

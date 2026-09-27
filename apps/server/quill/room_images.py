@@ -8,12 +8,12 @@ from PIL import Image
 from pydantic import Field
 
 from quill.backgrounds import BackgroundResult
-from quill.exports import composite_artwork
+from quill.exports import artwork_size, composite_artwork
 from quill.models import Bounds, Contract, GenerationRecord, Point, Project, RasterLayer
 from quill.projects import project_store, validate_project
 from quill.provider_config import create_provider
 from quill.providers import InpaintRequest
-from quill.raster import HEIGHT, WIDTH, image, masked_layer, png, polygon_mask
+from quill.raster import context_crop, image, masked_layer, png, polygon_mask
 from quill.styles import room_style_prompt
 
 
@@ -38,15 +38,16 @@ def generate_room(request: RoomImageRequest) -> BackgroundResult:
     if len(room.prompt) > 4000:
         raise ValueError("Room generation prompts support at most 4000 characters.")
     prompt, effective_style = room_style_prompt(room, project.map.style)
-    mask = polygon_mask(room.polygon)
-    box = mask.getbbox()
-    if box is None:
-        raise ValueError("The room is too small at the current 2.5-map-unit pixel resolution.")
-    # Context includes current composited art, including previous target art for regeneration.
-    source = composite_artwork(project, store)
-    # Eight pixels of protected surrounding context; crop never changes the mask.
-    crop = (max(0, box[0] - 8), max(0, box[1] - 8), min(WIDTH, box[2] + 8), min(HEIGHT, box[3] + 8))
+    size = artwork_size(project, store)
+    mask = polygon_mask(room.polygon, size)
+    # Keep the same native 20-unit context margin at either pixel density.
+    crop = context_crop(mask, margin=round(20 * size[0] / 1200))
     provider = create_provider()
+    descriptor = provider.descriptor()
+    if crop[2] - crop[0] > descriptor.maxWidth or crop[3] - crop[1] > descriptor.maxHeight:
+        raise ValueError("This room crop exceeds the configured provider's dimension limits.")
+    # Context includes current composited art, including previous target art.
+    source = composite_artwork(project, store, size=size)
     source_hash, mask_hash = store.put_asset(png(source)), store.put_asset(png(mask))
     result = asyncio.run(
         provider.inpaint(
@@ -62,8 +63,12 @@ def generate_room(request: RoomImageRequest) -> BackgroundResult:
             )
         )
     )
-    generated = Image.new("RGBA", (WIDTH, HEIGHT))
-    generated.paste(image(provider.assets[result.assetHash]), crop[:2])
+    output = image(provider.assets[result.assetHash])
+    expected = (crop[2] - crop[0], crop[3] - crop[1])
+    if output.size != expected or (result.width, result.height) != expected:
+        raise ValueError("Provider output dimensions do not match the requested room crop.")
+    generated = Image.new("RGBA", size)
+    generated.paste(output, crop[:2])
     # Enforce outside-mask preservation ourselves, regardless of provider behavior.
     output_hash = store.put_asset(png(masked_layer(generated, mask)))
     return BackgroundResult(
@@ -95,8 +100,8 @@ def generate_room(request: RoomImageRequest) -> BackgroundResult:
             parameters={
                 "seed": request.seed,
                 "crop": list(crop),
-                "width": WIDTH,
-                "height": HEIGHT,
+                "width": size[0],
+                "height": size[1],
                 "promptTemplate": "room-style-v1",
                 "roomPrompt": room.prompt,
                 "styleOverrides": dict(room.styleOverrides),

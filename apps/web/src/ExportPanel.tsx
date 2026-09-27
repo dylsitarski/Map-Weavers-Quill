@@ -71,8 +71,8 @@ export function ExportPanel({
     <section aria-label="Export artwork">
       <h3>Export artwork</h3>
       <p>
-        480 × 320 pixels. Accepted artwork only, with current layer settings. No
-        grid or editing guides.
+        Uses the highest stored artwork resolution. Accepted artwork only, with
+        current layer settings. No grid or editing guides.
       </p>
       <button
         type="button"

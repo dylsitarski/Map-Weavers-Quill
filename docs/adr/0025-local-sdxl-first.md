@@ -98,3 +98,11 @@ Primary implementation references (checked 2026-09-26):
 - https://docs.comfy.org/tutorials/basic/inpaint
 - https://comfyanonymous.github.io/ComfyUI_examples/sdxl/
 - https://github.com/Comfy-Org/ComfyUI/blob/master/nodes.py
+
+## Follow-up status
+
+The owner reports SDXL working locally. Flux Fill is deferred. ADR-0026 implements
+the resolution gate for persistence, masks, crops, composition and export; the
+historical 480x320-only limitation above no longer applies. The editor provider
+remains mock until the next queued integration increment. Adapter-specific GPU
+measurements and visual acceptance have not yet been recorded.

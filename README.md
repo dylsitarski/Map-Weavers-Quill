@@ -323,9 +323,14 @@ protocol tests. Run `make comfy-check` after installing ComfyUI and the SDXL bas
 checkpoint separately. See [docs/COMFYUI.md](docs/COMFYUI.md) for Linux setup and the
 explicit GPU smoke command. No model weights, PyTorch or new dependencies are bundled.
 
-The editor still uses mock: its 480x320 persistence profile must become resolution-aware
-before integration, so real generated detail is retained. The standalone workflow uses
-SDXL base with a latent mask, not a dedicated inpainting fine-tune. Actual GPU execution,
-visual continuity and performance on the target RTX 3060 Ti (8 GB) remain unverified.
-Next: resolution-aware assets/masks/exports, then queued editor previews and save/open
-with ComfyUI. Building layout conditioning remains planned separately under ADR-0023.
+The editor still uses mock. Storage, masks, composition and exports now support both
+legacy 480 × 320 assets and a 960 × 640 SDXL map profile, preserving the native map's
+3:2 proportions. Mixed-resolution layers retain their original files; exports use
+the highest stored resolution, including hidden layers when choosing dimensions.
+See [ADR-0026](docs/adr/0026-resolution-aware-raster-assets.md).
+
+The owner reports SDXL working locally. Adapter-specific GPU timing, visual continuity
+and peak memory remain to be recorded. The standalone workflow uses SDXL base with a
+latent mask, not a dedicated inpainting fine-tune. Flux Fill is deferred.
+Next: connect ComfyUI to queued editor previews and save/open. Building layout
+conditioning remains planned separately under ADR-0023.
