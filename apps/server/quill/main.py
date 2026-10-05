@@ -4,6 +4,7 @@ import re
 import sqlite3
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from io import BytesIO
 from uuid import UUID
 
 from fastapi import FastAPI, HTTPException, Request, Response
@@ -20,6 +21,7 @@ from quill.projects import ProjectList, SaveConflict, SaveRequest, project_store
 from quill.provider_config import check_provider, create_provider, provider_config
 from quill.providers import ProviderDescriptor, ProviderFailure, ProviderReadiness
 from quill.room_images import RoomImageRequest, generate_room
+from quill.wall_art import WallArtRequest, render_request
 from quill.walls import WallDerivationRequest, WallDerivationResult, derive_walls
 
 
@@ -84,6 +86,32 @@ def doors(request: DoorRequest) -> DoorResult:
         return reconcile_doors(request)
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@app.post("/api/render/walls")
+async def wall_art(request: Request) -> Response:
+    """Deterministic wall/door overlay for the editor; identical renderer to export."""
+    if request.headers.get("content-type", "").split(";")[0].strip() != "application/json":
+        raise HTTPException(415, "Use application/json.")
+    body = bytearray()
+    async for chunk in request.stream():
+        body.extend(chunk)
+        if len(body) > 4 * 1024 * 1024:
+            raise HTTPException(413, "Wall art request exceeds 4 MiB.")
+    try:
+        data = WallArtRequest.model_validate_json(bytes(body))
+        rendered = await run_in_threadpool(render_request, data)
+    except ValidationError as error:
+        raise HTTPException(422, "Invalid wall art request.") from error
+    except ValueError as error:
+        raise HTTPException(422, str(error)) from error
+    output = BytesIO()
+    await run_in_threadpool(rendered.save, output, format="PNG", compress_level=1)
+    return Response(
+        output.getvalue(),
+        media_type="image/png",
+        headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"},
+    )
 
 
 @app.get("/api/projects", response_model=ProjectList)

@@ -1,6 +1,11 @@
 import { expect, type Page, test } from '@playwright/test';
 
 async function canvasPixels(page: Page) {
+  // Server-rendered wall art arrives asynchronously; compare settled canvases.
+  await expect(page.getByTestId('map-canvas')).not.toHaveAttribute(
+    'data-wall-art',
+    'loading',
+  );
   return page.locator('canvas').evaluate(async (canvas) => {
     await new Promise<void>((resolve) =>
       requestAnimationFrame(() => requestAnimationFrame(() => resolve())),

@@ -72,7 +72,8 @@ export function ExportPanel({
       <h3>Export artwork</h3>
       <p>
         Uses the highest stored artwork resolution. Accepted artwork only, with
-        current layer settings. No grid or editing guides.
+        current layer settings, plus walls and doors when shown. No grid or
+        editing guides.
       </p>
       <button
         type="button"

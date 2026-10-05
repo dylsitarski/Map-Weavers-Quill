@@ -12,6 +12,8 @@ import { DoorInspector } from './DoorInspector';
 import type { Scope, Tool } from './editorTools';
 import { PromptPanel } from './PromptPanel';
 import { RoomInspector } from './RoomInspector';
+import { WallArtControls, type WallArtState } from './WallArtControls';
+import type { WallArtSettings } from './wallArt';
 
 type Props = {
   status: string;
@@ -25,6 +27,10 @@ type Props = {
     changes: { visible?: boolean; opacity?: number },
   ) => void;
   reorderArtwork: (id: string, target: string) => void;
+  wallArt: WallArtState;
+  changeWallArt: (
+    changes: Partial<WallArtSettings> & { thickness?: number },
+  ) => void;
   tool: Tool;
   setTool: (tool: Tool) => void;
   scope: Scope | null;
@@ -471,6 +477,11 @@ export function EditorPanels(p: Props) {
             aria-labelledby="tab-Layers"
             hidden={tab !== 'Layers'}
           >
+            <WallArtControls
+              wallArt={p.wallArt}
+              busy={p.busy}
+              change={p.changeWallArt}
+            />
             <ArtworkLayers
               selectedId={p.selected?.id}
               selectRoom={p.selectRoom}

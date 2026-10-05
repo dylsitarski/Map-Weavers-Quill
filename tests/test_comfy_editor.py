@@ -24,6 +24,7 @@ from quill.provider_config import create_provider, load_provider_config, provide
 from quill.providers import GenerateRequest
 from quill.raster import image, png, polygon_mask
 from quill.sdxl_authoring import NEGATIVE, RoomTransform
+from quill.wall_art import WALL_ART_PROMPT
 from test_projects import document
 
 
@@ -328,6 +329,20 @@ class ComfyEditorTests(unittest.TestCase):
                         result.generation.parameters["physicalScale"]["cellDistance"], 5
                     )
                     self.assertTrue(result.generation.parameters["layoutConditioning"])
+                    # Default wall art is visible: the prompt asks for floor only.
+                    self.assertTrue(result.generation.prompt.startswith(WALL_ART_PROMPT))
+                    self.assertEqual(
+                        result.generation.parameters["wallArt"],
+                        {
+                            "renderer": "quill-wall-art-v1",
+                            "visible": True,
+                            "material": "stone",
+                            "thickness": project.map.style.wallThicknessPx,
+                        },
+                    )
+                    self.assertEqual(
+                        result.generation.parameters["promptTemplate"], "sdxl-room-layout-v2"
+                    )
                     self.assertEqual(self.fake.calls.count("/upload/image"), 2)
                     self.assertEqual(self.fake.graph["5"]["inputs"]["positive"], ["11", 0])
                     self.assertEqual(self.fake.graph["5"]["inputs"]["negative"], ["11", 1])

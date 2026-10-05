@@ -83,7 +83,7 @@ export function newProject(): Project {
         environment: '',
         renderStyle: '',
         palette: '',
-        wallThicknessPx: 5,
+        wallThicknessPx: 10,
         bakedLighting: 'neutral',
       },
     },

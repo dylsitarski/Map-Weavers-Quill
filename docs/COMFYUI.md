@@ -238,3 +238,13 @@ command checks configured model readiness but does not construct a project wall 
 use room generation in the editor for this trial. Background roof/entrance alignment,
 explicit building grouping, hard door-clearance enforcement and sized furniture placement
 remain future work. See ADR-0029.
+
+## Walls drawn by Quill
+
+Quill now draws walls and doors itself above room artwork (ADR-0030). While Layers →
+Walls & doors is shown, SDXL room prompts start with an instruction to paint only the
+floor, right up to the room edge, and no walls or doorways. The wall band covers the
+room boundary, so any model-painted wall near the edge is mostly hidden. For the next
+trial, generate the same room and seed and compare the result with walls shown and
+hidden. The ControlNet guide above still applies when configured. Note whether SDXL
+follows the floor-only instruction or still paints walls just inside the boundary.
