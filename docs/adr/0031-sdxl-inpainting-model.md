@@ -87,8 +87,12 @@ outdoor background into the room for some distance and invented its own layout r
 than walls at the room boundary. This is expected: the mask shows where to paint, not
 where walls are, so wall guidance is needed. Control-LoRA guidance failed as above.
 
-Next: trial the dedicated UNet with a full canny ControlNet, recording time and peak
-VRAM. Then add a FLUX.2 klein workflow as a second local option.
+Second owner trial (2026-10-05): with the small full canny ControlNet the walls were followed in part (the left
+walls traced the partial octagon and the room joined its neighbours), but the right
+half of the enclosed room became an outdoor area continuing the surrounding scene. Edges are followed;
+the large enclosed interior is not understood as indoors. Stronger edge guidance is not
+expected to fix that, so the next step is a FLUX.2 klein provider rather than more SDXL
+guidance tuning. Runtime and peak VRAM were not recorded.
 
 Sources (checked 2026-10-05): ComfyUI `nodes.py` (`InpaintModelConditioning`,
 `UNETLoader`), `comfy/model_detection.py` (`SDXL_diffusers_inpaint`),

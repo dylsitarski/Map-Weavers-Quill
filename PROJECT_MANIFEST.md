@@ -1088,10 +1088,9 @@ Milestone 3 status:
   by ADR-0029, not yet trialled).
 - Third owner trial: the inpainting UNet uses context well but, without guidance, invents
   its own layout instead of walls at the boundary; Control-LoRA guidance is incompatible
-  with it (ADR-0031).
-- Next: owner GPU trial of the inpainting UNet with a full SDXL canny ControlNet,
-  recording runtime and peak VRAM; then a FLUX.2 klein workflow
-  as a second local option; then explicit building/open-air intent and geometry-aware
+  with it (ADR-0031). Fourth trial: with a full canny ControlNet, walls are partly
+  followed but a large enclosed room still turns partly outdoors.
+- Next: a FLUX.2 klein provider as a second local option; then explicit building/open-air intent and geometry-aware
   backgrounds (ADR-0023).
 - Not implemented: hosted generation, geometry-aware exteriors, exact furniture sizing,
   hard architectural pixel enforcement, provider-side job interruption. Flux Fill is

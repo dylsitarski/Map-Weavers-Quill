@@ -39,6 +39,6 @@ Status as of 2026-10-05.
 | [0028](0028-sdxl-room-working-resolution.md) | SDXL 1024 × 1024 room working transform and prompts | Implemented; GPU trial pending | 0027 |
 | [0029](0029-scale-and-room-layout-conditioning.md) | Physical scale prompts and optional ControlNet wall guidance | Implemented; GPU trial pending | 0028, 0023 |
 | 0030 | Deterministic wall/door overlay drawn by Quill | **Parked**; exists only on the PR #1 branch, not on main | |
-| [0031](0031-sdxl-inpainting-model.md) | `InpaintModelConditioning` and optional dedicated SDXL inpainting UNet for rooms | Implemented; first trial done; needs a full ControlNet for walls (Control-LoRA incompatible) | 0025, 0029 |
+| [0031](0031-sdxl-inpainting-model.md) | `InpaintModelConditioning` and optional dedicated SDXL inpainting UNet for rooms | Implemented; trialled: context good, walls partly followed with a full ControlNet, interiors not reliably indoors | 0025, 0029 |
 
 M0–M8 refer to milestones in [PROJECT_MANIFEST.md](../../PROJECT_MANIFEST.md) §16.

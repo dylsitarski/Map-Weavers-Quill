@@ -208,7 +208,10 @@ guidance through the editor.
 Recorded 2026-10-05 on the reference hardware (details in docs/HISTORY.md): the dedicated
 inpainting UNet without guidance connected well to neighbouring rooms, but continued the
 outdoor background into the room and invented its own layout instead of walls at the
-boundary. With Control-LoRA guidance it failed as described above.
+boundary. With Control-LoRA guidance it failed as described above. With the small full
+canny ControlNet, walls were followed in part, but the right half of a large enclosed room
+became outdoors, continuing the surrounding scene. SDXL guidance tuning has stopped here
+in favour of a FLUX.2 klein provider.
 
 Still to record:
 
@@ -217,9 +220,6 @@ Still to record:
    untouched. Accept, undo/redo, save/reopen and export.
 2. Generate the same room and seed with wall guidance on and off; compare door
    clearance, partitions and object size.
-3. Dedicated inpainting UNet with a full canny ControlNet (the small model above): check
-   that walls follow the room boundary and doors stay open, and that context continuity
-   from the first trial is kept.
-4. Record elapsed time, peak VRAM, whether `--lowvram` was needed, the ComfyUI commit
+3. Record elapsed time, peak VRAM, whether `--lowvram` was needed, the ComfyUI commit
    (`git rev-parse HEAD`) and checkpoint SHA-256
    (`sha256sum models/checkpoints/sd_xl_base_1.0.safetensors`).

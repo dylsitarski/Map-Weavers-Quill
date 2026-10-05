@@ -98,6 +98,12 @@ criterion to its tests.
    guidance, sampling failed: Control-LoRA cannot adapt to the inpainting UNet's
    9-channel input. Readiness now refuses that pairing and the docs recommend a full
    SDXL canny ControlNet (ADR-0031).
+10. **Fourth owner trial (2026-10-05).** With the inpainting UNet and the small full canny
+    ControlNet, the left walls followed the partial-octagon room shape and the room joined
+    its neighbours, but the right half of the enclosed room became an outdoor area (grass,
+    fire pit) continuing the surrounding scene. Edge guidance works; the model does not
+    treat a large enclosed area as indoors. Further SDXL guidance tuning was judged
+    unlikely to fix this, and work moved to a FLUX.2 klein provider.
 
 Outstanding before Milestone 3 can close: an owner GPU trial of ADR-0029 conditioning
 (same seed, guidance on and off), a base-versus-inpainting-model comparison (ADR-0031),
