@@ -40,10 +40,21 @@ openrail++). Download `unet/diffusion_pytorch_model.fp16.safetensors` (5.14 GB) 
 example `sdxl-inpainting-0.1.fp16.safetensors`. It replaces only the room sampler model;
 the base checkpoint above is still required for text encoding, the VAE and backgrounds.
 
-Optional, for room wall/door guidance: download
-[control-lora-canny-rank128.safetensors](https://huggingface.co/stabilityai/control-lora/blob/main/control-LoRAs-rank128/control-lora-canny-rank128.safetensors)
-into `ComfyUI/models/controlnet/` (not checkpoints or loras). Use an SDXL-compatible
-control model, not an SD 1.5 one, and restart ComfyUI after installing it.
+Optional, for room wall/door guidance, put one SDXL canny control model in
+`ComfyUI/models/controlnet/` (not checkpoints or loras) and restart ComfyUI. Use an SDXL
+model, not an SD 1.5 one. Which kind depends on the room model:
+
+- **With the dedicated inpainting UNet, use a full ControlNet.** Recommended for 8 GB
+  GPUs: [diffusers/controlnet-canny-sdxl-1.0-small](https://huggingface.co/diffusers/controlnet-canny-sdxl-1.0-small)
+  (about 320 MB in fp16). Download its fp16 `.safetensors` file and rename it, for example
+  `controlnet-canny-sdxl-1.0-small.fp16.safetensors`. Higher quality but 5 GB:
+  [xinsir/controlnet-canny-sdxl-1.0](https://huggingface.co/xinsir/controlnet-canny-sdxl-1.0)
+  (Apache-2.0).
+- **Control-LoRA works only with base SDXL rooms:**
+  [control-lora-canny-rank128.safetensors](https://huggingface.co/stabilityai/control-lora/blob/main/control-LoRAs-rank128/control-lora-canny-rank128.safetensors).
+  A Control-LoRA is built from the active UNet's weights and cannot adapt to the inpainting
+  UNet's 9-channel input; ComfyUI fails with `shape '[320, 9, 3, 3]' is invalid`. Quill's
+  readiness check refuses this combination (detected by the `control-lora` filename).
 
 Check each model's published license and access terms before use or redistribution.
 
@@ -80,8 +91,8 @@ export MWQ_IMAGE_PROVIDER=comfyui-sdxl
 export MWQ_IMAGE_COMFY_CHECKPOINT=sd_xl_base_1.0.safetensors
 # optional dedicated inpainting model for rooms:
 # export MWQ_IMAGE_COMFY_INPAINT_UNET=sdxl-inpainting-0.1.fp16.safetensors
-# optional wall/door guidance:
-# export MWQ_IMAGE_COMFY_CONTROLNET=control-lora-canny-rank128.safetensors
+# optional wall/door guidance (a full ControlNet when using the inpainting UNet):
+# export MWQ_IMAGE_COMFY_CONTROLNET=controlnet-canny-sdxl-1.0-small.fp16.safetensors
 make dev
 ```
 
@@ -138,8 +149,8 @@ either provider.
 
 - With the dedicated inpainting UNet, ComfyUI holds it (5.14 GB) as well as the base
   checkpoint. On an 8 GB GPU this relies on ComfyUI's offloading and may need
-  `--lowvram`; time and memory are not yet measured. ControlNet guidance combined with
-  the dedicated UNet is untested: if it fails, unset one of the two and report it.
+  `--lowvram`; time and memory are not yet measured. Combined with a full ControlNet
+  the pairing is supported by ComfyUI but not yet run here; Control-LoRA is refused.
 - Jobs run one at a time through Quill's durable queue. Cancel preview stops the result
   from being published but does not stop ComfyUI's GPU work; the worker stays busy
   until completion or the timeout, and server shutdown may wait for it.
@@ -192,18 +203,23 @@ dimensions, ComfyUI prompt ID and input/output hashes. Treat the sidecar as proj
 content when sharing. The smoke command does not build a project wall guide; test
 guidance through the editor.
 
-## Pending owner trial
+## Trial results and pending checks
 
-Not yet recorded on the reference hardware:
+Recorded 2026-10-05 on the reference hardware (details in docs/HISTORY.md): the dedicated
+inpainting UNet without guidance connected well to neighbouring rooms, but continued the
+outdoor background into the room and invented its own layout instead of walls at the
+boundary. With Control-LoRA guidance it failed as described above.
+
+Still to record:
 
 1. Generate a background and two adjacent room interiors. Check top-down perspective,
    furniture scale, invented partitions, seams and that pixels outside each room are
    untouched. Accept, undo/redo, save/reopen and export.
 2. Generate the same room and seed with wall guidance on and off; compare door
    clearance, partitions and object size.
-3. Generate the same rooms and seeds with base SDXL and with the dedicated inpainting
-   UNet (guidance off, then on); compare seams, continuity with neighbours, partitions
-   and scale.
+3. Dedicated inpainting UNet with a full canny ControlNet (the small model above): check
+   that walls follow the room boundary and doors stay open, and that context continuity
+   from the first trial is kept.
 4. Record elapsed time, peak VRAM, whether `--lowvram` was needed, the ComfyUI commit
    (`git rev-parse HEAD`) and checkpoint SHA-256
    (`sha256sum models/checkpoints/sd_xl_base_1.0.safetensors`).

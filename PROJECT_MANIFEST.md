@@ -1086,8 +1086,11 @@ Milestone 3 status:
   ADR-0028); the second found coherent top-down images but wrong furniture scale,
   invented partitions and backgrounds that ignore the architecture (addressed in part
   by ADR-0029, not yet trialled).
-- Next: owner GPU trial comparing base SDXL and the dedicated inpainting UNet, with and
-  without wall guidance, recording runtime and peak VRAM; then a FLUX.2 klein workflow
+- Third owner trial: the inpainting UNet uses context well but, without guidance, invents
+  its own layout instead of walls at the boundary; Control-LoRA guidance is incompatible
+  with it (ADR-0031).
+- Next: owner GPU trial of the inpainting UNet with a full SDXL canny ControlNet,
+  recording runtime and peak VRAM; then a FLUX.2 klein workflow
   as a second local option; then explicit building/open-air intent and geometry-aware
   backgrounds (ADR-0023).
 - Not implemented: hosted generation, geometry-aware exteriors, exact furniture sizing,

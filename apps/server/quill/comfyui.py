@@ -98,6 +98,16 @@ class ComfyConfig:
         )
 
 
+def is_control_lora(filename: str) -> bool:
+    """Name heuristic: Control-LoRA deltas assume the base 4-channel UNet input.
+
+    ComfyUI builds a Control-LoRA from the active UNet, so with a 9-channel inpainting
+    UNet its input-layer delta cannot be applied (owner trial, ADR-0031). Readiness
+    cannot inspect weights; Stability AI's Control-LoRA files are named control-lora-*.
+    """
+    return "control-lora" in filename.lower().replace("_", "-")
+
+
 def workflow(
     config: ComfyConfig,
     request: GenerateRequest,
@@ -269,6 +279,16 @@ class ComfyProvider:
                             "unavailable",
                             "The configured SDXL inpainting UNet is not installed in ComfyUI.",
                         )
+                if (
+                    self.config.controlnet
+                    and self.config.inpaint_unet
+                    and is_control_lora(self.config.controlnet)
+                ):
+                    raise failure(
+                        "unsupported_capability",
+                        "Control-LoRA guidance cannot condition the dedicated inpainting UNet. "
+                        "Use a full SDXL ControlNet, or unset one of the two settings.",
+                    )
                 if self.config.controlnet:
                     names = info["ControlNetLoader"]["input"]["required"]["control_net_name"][0]
                     if not isinstance(names, list) or self.config.controlnet not in names:

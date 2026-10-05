@@ -354,6 +354,56 @@ class ComfyTests(unittest.IsolatedAsyncioTestCase):
             await provider.check()
         self.assertIn("inpainting UNet", error.exception.error.message)
 
+    async def test_control_lora_with_inpainting_unet_fails_readiness_before_gpu_work(self):
+        unet = "sdxl-inpainting-0.1.fp16.safetensors"
+        original = self.respond
+
+        def respond(request):
+            response = original(request)
+            if request.url.path == "/object_info":
+                info = response.json()
+                info["UNETLoader"] = {"input": {"required": {"unet_name": [[unet]]}}}
+                info["ControlNetLoader"] = {
+                    "input": {"required": {"control_net_name": [list(controls)]}}
+                }
+                info["ControlNetApplyAdvanced"] = {}
+                return httpx.Response(200, json=info)
+            return response
+
+        controls = [
+            "control-lora-canny-rank128.safetensors",
+            "controlnet-canny-sdxl-small.safetensors",
+        ]
+        lora = ComfyProvider(
+            ComfyConfig(controlnet=controls[0], inpaint_unet=unet),
+            transport=httpx.MockTransport(respond),
+        )
+        with self.assertRaises(ProviderFailure) as error:
+            await lora.check()
+        self.assertEqual(error.exception.error.code, "unsupported_capability")
+        self.assertIn("full SDXL ControlNet", error.exception.error.message)
+        self.assertFalse(any(r.url.path == "/prompt" for r in self.calls))
+        # Control-LoRA alone (base model) and a full ControlNet with the UNet stay allowed.
+        for config in (
+            ComfyConfig(controlnet=controls[0]),
+            ComfyConfig(controlnet=controls[1], inpaint_unet=unet),
+        ):
+            provider = ComfyProvider(config, transport=httpx.MockTransport(respond))
+            self.assertTrue(await provider.health(), config)
+        graph = workflow(
+            ComfyConfig(controlnet=controls[1], inpaint_unet=unet), self.request, "a.png", "b.png"
+        )
+        self.assertEqual(graph["5"]["inputs"]["model"], ["12", 0])
+        self.assertEqual(graph["4"]["inputs"]["positive"], ["11", 0])
+
+    def test_control_lora_name_heuristic(self):
+        from quill.comfyui import is_control_lora
+
+        for name in ("control-lora-canny-rank128.safetensors", "Control_LoRA_canny.safetensors"):
+            self.assertTrue(is_control_lora(name), name)
+        for name in ("controlnet-canny-sdxl-1.0-small.safetensors", "xinsir-canny.safetensors"):
+            self.assertFalse(is_control_lora(name), name)
+
     def test_readiness_message_names_the_dedicated_inpainting_model(self):
         from quill.main import readiness_message
         from quill.providers import MockProvider

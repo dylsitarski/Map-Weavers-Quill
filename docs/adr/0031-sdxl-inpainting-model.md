@@ -1,7 +1,7 @@
 # ADR-0031: Optional dedicated SDXL inpainting model for rooms
 
-Status: Implemented with offline protocol tests; image quality unverified until an
-owner GPU trial. Extends ADR-0025 (which planned this comparison) and ADR-0029.
+Status: Implemented. First owner trial recorded (below); guidance with a full ControlNet
+is not yet trialled. Extends ADR-0025 (which planned this comparison) and ADR-0029.
 
 ## Context
 
@@ -59,10 +59,16 @@ is parked), so improving how well the model uses context is the priority.
 - Memory: ComfyUI holds both the base checkpoint (for CLIP and VAE) and the 5.14 GB
   inpainting UNet. On the 8 GB reference GPU this relies on ComfyUI's model offloading,
   costing time; `--lowvram` may be needed. Not measured.
-- **Untested combination:** ControlNet guidance with the dedicated UNet. ComfyUI's
-  Control-LoRA builds its control network from the active model's configuration and
-  weights, so this is plausible, but nothing has run it. If it fails, unset one of the
-  two settings and record the failure.
+- **Control-LoRA is incompatible with the dedicated UNet** (found in the first owner trial).
+  ComfyUI builds a Control-LoRA from the active UNet and adds low-rank deltas trained for
+  the base model's 4-channel input layer; with the 9-channel inpainting UNet the delta
+  cannot be applied and sampling fails (`shape '[320, 9, 3, 3]' is invalid for input of
+  size 11520`). Readiness now refuses a ControlNet filename containing `control-lora`
+  when the inpainting UNet is configured (a name heuristic: readiness cannot inspect
+  weights). A full SDXL ControlNet builds its own network, receives only the 4-channel
+  latent, and is loaded by ComfyUI in diffusers format (including the `small` and `mid`
+  variants), so it is the supported pairing. Recommended for 8 GB:
+  `diffusers/controlnet-canny-sdxl-1.0-small` (about 320 MB fp16).
 - Fooocus-style inpaint patches, differential diffusion and soft masks need custom
   nodes or changes to Quill's binary-mask contract and are out of scope.
 
@@ -75,11 +81,17 @@ the configured UNet is missing, filename validation, environment loading, proven
 the readiness message. Existing mask-orientation and outside-pixel preservation tests
 are unchanged and pass.
 
-Next: owner trial comparing the same rooms and seeds with base SDXL and the dedicated
-UNet (with ControlNet off, then on), recording time and peak VRAM. Then add a FLUX.2
-klein workflow as a second local option.
+First owner trial (2026-10-05, reference hardware): without guidance the dedicated UNet
+connected well to neighbouring rooms and used the surrounding context, but continued the
+outdoor background into the room for some distance and invented its own layout rather
+than walls at the room boundary. This is expected: the mask shows where to paint, not
+where walls are, so wall guidance is needed. Control-LoRA guidance failed as above.
+
+Next: trial the dedicated UNet with a full canny ControlNet, recording time and peak
+VRAM. Then add a FLUX.2 klein workflow as a second local option.
 
 Sources (checked 2026-10-05): ComfyUI `nodes.py` (`InpaintModelConditioning`,
 `UNETLoader`), `comfy/model_detection.py` (`SDXL_diffusers_inpaint`),
-`comfy/controlnet.py` (`ControlLora.pre_run`), and the model card at
-https://huggingface.co/diffusers/stable-diffusion-xl-1.0-inpainting-0.1.
+`comfy/controlnet.py` (`ControlLora.pre_run`, diffusers ControlNet loading), and the model
+cards at https://huggingface.co/diffusers/stable-diffusion-xl-1.0-inpainting-0.1 and
+https://huggingface.co/diffusers/controlnet-canny-sdxl-1.0-small.

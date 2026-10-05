@@ -91,8 +91,13 @@ criterion to its tests.
 
 8. **Inpainting quality (ADR-0031).** Room inpainting moved from `VAEEncodeForInpaint` to
    `InpaintModelConditioning`, and an optional dedicated SD-XL Inpainting 0.1 UNet can
-   replace base SDXL for rooms. Verified offline only; the owner comparison trial is
-   pending.
+   replace base SDXL for rooms.
+9. **Third owner trial (2026-10-05).** Without guidance, the inpainting UNet connected
+   well to neighbouring rooms, but continued the outdoor background into the room and
+   invented its own layout instead of walls at the boundary. With the Control-LoRA wall
+   guidance, sampling failed: Control-LoRA cannot adapt to the inpainting UNet's
+   9-channel input. Readiness now refuses that pairing and the docs recommend a full
+   SDXL canny ControlNet (ADR-0031).
 
 Outstanding before Milestone 3 can close: an owner GPU trial of ADR-0029 conditioning
 (same seed, guidance on and off), a base-versus-inpainting-model comparison (ADR-0031),
