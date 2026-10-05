@@ -1,240 +1,186 @@
-# Local SDXL / ComfyUI test
+# Local SDXL with ComfyUI
 
-Milestone 3 uses a local backend first to avoid per-image API charges. This increment
-supports queued editor previews as well as the standalone GPU smoke command.
-The default remains mock; explicitly select comfyui-sdxl below. See ADR-0025–0027.
+Quill's first real image provider is a local [ComfyUI](https://docs.comfy.org) server
+running SDXL (ADR-0025). ComfyUI runs as a separate process with its own Python
+environment, and Quill talks to it over loopback HTTP. No API key, account, custom
+nodes or paid partner nodes are needed, and nothing leaves your machine. Quill bundles
+no model weights: you download them yourself under their own licenses.
 
-## Install separately on Linux
+The default provider is still the offline mock. Design records: ADR-0025 (adapter),
+ADR-0026 (resolution), ADR-0027 (editor integration), ADR-0028 (room working resolution
+and prompts), ADR-0029 (scale and wall guidance).
 
-Use the [official ComfyUI installation guide](https://docs.comfy.org/installation/manual_install)
-for its current Python/PyTorch requirements. Install outside Map-Weavers-Quill, with
-its own virtual environment. Do not install ComfyUI's dependencies into Quill's venv.
-No custom nodes, paid partner nodes, account, or API key is needed for this workflow.
+Reference hardware: Linux, NVIDIA RTX 3060 Ti (8 GB VRAM), about 32 GB RAM. This is the
+owner's test machine, not a measured requirement.
 
-The first target is the owner's RTX 3060 Ti (8 GB VRAM), 32 GB RAM, Linux desktop.
-The owner reports SDXL working locally. Adapter-specific timing, peak memory and
-visual acceptance still need to be recorded. Flux Fill is deferred.
+## 1. Install ComfyUI
 
-Download `sd_xl_base_1.0.safetensors` from the
-[SDXL base model repository](https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/tree/main)
-into ComfyUI's `models/checkpoints/` directory. Follow the model's published license
-and access terms. Quill does not bundle weights or change their license. The initial
-graph uses SDXL base for both generation and masked editing; it does not yet use the
-separate Diffusers SDXL inpainting fine-tune. A dedicated inpainting comparison is
-planned after the baseline works.
-
-From the ComfyUI directory, using its Python environment, start it on loopback:
+Follow the [official manual install guide](https://docs.comfy.org/installation/manual_install)
+for its current Python/PyTorch requirements. Install it outside the Map-Weavers-Quill
+directory, in its own virtual environment; never install ComfyUI dependencies into
+Quill's venv. Start it on loopback from the ComfyUI directory:
 
 ```sh
 python main.py --listen 127.0.0.1 --port 8188
 ```
 
-Use batch one (fixed by our graph). Start with default memory management. If GPU
-memory is exhausted, stop other GPU workloads, try 768x768, or restart ComfyUI with
-its documented `--lowvram` option. These affect capacity/speed; reduced resolution
-also affects quality. Do not install a refiner or ControlNet for this initial test.
+If GPU memory runs out, stop other GPU workloads first, then try ComfyUI's documented
+`--lowvram` option. That trades speed for capacity.
 
-## Check from Quill
+## 2. Install models
 
-Pull the latest repository changes and activate Quill's existing dependencies.
-In a second terminal, from Map-Weavers-Quill:
+Required: download `sd_xl_base_1.0.safetensors` from the
+[SDXL base repository](https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/tree/main)
+into `ComfyUI/models/checkpoints/`.
+
+Optional, for room wall/door guidance: download
+[control-lora-canny-rank128.safetensors](https://huggingface.co/stabilityai/control-lora/blob/main/control-LoRAs-rank128/control-lora-canny-rank128.safetensors)
+into `ComfyUI/models/controlnet/` (not checkpoints or loras). Use an SDXL-compatible
+control model, not an SD 1.5 one, and restart ComfyUI after installing it.
+
+Check each model's published license and access terms before use or redistribution.
+
+## 3. Configure and check from Quill
+
+Configuration is read from the environment of the Quill API process. `.env` is not
+loaded automatically, so export variables before running commands:
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `MWQ_IMAGE_PROVIDER` | `mock` | Set to `comfyui-sdxl` to use ComfyUI in the editor |
+| `MWQ_IMAGE_COMFY_URL` | `http://127.0.0.1:8188` | Loopback HTTP URL with an explicit port; credentials, paths, queries and non-local hosts are rejected |
+| `MWQ_IMAGE_COMFY_CHECKPOINT` | `sd_xl_base_1.0.safetensors` | Checkpoint filename (not a path) |
+| `MWQ_IMAGE_COMFY_TIMEOUT` | `600` | Overall generation deadline in seconds |
+| `MWQ_IMAGE_COMFY_CONTROLNET` | unset | Optional ControlNet filename that enables wall/door guidance |
+
+With ComfyUI running, from the Quill directory:
 
 ```sh
 make comfy-check
 ```
 
-This checks core node availability and the configured checkpoint filename. It does
-not queue an image, load the model, or test GPU memory. If it fails, verify ComfyUI
-is running and the checkpoint is installed. Optional environment overrides:
+This checks connectivity, the core nodes and that the configured files exist. It does
+not load weights, queue an image or test GPU memory, and it cannot verify that a file
+really is an SDXL model.
+
+## 4. Use SDXL in the editor
+
+Stop any running `make dev`, then:
 
 ```sh
-export MWQ_IMAGE_COMFY_URL=http://127.0.0.1:8188
+export MWQ_IMAGE_PROVIDER=comfyui-sdxl
 export MWQ_IMAGE_COMFY_CHECKPOINT=sd_xl_base_1.0.safetensors
-export MWQ_IMAGE_COMFY_TIMEOUT=600
+# optional wall/door guidance:
+# export MWQ_IMAGE_COMFY_CONTROLNET=control-lora-canny-rank128.safetensors
+make dev
 ```
 
-Only HTTP loopback hosts with an explicit port are accepted. The checkpoint must
-be a filename, not a directory. `.env` is not loaded automatically. Use
-`MWQ_IMAGE_PROVIDER=comfyui-sdxl` to enable the editor adapter. The standalone
-command constructs the adapter directly using the variables above.
+Open Map → AI. The panel identifies Local SDXL / ComfyUI and its readiness. If it is not
+ready, fix the setup and click **Check provider**; generation stays disabled until the
+check passes, and each job re-checks before submitting. With ControlNet configured, a
+selected room's AI panel reports that wall and door guidance is enabled. A configured
+but missing model or node fails readiness instead of silently falling back.
 
-## Run one real generation
+Then use the normal workflow: apply a background prompt and style, Generate preview,
+Accept; select a room, apply its prompt, generate and accept. Accepting is undoable and
+File → Save keeps accepted art with its provenance. To switch back, set
+`MWQ_IMAGE_PROVIDER=mock` and restart Quill. Save/Open and export keep working with
+either provider.
+
+## What Quill sends to SDXL
+
+- **Resolution.** The native map is 1200 × 800 units. SDXL backgrounds and room layers
+  are stored at 960 × 640 (3:2, multiples of 64). Older 480 × 320 mock layers keep
+  their original bytes and are only resampled for composition and context.
+- **Rooms.** Quill crops the room plus a 20-unit context margin, aligned to multiples
+  of 64, pads it to a square by extending edge pixels (padding is protected), and
+  generates at 1024 × 1024. The result is scaled back, placed at the original crop
+  position, and clipped to the exact room mask, so pixels outside the room never
+  change (ADR-0028).
+- **Context.** The source image for a room excludes that room's previous artwork and
+  any known mock output (identified by provenance, not appearance). Real neighbouring
+  artwork is kept.
+- **Prompts.** Both backgrounds and rooms use camera-first, plain-language prompts
+  (template `sdxl-overhead-v2`) with negative prompts against perspective, horizons,
+  text, grids and abstract patterns. Backgrounds ask for terrain and roofs from above;
+  rooms ask for roof-removed interiors and furniture from above. Your own prompts and
+  style fields are included unchanged. Override a room's Environment if it inherits an
+  unsuitable exterior description.
+- **Scale.** Room prompts state the grid distance (default 5 ft per cell), the room's
+  dimensions and area, and ask for life-size furniture and no interior partitions
+  (ADR-0029). This is guidance, not a guarantee.
+- **Wall/door guidance (optional).** When ControlNet is configured, Quill draws a
+  white-on-black guide of the actual walls, with gaps at doors, transforms it with the
+  room crop, and passes it through core ControlNet nodes at strength 1 for the whole
+  sampling run. No preprocessor or custom nodes are needed. Backgrounds remain
+  text-only.
+- **Sampler.** 20 Euler/normal steps, CFG 7, denoise 1, batch one. Masked editing uses
+  the SDXL base model with `VAEEncodeForInpaint`, not a dedicated inpainting model.
+  These are fixed reference settings, not UI controls.
+
+## Behavior and limits
+
+- Jobs run one at a time through Quill's durable queue. Cancel preview stops the result
+  from being published but does not stop ComfyUI's GPU work; the worker stays busy
+  until completion or the timeout, and server shutdown may wait for it.
+- Submissions are never retried automatically, and Quill never calls ComfyUI's global
+  interrupt (it could stop another application's work). After a timeout, check
+  ComfyUI's queue before retrying.
+- ComfyUI keeps its own copies of uploaded inputs and outputs, and may embed workflow
+  metadata in its PNGs. Quill re-encodes returned images without that metadata.
+  Cleanup is manual.
+- Accepted generation records include workflow version and hash, checkpoint and
+  control-model filenames, ComfyUI prompt ID, seed, sampler settings, prompts, crop and
+  transform details, scale data and input/output hashes. They contain no endpoint URL
+  or credentials. A filename is not a checkpoint hash, so record hashes separately
+  for reproducibility.
+- Responses are capped at 16 MiB and checked before decoding; errors omit server
+  payloads and tracebacks.
+- Offline tests simulate ComfyUI. They do not establish image quality, GPU performance,
+  adjacent-room continuity or building alignment.
+
+## Standalone smoke command
+
+`scripts/comfy_smoke.py` exercises the adapter directly, without the editor. It never
+changes a Quill project and refuses to overwrite existing output files.
 
 ```sh
+# one 1024 x 1024 image, seed 42, 20 steps
 PYTHONPATH=apps/server .venv/bin/python scripts/comfy_smoke.py \
   --generate --output data/comfy-smoke.png
-```
 
-This queues one local 1024x1024 image, seed 42, 20 steps. The default prompt asks for
-a top-down cottage interior. It writes the original-resolution PNG plus
-`data/comfy-smoke.json` metadata and never changes a Quill project. Existing files
-are not overwritten; choose a fresh output name for another run. The default data
-directory is ignored by git. Generation uses your GPU/electricity, with no hosted
-image API call or per-image fee.
-
-For the 8 GB card, a lower-memory trial is:
-
-```sh
+# lower-memory trial
 PYTHONPATH=apps/server .venv/bin/python scripts/comfy_smoke.py \
   --generate --width 768 --height 768 --output data/comfy-smoke-768.png
-```
 
-For masked editing, create a same-size grayscale PNG mask (white edits, black
-preserves) in an image editor and supply both inputs:
+# full-map size used by the editor
+PYTHONPATH=apps/server .venv/bin/python scripts/comfy_smoke.py \
+  --generate --width 960 --height 640 --output data/comfy-map-960.png
 
-```sh
+# masked edit: same-size grayscale mask, white edits, black preserves
 PYTHONPATH=apps/server .venv/bin/python scripts/comfy_smoke.py \
   --generate --source data/comfy-smoke.png --mask data/room-mask.png \
   --prompt 'Orthographic top-down cottage bedroom, wooden bed and stone floor, no grid or labels' \
   --output data/comfy-room-edit.png
 ```
 
-Source and mask dimensions must exactly match --width/--height (1024x1024 defaults).
-The adapter does not resize them. Black-mask RGB pixels are copied from the original
-source after generation. White-mask content quality and border continuity need
-visual review; a mask does not guarantee exact furniture/door placement.
+Dimensions must be multiples of 64 between 64 and 1024. Source and mask must match
+`--width`/`--height` exactly; nothing is resized. Black-mask pixels are copied back from
+the source after generation. Each run writes the PNG and a JSON sidecar with provider,
+workflow version and hash, checkpoint filename, prompts, seed, sampler settings,
+dimensions, ComfyUI prompt ID and input/output hashes. Treat the sidecar as project
+content when sharing. The smoke command does not build a project wall guide; test
+guidance through the editor.
 
-## Evidence to capture
+## Pending owner trial
 
-- PNG and JSON sidecar; inspect top-down perspective, room borders and continuity.
-- ComfyUI version/commit (`git rev-parse HEAD` in its repository).
-- Checkpoint file SHA-256 (`sha256sum models/checkpoints/sd_xl_base_1.0.safetensors`).
-- Actual elapsed time and peak VRAM, plus whether low-VRAM mode was needed.
+Not yet recorded on the reference hardware:
 
-The sidecar contains prompts, asset hashes and local model/workflow details; treat
-it as project content when sharing. No credentials or endpoint URL are recorded.
-ComfyUI retains its own input and output copies, and may store workflow metadata
-in its output PNG. Quill's returned PNG is re-encoded without that metadata.
-
-Timeouts do not automatically resubmit. ComfyUI may still finish after a timeout
-or Ctrl-C; inspect its queue before retrying. The adapter never calls the global
-interrupt endpoint. The command returns a safe summary; consult ComfyUI's local
-console for GPU errors. No automatic history/asset cleanup is implemented.
-
-Protocol tests run offline as part of `make check`; they do not demonstrate actual
-GPU performance, adjacent-room visual continuity or geometry-aware roof generation.
-
-## Editor resolution profile
-
-The map remains 1200 × 800 native units. Storage accepts legacy 480 × 320 PNGs and
-960 × 640 PNGs, preserving the map's 3:2 proportions. The latter is the initial
-SDXL editor target; both dimensions are multiples of 64. You can test this size
-through the standalone adapter now:
-
-```sh
-PYTHONPATH=apps/server .venv/bin/python scripts/comfy_smoke.py \
-  --generate --width 960 --height 640 --output data/comfy-map-960.png
-```
-
-This remains a standalone test, not an import into the editor. Square smoke outputs
-are not full-map assets. Do not resize them to fit; the editor requests
-the correct dimensions directly. Existing mock projects need no migration.
-
-## Use SDXL in the editor
-
-Keep ComfyUI running in its own terminal. Stop Quill's previous `make dev` with
-Ctrl-C, then from the Quill repository run:
-
-```sh
-export MWQ_IMAGE_PROVIDER=comfyui-sdxl
-export MWQ_IMAGE_COMFY_CHECKPOINT=sd_xl_base_1.0.safetensors
-make dev
-```
-
-Open Map → AI. The panel identifies Local SDXL / ComfyUI and checks connectivity,
-core nodes and checkpoint availability without loading weights or queuing an image.
-If unavailable, fix the local setup and click **Check provider**. Generation stays
-disabled until the check succeeds. Each job also checks readiness before submission.
-A successful check does not guarantee enough GPU memory or the correct checkpoint
-architecture; use an SDXL base-compatible checkpoint with this fixed workflow.
-
-Apply the background prompt/style, then Generate preview → Accept background.
-For interiors, select a room, apply its prompt, generate and accept room artwork.
-Previews appear on the map; accepting is undoable, and File → Save retains accepted
-art and provenance. Save/Open and exports also work when later switching back to
-mock. Set `MWQ_IMAGE_PROVIDER=mock` and restart Quill to switch back.
-
-New SDXL backgrounds and room layers use 960 × 640 full-map storage. Room generation
-uses a crop expanded to multiples of 64, pads it to a square and generates at
-1024 × 1024. It then restores the crop size and reapplies the original room mask
-(ADR-0028), preserving proportions and native placement. Old
-mock layers retain their bytes; they are resampled only for composition/context.
-Room generation now uses more GPU work than the previous small-crop implementation.
-Assess detail and continuity; very narrow rooms and base-model inpainting still have
-quality limitations.
-Generation currently uses 20 Euler/normal steps, CFG 7 and denoise 1, batch one.
-These are fixed reference settings, not UI controls.
-
-Generation runs serially through Quill's durable queue. Cancel preview prevents a
-result from being published, but does not stop ComfyUI's GPU work. The worker remains
-occupied until completion or timeout (default 600 seconds); server shutdown may wait
-for that operation. Check ComfyUI's queue before retrying after a timeout. Quill does
-not issue global interrupts or automatic provider retries. ComfyUI retains uploaded
-images and outputs locally; asset cleanup is not yet automated.
-
-Accepted generation records include workflow version/hash, checkpoint filename,
-ComfyUI prompt ID, seed, sampler settings and crop dimensions, plus full-map input
-hashes and native crop placement. They contain no endpoint URL or credentials.
-The filename is not a checkpoint hash: capture the additional hardware evidence above.
-
-Next acceptance trial: generate a background and two adjacent room interiors, inspect
-outside-mask preservation and seams, accept, undo/redo, save/reopen, and export. Record
-runtime and peak VRAM. Automated tests use simulated ComfyUI responses; they do not
-establish visual quality or geometry-aligned building exteriors.
-
-## Quality iteration after the first owner trial
-
-ADR-0028 addresses abstract small-room output with the 1024 × 1024 working transform.
-Room context excludes the target's previous art and known mock outputs; it retains
-real neighbouring art. Existing checkerboard layers may remain visible on the editor
-until hidden/replaced, but known mock outputs are excluded from new SDXL room context.
-Unknown-provenance layers are retained rather than guessed from appearance.
-
-SDXL now receives camera-first, plain-language prompts and negative prompts for
-perspective, text, grids and abstract patterns. Room guidance specifies roof-removed
-interiors; backgrounds specify roofs/terrain from above. Existing prompt/style fields
-are preserved. Override a room's Environment if it inherits unsuitable forest/exterior
-instructions. No new weights, custom nodes or configuration are needed.
-
-Pull and restart Quill with the same comfyui-sdxl selection. Generate fresh previews;
-existing accepted images do not change automatically. Compare the same room/seed and
-record runtime/peak VRAM. A true orthographic layout is still a visual acceptance target,
-not a guarantee of the base SDXL model. Geometry conditioning remains future work.
-
-## Enable room wall/door guidance
-
-Scale information now accompanies every SDXL room request: the document's grid distance
-(default 5 feet per cell), room dimensions/area and working pixels per unit. This is model
-guidance, not a guarantee that furniture will have an exact footprint.
-
-For spatial wall/door guidance, download
-[control-lora-canny-rank128.safetensors](https://huggingface.co/stabilityai/control-lora/blob/main/control-LoRAs-rank128/control-lora-canny-rank128.safetensors)
-from Stability AI into **ComfyUI/models/controlnet/** (not checkpoints or loras).
-Check the model's published license before redistributing weights. Quill does not bundle it.
-Use an SDXL-compatible control model, not an SD 1.5 model. Restart ComfyUI after installation.
-
-Stop Quill and restart it with:
-
-```sh
-export MWQ_IMAGE_PROVIDER=comfyui-sdxl
-export MWQ_IMAGE_COMFY_CONTROLNET=control-lora-canny-rank128.safetensors
-make dev
-```
-
-Select a room → AI → Check provider. The panel should report wall and door guidance
-enabled. Missing configured weights/nodes cause an explicit readiness failure. Generate
-a new preview; the background generation path remains text-only even with this option.
-
-Quill creates an edge guide from existing walls with gaps at door positions, transforms
-it with the room crop and submits it through core ControlNet nodes. It adds no grid or
-furniture geometry. No custom nodes/preprocessor are required. Strength is initially 1
-throughout sampling. Both source and guide remain local to ComfyUI. The additional model
-increases GPU memory/work; the RTX 3060 Ti hardware trial has not been run here.
-
-Compare the same room/seed with and without guidance. Inspect door clearance, invented
-partitions and object size; ControlNet is guidance, not an exact architectural renderer.
-To disable it, `unset MWQ_IMAGE_COMFY_CONTROLNET` and restart Quill. The standalone smoke
-command checks configured model readiness but does not construct a project wall guide;
-use room generation in the editor for this trial. Background roof/entrance alignment,
-explicit building grouping, hard door-clearance enforcement and sized furniture placement
-remain future work. See ADR-0029.
+1. Generate a background and two adjacent room interiors. Check top-down perspective,
+   furniture scale, invented partitions, seams and that pixels outside each room are
+   untouched. Accept, undo/redo, save/reopen and export.
+2. Generate the same room and seed with wall guidance on and off; compare door
+   clearance, partitions and object size.
+3. Record elapsed time, peak VRAM, whether `--lowvram` was needed, the ComfyUI commit
+   (`git rev-parse HEAD`) and checkpoint SHA-256
+   (`sha256sum models/checkpoints/sd_xl_base_1.0.safetensors`).

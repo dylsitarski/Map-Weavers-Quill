@@ -4,6 +4,9 @@ Status: Accepted; standalone adapter and offline protocol tests implemented.
 Actual GPU execution and editor integration are not yet verified/implemented.
 Supersedes the hosted-first sequence in ADR-0024 and manifest section 8.4.
 
+Update 2026-10-05: editor integration is implemented (ADR-0026, ADR-0027). GPU visual
+acceptance and hardware measurements are still pending.
+
 ## Decision and hardware
 
 The owner prioritizes avoiding recurring image-generation costs during development.
