@@ -24,8 +24,9 @@ Milestone 3 so far: the SDXL adapter works end to end in the editor (queued prev
 accept/undo, save/open, export) and is covered by offline tests. The owner has run SDXL
 locally, but image quality is not yet acceptable and hardware measurements are not
 recorded. Open problems are furniture scale, invented interior partitions, and
-backgrounds that ignore the placed rooms. Next: an owner GPU trial of the current
-room conditioning (ADR-0029), then improving inpainting quality.
+backgrounds that ignore the placed rooms. Rooms can now optionally use a dedicated
+SDXL inpainting model (ADR-0031). Next: an owner GPU trial comparing base SDXL and the
+inpainting model, with and without wall guidance (ADR-0029).
 
 Verification evidence and the development log are in [docs/HISTORY.md](docs/HISTORY.md).
 
@@ -165,7 +166,8 @@ make dev
 ```
 
 Map → AI then reports provider readiness. Generation stays disabled until the check
-passes.
+passes. For better room artwork, also install the optional SD-XL Inpainting 0.1 UNet and
+set `MWQ_IMAGE_COMFY_INPAINT_UNET` (see docs/COMFYUI.md).
 
 ## Provider configuration and secrets
 

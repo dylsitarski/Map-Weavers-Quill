@@ -8,7 +8,7 @@ no model weights: you download them yourself under their own licenses.
 
 The default provider is still the offline mock. Design records: ADR-0025 (adapter),
 ADR-0026 (resolution), ADR-0027 (editor integration), ADR-0028 (room working resolution
-and prompts), ADR-0029 (scale and wall guidance).
+and prompts), ADR-0029 (scale and wall guidance), ADR-0031 (dedicated inpainting model).
 
 Reference hardware: Linux, NVIDIA RTX 3060 Ti (8 GB VRAM), about 32 GB RAM. This is the
 owner's test machine, not a measured requirement.
@@ -33,6 +33,13 @@ Required: download `sd_xl_base_1.0.safetensors` from the
 [SDXL base repository](https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/tree/main)
 into `ComfyUI/models/checkpoints/`.
 
+Optional, recommended for room artwork: the dedicated SDXL inpainting UNet
+([SD-XL Inpainting 0.1](https://huggingface.co/diffusers/stable-diffusion-xl-1.0-inpainting-0.1),
+openrail++). Download `unet/diffusion_pytorch_model.fp16.safetensors` (5.14 GB) into
+`ComfyUI/models/diffusion_models/` and rename it to something recognizable, for
+example `sdxl-inpainting-0.1.fp16.safetensors`. It replaces only the room sampler model;
+the base checkpoint above is still required for text encoding, the VAE and backgrounds.
+
 Optional, for room wall/door guidance: download
 [control-lora-canny-rank128.safetensors](https://huggingface.co/stabilityai/control-lora/blob/main/control-LoRAs-rank128/control-lora-canny-rank128.safetensors)
 into `ComfyUI/models/controlnet/` (not checkpoints or loras). Use an SDXL-compatible
@@ -52,6 +59,7 @@ loaded automatically, so export variables before running commands:
 | `MWQ_IMAGE_COMFY_CHECKPOINT` | `sd_xl_base_1.0.safetensors` | Checkpoint filename (not a path) |
 | `MWQ_IMAGE_COMFY_TIMEOUT` | `600` | Overall generation deadline in seconds |
 | `MWQ_IMAGE_COMFY_CONTROLNET` | unset | Optional ControlNet filename that enables wall/door guidance |
+| `MWQ_IMAGE_COMFY_INPAINT_UNET` | unset | Optional dedicated SDXL inpainting UNet filename (in `models/diffusion_models`) used for room artwork |
 
 With ComfyUI running, from the Quill directory:
 
@@ -70,6 +78,8 @@ Stop any running `make dev`, then:
 ```sh
 export MWQ_IMAGE_PROVIDER=comfyui-sdxl
 export MWQ_IMAGE_COMFY_CHECKPOINT=sd_xl_base_1.0.safetensors
+# optional dedicated inpainting model for rooms:
+# export MWQ_IMAGE_COMFY_INPAINT_UNET=sdxl-inpainting-0.1.fp16.safetensors
 # optional wall/door guidance:
 # export MWQ_IMAGE_COMFY_CONTROLNET=control-lora-canny-rank128.safetensors
 make dev
@@ -77,7 +87,9 @@ make dev
 
 Open Map → AI. The panel identifies Local SDXL / ComfyUI and its readiness. If it is not
 ready, fix the setup and click **Check provider**; generation stays disabled until the
-check passes, and each job re-checks before submitting. With ControlNet configured, a
+check passes, and each job re-checks before submitting. With the inpainting UNet
+configured, the readiness message reads "Ready · dedicated SDXL inpainting model for
+rooms". With ControlNet configured, a
 selected room's AI panel reports that wall and door guidance is enabled. A configured
 but missing model or node fails readiness instead of silently falling back.
 
@@ -114,12 +126,20 @@ either provider.
   room crop, and passes it through core ControlNet nodes at strength 1 for the whole
   sampling run. No preprocessor or custom nodes are needed. Backgrounds remain
   text-only.
-- **Sampler.** 20 Euler/normal steps, CFG 7, denoise 1, batch one. Masked editing uses
-  the SDXL base model with `VAEEncodeForInpaint`, not a dedicated inpainting model.
-  These are fixed reference settings, not UI controls.
+- **Masked editing (rooms).** The source and mask go through `InpaintModelConditioning`
+  (ADR-0031). With the dedicated inpainting UNet, the model receives the masked image and
+  mask as extra inputs and is trained to continue the surroundings. Without it, base SDXL
+  ignores those inputs and sees the context only through the latent noise mask.
+  Backgrounds always use the base model.
+- **Sampler.** 20 Euler/normal steps, CFG 7, denoise 1, batch one. These are fixed
+  reference settings, not UI controls.
 
 ## Behavior and limits
 
+- With the dedicated inpainting UNet, ComfyUI holds it (5.14 GB) as well as the base
+  checkpoint. On an 8 GB GPU this relies on ComfyUI's offloading and may need
+  `--lowvram`; time and memory are not yet measured. ControlNet guidance combined with
+  the dedicated UNet is untested: if it fails, unset one of the two and report it.
 - Jobs run one at a time through Quill's durable queue. Cancel preview stops the result
   from being published but does not stop ComfyUI's GPU work; the worker stays busy
   until completion or the timeout, and server shutdown may wait for it.
@@ -181,6 +201,9 @@ Not yet recorded on the reference hardware:
    untouched. Accept, undo/redo, save/reopen and export.
 2. Generate the same room and seed with wall guidance on and off; compare door
    clearance, partitions and object size.
-3. Record elapsed time, peak VRAM, whether `--lowvram` was needed, the ComfyUI commit
+3. Generate the same rooms and seeds with base SDXL and with the dedicated inpainting
+   UNet (guidance off, then on); compare seams, continuity with neighbours, partitions
+   and scale.
+4. Record elapsed time, peak VRAM, whether `--lowvram` was needed, the ComfyUI commit
    (`git rev-parse HEAD`) and checkpoint SHA-256
    (`sha256sum models/checkpoints/sd_xl_base_1.0.safetensors`).

@@ -329,8 +329,17 @@ class ComfyEditorTests(unittest.TestCase):
                     )
                     self.assertTrue(result.generation.parameters["layoutConditioning"])
                     self.assertEqual(self.fake.calls.count("/upload/image"), 2)
-                    self.assertEqual(self.fake.graph["5"]["inputs"]["positive"], ["11", 0])
-                    self.assertEqual(self.fake.graph["5"]["inputs"]["negative"], ["11", 1])
+                    # ControlNet conditioning feeds inpaint conditioning, which feeds sampling.
+                    inpaint = self.fake.graph["4"]
+                    self.assertEqual(inpaint["class_type"], "InpaintModelConditioning")
+                    self.assertEqual(inpaint["inputs"]["positive"], ["11", 0])
+                    self.assertEqual(inpaint["inputs"]["negative"], ["11", 1])
+                    self.assertEqual(self.fake.graph["5"]["inputs"]["positive"], ["4", 0])
+                    self.assertEqual(self.fake.graph["5"]["inputs"]["negative"], ["4", 1])
+                    self.assertEqual(
+                        result.generation.parameters["comfyui"]["workflowVersion"],
+                        "comfy-sdxl-layout-v2",
+                    )
                     self.assertEqual(self.fake.graph["11"]["inputs"]["strength"], 1.0)
                     self.assertEqual(
                         self.fake.graph["10"]["inputs"]["image"][:14], "quill-control-"

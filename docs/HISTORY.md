@@ -89,8 +89,13 @@ criterion to its tests.
    the owner prefers to keep AI-generated walls, which can match the room's style and
    perspective, while image generation is improved.
 
+8. **Inpainting quality (ADR-0031).** Room inpainting moved from `VAEEncodeForInpaint` to
+   `InpaintModelConditioning`, and an optional dedicated SD-XL Inpainting 0.1 UNet can
+   replace base SDXL for rooms. Verified offline only; the owner comparison trial is
+   pending.
+
 Outstanding before Milestone 3 can close: an owner GPU trial of ADR-0029 conditioning
-(same seed, guidance on and off), recorded runtime and peak VRAM, inpainting quality
-improvements, explicit building/open-air intent, and geometry-aware backgrounds
+(same seed, guidance on and off), a base-versus-inpainting-model comparison (ADR-0031),
+recorded runtime and peak VRAM, explicit building/open-air intent, and geometry-aware backgrounds
 (ADR-0023). Flux Fill was considered and deferred; hosted generation moved to
 Milestone 5.

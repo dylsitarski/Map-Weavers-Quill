@@ -156,7 +156,28 @@ class ComfyTests(unittest.IsolatedAsyncioTestCase):
                 mask_image,
             )
             self.assertEqual(image.tobytes(), expected.tobytes())
-        self.assertEqual(self.graph["4"]["inputs"]["grow_mask_by"], 0)
+        inpaint = self.graph["4"]
+        self.assertEqual(inpaint["class_type"], "InpaintModelConditioning")
+        self.assertEqual(
+            inpaint["inputs"],
+            {
+                "positive": ["2", 0],
+                "negative": ["3", 0],
+                "vae": ["1", 2],
+                "pixels": ["8", 0],
+                "mask": ["8", 1],
+                "noise_mask": True,
+            },
+        )
+        sampler = self.graph["5"]["inputs"]
+        self.assertEqual(
+            (sampler["model"], sampler["positive"], sampler["negative"], sampler["latent_image"]),
+            (["1", 0], ["4", 0], ["4", 1], ["4", 2]),
+        )
+        self.assertEqual(sampler["denoise"], 1.0)
+        self.assertNotIn("12", self.graph)
+        self.assertEqual(self.provider.last_run["workflowVersion"], "comfy-sdxl-inpaint-v2")
+        self.assertIsNone(self.provider.last_run["inpaintModel"])
         self.assertEqual(self.provider.assets[source], png((10, 20, 30)))
 
     async def test_invalid_request_and_assets_never_contact_server(self):
@@ -282,6 +303,66 @@ class ComfyTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(sum(r.url.path == "/prompt" for r in self.calls), 1)
         self.assertEqual(provider.assets, {})
 
+    async def test_dedicated_inpainting_unet_for_masked_edits_only(self):
+        unet = "sdxl-inpainting-0.1.fp16.safetensors"
+        installed = [unet]
+        original = self.respond
+
+        def respond(request):
+            response = original(request)
+            if request.url.path == "/object_info":
+                info = response.json()
+                info["UNETLoader"] = {"input": {"required": {"unet_name": [list(installed)]}}}
+                return httpx.Response(200, json=info)
+            return response
+
+        provider = ComfyProvider(
+            ComfyConfig(inpaint_unet=unet), transport=httpx.MockTransport(respond)
+        )
+        self.assertTrue(await provider.health())
+        source = provider.put(png((10, 20, 30)))
+        mask = provider.put(png(255, mode="L"))
+        await provider.inpaint(
+            InpaintRequest(
+                **self.request.model_dump(),
+                sourceRef=source,
+                maskRef=mask,
+                maskConvention="white-edit-black-preserve",
+            )
+        )
+        self.assertEqual(
+            self.graph["12"],
+            {"class_type": "UNETLoader", "inputs": {"unet_name": unet, "weight_dtype": "default"}},
+        )
+        # Only the sampler's model changes; CLIP and VAE stay on the base checkpoint.
+        self.assertEqual(self.graph["5"]["inputs"]["model"], ["12", 0])
+        self.assertEqual(self.graph["2"]["inputs"]["clip"], ["1", 1])
+        self.assertEqual(self.graph["4"]["inputs"]["vae"], ["1", 2])
+        self.assertEqual(provider.last_run["inpaintModel"], unet)
+        self.assertEqual(provider.last_run["workflowVersion"], "comfy-sdxl-inpaint-v2")
+        # Text-to-image (backgrounds) keeps the base model and the v1 graph.
+        await provider.generate(self.request)
+        self.assertNotIn("12", self.graph)
+        self.assertEqual(self.graph["5"]["inputs"]["model"], ["1", 0])
+        self.assertEqual(self.graph["4"]["class_type"], "EmptyLatentImage")
+        self.assertEqual(provider.last_run["workflowVersion"], "comfy-sdxl-v1")
+        self.assertNotIn("inpaintModel", provider.last_run)
+        # A configured but missing UNet fails readiness instead of falling back.
+        installed.clear()
+        self.assertFalse(await provider.health())
+        with self.assertRaises(ProviderFailure) as error:
+            await provider.check()
+        self.assertIn("inpainting UNet", error.exception.error.message)
+
+    def test_readiness_message_names_the_dedicated_inpainting_model(self):
+        from quill.main import readiness_message
+        from quill.providers import MockProvider
+
+        self.assertEqual(readiness_message(MockProvider()), "Offline test pattern")
+        self.assertEqual(readiness_message(self.provider), "Ready")
+        dedicated = ComfyProvider(ComfyConfig(inpaint_unet="inpaint.safetensors"))
+        self.assertIn("dedicated SDXL inpainting model", readiness_message(dedicated))
+
     async def test_missing_checkpoint_and_no_global_interrupt(self):
         provider = ComfyProvider(
             ComfyConfig(checkpoint="missing.safetensors"),
@@ -306,6 +387,17 @@ class ComfyTests(unittest.IsolatedAsyncioTestCase):
         for checkpoint in ("../model.safetensors", "model.ckpt", "/model.safetensors"):
             with self.assertRaises(ValueError):
                 ComfyConfig(checkpoint=checkpoint)
+        for unet in (
+            "../unet.safetensors",
+            "unet.ckpt",
+            "models/unet.safetensors",
+            ".hidden.safetensors",
+        ):
+            with self.assertRaises(ValueError):
+                ComfyConfig(inpaint_unet=unet)
+        config = ComfyConfig.from_env({"MWQ_IMAGE_COMFY_INPAINT_UNET": "inpaint.safetensors"})
+        self.assertEqual(config.inpaint_unet, "inpaint.safetensors")
+        self.assertIsNone(ComfyConfig.from_env({"MWQ_IMAGE_COMFY_INPAINT_UNET": ""}).inpaint_unet)
         for timeout in (0, float("nan"), float("inf"), 1801):
             with self.assertRaises(ValueError):
                 ComfyConfig(timeout=timeout)

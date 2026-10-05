@@ -11,6 +11,7 @@ from pydantic import ValidationError
 from starlette.concurrency import run_in_threadpool
 
 from quill.backgrounds import BackgroundRequest, BackgroundResult, generate_background
+from quill.comfyui import ComfyProvider
 from quill.doors import DoorRequest, DoorResult, reconcile_doors
 from quill.exports import ExportRequest, export_image
 from quill.geometry import GeometryRequest, GeometryResult, validate_geometry
@@ -18,7 +19,12 @@ from quill.jobs import GenerationJob, JobConflict, JobQueueFull, JobService
 from quill.models import Project
 from quill.projects import ProjectList, SaveConflict, SaveRequest, project_store
 from quill.provider_config import check_provider, create_provider, provider_config
-from quill.providers import ProviderDescriptor, ProviderFailure, ProviderReadiness
+from quill.providers import (
+    ImageProvider,
+    ProviderDescriptor,
+    ProviderFailure,
+    ProviderReadiness,
+)
 from quill.room_images import RoomImageRequest, generate_room
 from quill.walls import WallDerivationRequest, WallDerivationResult, derive_walls
 
@@ -47,6 +53,14 @@ def providers() -> list[ProviderDescriptor]:
     return [create_provider().descriptor()]
 
 
+def readiness_message(provider: ImageProvider) -> str:
+    if provider.descriptor().id == "mock":
+        return "Offline test pattern"
+    if isinstance(provider, ComfyProvider) and provider.config.inpaint_unet:
+        return "Ready · dedicated SDXL inpainting model for rooms"
+    return "Ready"
+
+
 @app.get("/api/providers/readiness", response_model=ProviderReadiness)
 async def provider_readiness() -> ProviderReadiness:
     provider = create_provider()
@@ -55,7 +69,7 @@ async def provider_readiness() -> ProviderReadiness:
         return ProviderReadiness(
             descriptor=provider.descriptor(),
             ready=True,
-            message="Ready" if provider.descriptor().id != "mock" else "Offline test pattern",
+            message=readiness_message(provider),
         )
     except ProviderFailure as error:
         return ProviderReadiness(

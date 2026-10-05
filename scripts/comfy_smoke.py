@@ -22,7 +22,7 @@ async def run(args: argparse.Namespace) -> None:
     provider = ComfyProvider(ComfyConfig.from_env())
     await provider.check()
     if not args.generate:
-        print("ComfyUI is reachable; required core nodes and configured checkpoint are available.")
+        print("ComfyUI is reachable; required core nodes and configured models are available.")
         print("Readiness only: model loading and GPU execution have not been tested.")
         return
     output: Path = args.output

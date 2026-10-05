@@ -1079,15 +1079,16 @@ Milestone 3 status:
   composition and export for 480 × 320 and 960 × 640 rasters (ADR-0026); queued SDXL
   generation in the editor with readiness display, safe failures and provenance
   (ADR-0027); 1024 × 1024 room working transform and SDXL prompts (ADR-0028); physical
-  scale prompts and optional ControlNet wall/door guidance (ADR-0029). All are covered
-  by offline tests only.
+  scale prompts and optional ControlNet wall/door guidance (ADR-0029); room inpainting
+  through `InpaintModelConditioning` with an optional dedicated SD-XL Inpainting 0.1 UNet
+  (ADR-0031). All are covered by offline tests only.
 - Owner trials: the first found abstract room art and oblique perspective (addressed by
   ADR-0028); the second found coherent top-down images but wrong furniture scale,
   invented partitions and backgrounds that ignore the architecture (addressed in part
   by ADR-0029, not yet trialled).
-- Next: owner GPU trial of ADR-0029 conditioning with recorded runtime and peak VRAM;
-  improve inpainting quality (the current workflow uses base SDXL with
-  `VAEEncodeForInpaint`); then explicit building/open-air intent and geometry-aware
+- Next: owner GPU trial comparing base SDXL and the dedicated inpainting UNet, with and
+  without wall guidance, recording runtime and peak VRAM; then a FLUX.2 klein workflow
+  as a second local option; then explicit building/open-air intent and geometry-aware
   backgrounds (ADR-0023).
 - Not implemented: hosted generation, geometry-aware exteriors, exact furniture sizing,
   hard architectural pixel enforcement, provider-side job interruption. Flux Fill is

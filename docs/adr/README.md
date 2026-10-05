@@ -38,5 +38,7 @@ Status as of 2026-10-05.
 | [0027](0027-queued-sdxl-editor.md) | Queued SDXL generation in the editor | Implemented; visual acceptance pending | 0019, 0025 |
 | [0028](0028-sdxl-room-working-resolution.md) | SDXL 1024 × 1024 room working transform and prompts | Implemented; GPU trial pending | 0027 |
 | [0029](0029-scale-and-room-layout-conditioning.md) | Physical scale prompts and optional ControlNet wall guidance | Implemented; GPU trial pending | 0028, 0023 |
+| 0030 | Deterministic wall/door overlay drawn by Quill | **Parked**; exists only on the PR #1 branch, not on main | |
+| [0031](0031-sdxl-inpainting-model.md) | `InpaintModelConditioning` and optional dedicated SDXL inpainting UNet for rooms | Implemented; GPU trial pending | 0025, 0029 |
 
 M0–M8 refer to milestones in [PROJECT_MANIFEST.md](../../PROJECT_MANIFEST.md) §16.
