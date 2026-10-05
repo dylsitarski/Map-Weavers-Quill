@@ -89,8 +89,24 @@ criterion to its tests.
    the owner prefers to keep AI-generated walls, which can match the room's style and
    perspective, while image generation is improved.
 
+8. **Inpainting quality (ADR-0031).** Room inpainting moved from `VAEEncodeForInpaint` to
+   `InpaintModelConditioning`, and an optional dedicated SD-XL Inpainting 0.1 UNet can
+   replace base SDXL for rooms.
+9. **Third owner trial (2026-10-05).** Without guidance, the inpainting UNet connected
+   well to neighbouring rooms, but continued the outdoor background into the room and
+   invented its own layout instead of walls at the boundary. With the Control-LoRA wall
+   guidance, sampling failed: Control-LoRA cannot adapt to the inpainting UNet's
+   9-channel input. Readiness now refuses that pairing and the docs recommend a full
+   SDXL canny ControlNet (ADR-0031).
+10. **Fourth owner trial (2026-10-05).** With the inpainting UNet and the small full canny
+    ControlNet, the left walls followed the partial-octagon room shape and the room joined
+    its neighbours, but the right half of the enclosed room became an outdoor area (grass,
+    fire pit) continuing the surrounding scene. Edge guidance works; the model does not
+    treat a large enclosed area as indoors. Further SDXL guidance tuning was judged
+    unlikely to fix this, and work moved to a FLUX.2 klein provider.
+
 Outstanding before Milestone 3 can close: an owner GPU trial of ADR-0029 conditioning
-(same seed, guidance on and off), recorded runtime and peak VRAM, inpainting quality
-improvements, explicit building/open-air intent, and geometry-aware backgrounds
+(same seed, guidance on and off), a base-versus-inpainting-model comparison (ADR-0031),
+recorded runtime and peak VRAM, explicit building/open-air intent, and geometry-aware backgrounds
 (ADR-0023). Flux Fill was considered and deferred; hosted generation moved to
 Milestone 5.

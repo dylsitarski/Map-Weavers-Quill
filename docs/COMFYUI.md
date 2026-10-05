@@ -8,7 +8,7 @@ no model weights: you download them yourself under their own licenses.
 
 The default provider is still the offline mock. Design records: ADR-0025 (adapter),
 ADR-0026 (resolution), ADR-0027 (editor integration), ADR-0028 (room working resolution
-and prompts), ADR-0029 (scale and wall guidance).
+and prompts), ADR-0029 (scale and wall guidance), ADR-0031 (dedicated inpainting model).
 
 Reference hardware: Linux, NVIDIA RTX 3060 Ti (8 GB VRAM), about 32 GB RAM. This is the
 owner's test machine, not a measured requirement.
@@ -33,10 +33,28 @@ Required: download `sd_xl_base_1.0.safetensors` from the
 [SDXL base repository](https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/tree/main)
 into `ComfyUI/models/checkpoints/`.
 
-Optional, for room wall/door guidance: download
-[control-lora-canny-rank128.safetensors](https://huggingface.co/stabilityai/control-lora/blob/main/control-LoRAs-rank128/control-lora-canny-rank128.safetensors)
-into `ComfyUI/models/controlnet/` (not checkpoints or loras). Use an SDXL-compatible
-control model, not an SD 1.5 one, and restart ComfyUI after installing it.
+Optional, recommended for room artwork: the dedicated SDXL inpainting UNet
+([SD-XL Inpainting 0.1](https://huggingface.co/diffusers/stable-diffusion-xl-1.0-inpainting-0.1),
+openrail++). Download `unet/diffusion_pytorch_model.fp16.safetensors` (5.14 GB) into
+`ComfyUI/models/diffusion_models/` and rename it to something recognizable, for
+example `sdxl-inpainting-0.1.fp16.safetensors`. It replaces only the room sampler model;
+the base checkpoint above is still required for text encoding, the VAE and backgrounds.
+
+Optional, for room wall/door guidance, put one SDXL canny control model in
+`ComfyUI/models/controlnet/` (not checkpoints or loras) and restart ComfyUI. Use an SDXL
+model, not an SD 1.5 one. Which kind depends on the room model:
+
+- **With the dedicated inpainting UNet, use a full ControlNet.** Recommended for 8 GB
+  GPUs: [diffusers/controlnet-canny-sdxl-1.0-small](https://huggingface.co/diffusers/controlnet-canny-sdxl-1.0-small)
+  (about 320 MB in fp16). Download its fp16 `.safetensors` file and rename it, for example
+  `controlnet-canny-sdxl-1.0-small.fp16.safetensors`. Higher quality but 5 GB:
+  [xinsir/controlnet-canny-sdxl-1.0](https://huggingface.co/xinsir/controlnet-canny-sdxl-1.0)
+  (Apache-2.0).
+- **Control-LoRA works only with base SDXL rooms:**
+  [control-lora-canny-rank128.safetensors](https://huggingface.co/stabilityai/control-lora/blob/main/control-LoRAs-rank128/control-lora-canny-rank128.safetensors).
+  A Control-LoRA is built from the active UNet's weights and cannot adapt to the inpainting
+  UNet's 9-channel input; ComfyUI fails with `shape '[320, 9, 3, 3]' is invalid`. Quill's
+  readiness check refuses this combination (detected by the `control-lora` filename).
 
 Check each model's published license and access terms before use or redistribution.
 
@@ -52,6 +70,7 @@ loaded automatically, so export variables before running commands:
 | `MWQ_IMAGE_COMFY_CHECKPOINT` | `sd_xl_base_1.0.safetensors` | Checkpoint filename (not a path) |
 | `MWQ_IMAGE_COMFY_TIMEOUT` | `600` | Overall generation deadline in seconds |
 | `MWQ_IMAGE_COMFY_CONTROLNET` | unset | Optional ControlNet filename that enables wall/door guidance |
+| `MWQ_IMAGE_COMFY_INPAINT_UNET` | unset | Optional dedicated SDXL inpainting UNet filename (in `models/diffusion_models`) used for room artwork |
 
 With ComfyUI running, from the Quill directory:
 
@@ -70,14 +89,18 @@ Stop any running `make dev`, then:
 ```sh
 export MWQ_IMAGE_PROVIDER=comfyui-sdxl
 export MWQ_IMAGE_COMFY_CHECKPOINT=sd_xl_base_1.0.safetensors
-# optional wall/door guidance:
-# export MWQ_IMAGE_COMFY_CONTROLNET=control-lora-canny-rank128.safetensors
+# optional dedicated inpainting model for rooms:
+# export MWQ_IMAGE_COMFY_INPAINT_UNET=sdxl-inpainting-0.1.fp16.safetensors
+# optional wall/door guidance (a full ControlNet when using the inpainting UNet):
+# export MWQ_IMAGE_COMFY_CONTROLNET=controlnet-canny-sdxl-1.0-small.fp16.safetensors
 make dev
 ```
 
 Open Map → AI. The panel identifies Local SDXL / ComfyUI and its readiness. If it is not
 ready, fix the setup and click **Check provider**; generation stays disabled until the
-check passes, and each job re-checks before submitting. With ControlNet configured, a
+check passes, and each job re-checks before submitting. With the inpainting UNet
+configured, the readiness message reads "Ready · dedicated SDXL inpainting model for
+rooms". With ControlNet configured, a
 selected room's AI panel reports that wall and door guidance is enabled. A configured
 but missing model or node fails readiness instead of silently falling back.
 
@@ -114,12 +137,20 @@ either provider.
   room crop, and passes it through core ControlNet nodes at strength 1 for the whole
   sampling run. No preprocessor or custom nodes are needed. Backgrounds remain
   text-only.
-- **Sampler.** 20 Euler/normal steps, CFG 7, denoise 1, batch one. Masked editing uses
-  the SDXL base model with `VAEEncodeForInpaint`, not a dedicated inpainting model.
-  These are fixed reference settings, not UI controls.
+- **Masked editing (rooms).** The source and mask go through `InpaintModelConditioning`
+  (ADR-0031). With the dedicated inpainting UNet, the model receives the masked image and
+  mask as extra inputs and is trained to continue the surroundings. Without it, base SDXL
+  ignores those inputs and sees the context only through the latent noise mask.
+  Backgrounds always use the base model.
+- **Sampler.** 20 Euler/normal steps, CFG 7, denoise 1, batch one. These are fixed
+  reference settings, not UI controls.
 
 ## Behavior and limits
 
+- With the dedicated inpainting UNet, ComfyUI holds it (5.14 GB) as well as the base
+  checkpoint. On an 8 GB GPU this relies on ComfyUI's offloading and may need
+  `--lowvram`; time and memory are not yet measured. Combined with a full ControlNet
+  the pairing is supported by ComfyUI but not yet run here; Control-LoRA is refused.
 - Jobs run one at a time through Quill's durable queue. Cancel preview stops the result
   from being published but does not stop ComfyUI's GPU work; the worker stays busy
   until completion or the timeout, and server shutdown may wait for it.
@@ -172,9 +203,17 @@ dimensions, ComfyUI prompt ID and input/output hashes. Treat the sidecar as proj
 content when sharing. The smoke command does not build a project wall guide; test
 guidance through the editor.
 
-## Pending owner trial
+## Trial results and pending checks
 
-Not yet recorded on the reference hardware:
+Recorded 2026-10-05 on the reference hardware (details in docs/HISTORY.md): the dedicated
+inpainting UNet without guidance connected well to neighbouring rooms, but continued the
+outdoor background into the room and invented its own layout instead of walls at the
+boundary. With Control-LoRA guidance it failed as described above. With the small full
+canny ControlNet, walls were followed in part, but the right half of a large enclosed room
+became outdoors, continuing the surrounding scene. SDXL guidance tuning has stopped here
+in favour of a FLUX.2 klein provider.
+
+Still to record:
 
 1. Generate a background and two adjacent room interiors. Check top-down perspective,
    furniture scale, invented partitions, seams and that pixels outside each room are

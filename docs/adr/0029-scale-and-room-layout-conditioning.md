@@ -3,6 +3,9 @@
 Status: Implemented with offline protocol/geometry tests; GPU quality unverified.
 Extends ADR-0028. Building-aware backgrounds (ADR-0023) are still pending.
 
+Update 2026-10-05: with guidance, ControlNet outputs now feed InpaintModelConditioning
+(workflow comfy-sdxl-layout-v2, ADR-0031).
+
 ## Problem and scope
 
 The owner reports improved room coherence and top-down views but incorrect furniture

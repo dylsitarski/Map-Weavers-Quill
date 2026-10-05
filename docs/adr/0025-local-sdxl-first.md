@@ -7,6 +7,9 @@ Supersedes the hosted-first sequence in ADR-0024 and manifest section 8.4.
 Update 2026-10-05: editor integration is implemented (ADR-0026, ADR-0027). GPU visual
 acceptance and hardware measurements are still pending.
 
+Update 2026-10-05: the planned dedicated-inpainting comparison is implemented as an
+optional SD-XL Inpainting 0.1 UNet (ADR-0031); masked edits now use InpaintModelConditioning.
+
 ## Decision and hardware
 
 The owner prioritizes avoiding recurring image-generation costs during development.

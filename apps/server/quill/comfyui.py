@@ -25,6 +25,9 @@ from quill.providers import (
 )
 
 WORKFLOW_VERSION = "comfy-sdxl-v1"
+# Masked editing uses InpaintModelConditioning, required by 9-channel inpainting UNets.
+INPAINT_WORKFLOW_VERSION = "comfy-sdxl-inpaint-v2"
+LAYOUT_WORKFLOW_VERSION = "comfy-sdxl-layout-v2"
 MAX_RESPONSE = 16 * 1024 * 1024
 
 
@@ -38,6 +41,8 @@ class ComfyConfig:
     checkpoint: str = "sd_xl_base_1.0.safetensors"
     timeout: float = 600.0
     controlnet: str | None = None
+    # Optional dedicated SDXL inpainting UNet (models/diffusion_models) for masked edits.
+    inpaint_unet: str | None = None
 
     def __post_init__(self) -> None:
         try:
@@ -63,13 +68,17 @@ class ComfyConfig:
             or self.checkpoint.startswith(".")
         ):
             raise ValueError("Use a safetensors checkpoint filename without a directory.")
-        if self.controlnet is not None and (
-            not self.controlnet.endswith(".safetensors")
-            or self.controlnet.startswith(".")
-            or len(self.controlnet) > 200
-            or any(c in self.controlnet for c in "/\\\r\n")
+        for name, label in (
+            (self.controlnet, "ControlNet"),
+            (self.inpaint_unet, "inpainting UNet"),
         ):
-            raise ValueError("Use a ControlNet safetensors filename without a directory.")
+            if name is not None and (
+                not name.endswith(".safetensors")
+                or name.startswith(".")
+                or len(name) > 200
+                or any(c in name for c in "/\\\r\n")
+            ):
+                raise ValueError(f"Use a {label} safetensors filename without a directory.")
         if not 1 <= self.timeout <= 1800:
             raise ValueError("ComfyUI timeout must be between 1 and 1800 seconds.")
 
@@ -85,7 +94,18 @@ class ComfyConfig:
             env.get("MWQ_IMAGE_COMFY_CHECKPOINT", "sd_xl_base_1.0.safetensors"),
             timeout,
             env.get("MWQ_IMAGE_COMFY_CONTROLNET") or None,
+            env.get("MWQ_IMAGE_COMFY_INPAINT_UNET") or None,
         )
+
+
+def is_control_lora(filename: str) -> bool:
+    """Name heuristic: Control-LoRA deltas assume the base 4-channel UNet input.
+
+    ComfyUI builds a Control-LoRA from the active UNet, so with a 9-channel inpainting
+    UNet its input-layer delta cannot be applied (owner trial, ADR-0031). Readiness
+    cannot inspect weights; Stability AI's Control-LoRA files are named control-lora-*.
+    """
+    return "control-lora" in filename.lower().replace("_", "-")
 
 
 def workflow(
@@ -127,12 +147,6 @@ def workflow(
             "inputs": {"images": ["6", 0], "filename_prefix": "quill/preview"},
         },
     }
-    if upload is not None:
-        graph["8"] = {"class_type": "LoadImage", "inputs": {"image": upload}}
-        graph["4"] = {
-            "class_type": "VAEEncodeForInpaint",
-            "inputs": {"pixels": ["8", 0], "mask": ["8", 1], "vae": ["1", 2], "grow_mask_by": 0},
-        }
     if control_upload is not None:
         graph["9"] = {
             "class_type": "ControlNetLoader",
@@ -153,6 +167,30 @@ def workflow(
             },
         }
         graph["5"]["inputs"].update(positive=["11", 0], negative=["11", 1])
+    if upload is not None:
+        # The latent keeps the original pixels with a noise mask, and the masked image
+        # plus mask become concat conditioning. Base SDXL ignores the concat inputs;
+        # a 9-channel inpainting UNet requires them to see context around the mask.
+        graph["8"] = {"class_type": "LoadImage", "inputs": {"image": upload}}
+        graph["4"] = {
+            "class_type": "InpaintModelConditioning",
+            "inputs": {
+                "positive": graph["5"]["inputs"]["positive"],
+                "negative": graph["5"]["inputs"]["negative"],
+                "vae": ["1", 2],
+                "pixels": ["8", 0],
+                "mask": ["8", 1],
+                "noise_mask": True,
+            },
+        }
+        graph["5"]["inputs"].update(positive=["4", 0], negative=["4", 1], latent_image=["4", 2])
+        if config.inpaint_unet is not None:
+            # CLIP and VAE still come from the base checkpoint.
+            graph["12"] = {
+                "class_type": "UNETLoader",
+                "inputs": {"unet_name": config.inpaint_unet, "weight_dtype": "default"},
+            }
+            graph["5"]["inputs"]["model"] = ["12", 0]
     return graph
 
 
@@ -233,6 +271,23 @@ class ComfyProvider:
                 if not isinstance(names, list) or self.config.checkpoint not in names:
                     raise failure(
                         "unavailable", "The configured SDXL checkpoint is not installed in ComfyUI."
+                    )
+                if self.config.inpaint_unet:
+                    names = info["UNETLoader"]["input"]["required"]["unet_name"][0]
+                    if not isinstance(names, list) or self.config.inpaint_unet not in names:
+                        raise failure(
+                            "unavailable",
+                            "The configured SDXL inpainting UNet is not installed in ComfyUI.",
+                        )
+                if (
+                    self.config.controlnet
+                    and self.config.inpaint_unet
+                    and is_control_lora(self.config.controlnet)
+                ):
+                    raise failure(
+                        "unsupported_capability",
+                        "Control-LoRA guidance cannot condition the dedicated inpainting UNet. "
+                        "Use a full SDXL ControlNet, or unset one of the two settings.",
                     )
                 if self.config.controlnet:
                     names = info["ControlNetLoader"]["input"]["required"]["control_net_name"][0]
@@ -437,9 +492,12 @@ class ComfyProvider:
                     result_image = Image.composite(result_image, source, mask)
                 output_hash = self.put(self._png(result_image))
                 self.last_run = {
-                    "workflowVersion": "comfy-sdxl-layout-v1"
+                    "workflowVersion": LAYOUT_WORKFLOW_VERSION
                     if control is not None
+                    else INPAINT_WORKFLOW_VERSION
+                    if upload is not None
                     else WORKFLOW_VERSION,
+                    **({"inpaintModel": self.config.inpaint_unet} if upload is not None else {}),
                     **(
                         {
                             "controlnet": self.config.controlnet,
