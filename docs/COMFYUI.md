@@ -1,14 +1,18 @@
-# Local SDXL with ComfyUI
+# Local image generation with ComfyUI
 
-Quill's first real image provider is a local [ComfyUI](https://docs.comfy.org) server
-running SDXL (ADR-0025). ComfyUI runs as a separate process with its own Python
+Quill's real image providers run on a local [ComfyUI](https://docs.comfy.org) server.
+Two model families are supported: **SDXL** (`comfyui-sdxl`, ADR-0025) and
+**FLUX.2 [klein]** (`comfyui-flux2-klein`, ADR-0032); choose one with
+`MWQ_IMAGE_PROVIDER`. Sections 1–4 set up ComfyUI and SDXL; section 5 covers klein.
+ComfyUI runs as a separate process with its own Python
 environment, and Quill talks to it over loopback HTTP. No API key, account, custom
 nodes or paid partner nodes are needed, and nothing leaves your machine. Quill bundles
 no model weights: you download them yourself under their own licenses.
 
 The default provider is still the offline mock. Design records: ADR-0025 (adapter),
 ADR-0026 (resolution), ADR-0027 (editor integration), ADR-0028 (room working resolution
-and prompts), ADR-0029 (scale and wall guidance), ADR-0031 (dedicated inpainting model).
+and prompts), ADR-0029 (scale and wall guidance), ADR-0031 (dedicated inpainting model),
+ADR-0032 (FLUX.2 klein).
 
 Reference hardware: Linux, NVIDIA RTX 3060 Ti (8 GB VRAM), about 32 GB RAM. This is the
 owner's test machine, not a measured requirement.
@@ -109,6 +113,57 @@ Accept; select a room, apply its prompt, generate and accept. Accepting is undoa
 File → Save keeps accepted art with its provenance. To switch back, set
 `MWQ_IMAGE_PROVIDER=mock` and restart Quill. Save/Open and export keep working with
 either provider.
+
+## 5. Use FLUX.2 klein instead
+
+FLUX.2 [klein] 4B follows prompts better than SDXL and edits images from reference
+pictures. Quill sends each room as two references: the surroundings with the room blanked
+out, and a floor plan of the room (gray floor, white walls, gaps for doorways). It needs a
+ComfyUI version recent enough to offer the `flux2` text-encoder type; update ComfyUI if
+readiness says so. No ControlNet is needed. The 4B model is Apache-2.0; check each model
+card for the text encoder and VAE.
+
+Download these files (the links are from ComfyUI's official klein guide):
+
+| File | Folder | Source |
+| --- | --- | --- |
+| `flux-2-klein-4b-fp8.safetensors` (distilled, recommended) | `models/diffusion_models/` | [black-forest-labs/FLUX.2-klein-4b-fp8](https://huggingface.co/black-forest-labs/FLUX.2-klein-4b-fp8/blob/main/flux-2-klein-4b-fp8.safetensors) |
+| `qwen_3_4b.safetensors` (text encoder) | `models/text_encoders/` | [Comfy-Org/flux2-klein-4B](https://huggingface.co/Comfy-Org/flux2-klein-4B/blob/main/split_files/text_encoders/qwen_3_4b.safetensors) |
+| `flux2-vae.safetensors` | `models/vae/` | [Comfy-Org/flux2-dev](https://huggingface.co/Comfy-Org/flux2-dev/blob/main/split_files/vae/flux2-vae.safetensors) |
+| optional: `flux-2-klein-base-4b-fp8.safetensors` (base) | `models/diffusion_models/` | [black-forest-labs/FLUX.2-klein-base-4b-fp8](https://huggingface.co/black-forest-labs/FLUX.2-klein-base-4b-fp8/blob/main/flux-2-klein-base-4b-fp8.safetensors) |
+
+Restart ComfyUI, stop Quill, then:
+
+```sh
+export MWQ_IMAGE_PROVIDER=comfyui-flux2-klein
+# defaults shown; set only what differs
+# export MWQ_IMAGE_COMFY_FLUX2_MODEL=flux-2-klein-4b-fp8.safetensors
+# export MWQ_IMAGE_COMFY_FLUX2_TEXT_ENCODER=qwen_3_4b.safetensors
+# export MWQ_IMAGE_COMFY_FLUX2_VAE=flux2-vae.safetensors
+# export MWQ_IMAGE_COMFY_FLUX2_VARIANT=distilled   # or base (with the base model file)
+# export MWQ_IMAGE_COMFY_FLUX2_TEXT_ENCODER_DEVICE=cpu   # keep the encoder off an 8 GB GPU
+make dev
+```
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `MWQ_IMAGE_COMFY_FLUX2_MODEL` | `flux-2-klein-4b-fp8.safetensors` | Diffusion model file in `models/diffusion_models` |
+| `MWQ_IMAGE_COMFY_FLUX2_TEXT_ENCODER` | `qwen_3_4b.safetensors` | Text encoder file in `models/text_encoders` |
+| `MWQ_IMAGE_COMFY_FLUX2_VAE` | `flux2-vae.safetensors` | VAE file in `models/vae` |
+| `MWQ_IMAGE_COMFY_FLUX2_VARIANT` | `distilled` | `distilled`: 4 steps, CFG 1. `base`: 20 steps, CFG 5; needs the base model file |
+| `MWQ_IMAGE_COMFY_FLUX2_TEXT_ENCODER_DEVICE` | `default` | `cpu` runs the text encoder on the CPU to save GPU memory |
+
+The AI panel shows "Local FLUX.2 klein · ComfyUI" and "Ready · distilled model" (or
+base). Backgrounds are text-to-image at 960 × 640 with the same camera-first prompt as
+SDXL. Rooms use the same working transform, context, scale and wall data as SDXL, but
+the prompt is an edit instruction that refers to both reference images (ADR-0032). Pixels
+outside the room are always protected exactly. The smoke command in this document tests
+SDXL only.
+
+Memory: the model, its 4B text encoder and the VAE do not fit in 8 GB of VRAM at once.
+ComfyUI swaps them between GPU and system RAM, so expect slower generation; try
+`MWQ_IMAGE_COMFY_FLUX2_TEXT_ENCODER_DEVICE=cpu` or ComfyUI's `--lowvram` if it runs out of
+memory. Not yet measured on the reference hardware.
 
 ## What Quill sends to SDXL
 
@@ -213,7 +268,7 @@ canny ControlNet, walls were followed in part, but the right half of a large enc
 became outdoors, continuing the surrounding scene. SDXL guidance tuning has stopped here
 in favour of a FLUX.2 klein provider.
 
-Still to record:
+Still to record (SDXL items 1–3, then FLUX.2 klein):
 
 1. Generate a background and two adjacent room interiors. Check top-down perspective,
    furniture scale, invented partitions, seams and that pixels outside each room are
@@ -223,3 +278,8 @@ Still to record:
 3. Record elapsed time, peak VRAM, whether `--lowvram` was needed, the ComfyUI commit
    (`git rev-parse HEAD`) and checkpoint SHA-256
    (`sha256sum models/checkpoints/sd_xl_base_1.0.safetensors`).
+4. FLUX.2 klein (distilled): generate a background and the large partial-octagon room from
+   the fourth SDXL trial. Check that the whole room is drawn as an interior, that walls
+   follow the plan and doorways stay open, that the room joins its surroundings and
+   neighbours, and record time, peak VRAM and whether CPU text encoding or `--lowvram`
+   was needed.

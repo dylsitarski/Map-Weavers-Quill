@@ -24,9 +24,10 @@ Milestone 3 so far: the SDXL adapter works end to end in the editor (queued prev
 accept/undo, save/open, export) and is covered by offline tests. The owner has run SDXL
 locally, but image quality is not yet acceptable and hardware measurements are not
 recorded. Open problems are furniture scale, invented interior partitions, and
-backgrounds that ignore the placed rooms. Rooms can now optionally use a dedicated
-SDXL inpainting model (ADR-0031). Next: an owner GPU trial comparing base SDXL and the
-inpainting model, with and without wall guidance (ADR-0029).
+backgrounds that ignore the placed rooms. Rooms can optionally use a dedicated SDXL
+inpainting model (ADR-0031), but SDXL still does not reliably draw a large enclosed room
+as indoors. A second local model family, FLUX.2 klein, is now available (ADR-0032).
+Next: an owner GPU trial of FLUX.2 klein rooms and backgrounds.
 
 Verification evidence and the development log are in [docs/HISTORY.md](docs/HISTORY.md).
 
@@ -152,10 +153,10 @@ formats are lossless. Export respects layer order, visibility and opacity, inclu
 unsaved applied edits, and excludes previews, the grid and editing guides. It does not
 save the project. Foundry export is not implemented yet.
 
-## Local SDXL via ComfyUI
+## Local image generation via ComfyUI
 
-Real generation uses [ComfyUI](https://docs.comfy.org) with SDXL, installed and run
-separately from Quill. Quill bundles no model weights. Full setup, configuration and
+Real generation uses [ComfyUI](https://docs.comfy.org), installed and run separately
+from Quill, with one of two model families: SDXL or FLUX.2 klein. Quill bundles no model weights. Full setup, configuration and
 current limitations are in [docs/COMFYUI.md](docs/COMFYUI.md). In short, with ComfyUI
 running on 127.0.0.1:8188:
 
@@ -166,13 +167,17 @@ make dev
 ```
 
 Map → AI then reports provider readiness. Generation stays disabled until the check
-passes. For better room artwork, also install the optional SD-XL Inpainting 0.1 UNet and
-set `MWQ_IMAGE_COMFY_INPAINT_UNET` (see docs/COMFYUI.md).
+passes. For better SDXL room artwork, also install the optional SD-XL Inpainting 0.1 UNet
+and set `MWQ_IMAGE_COMFY_INPAINT_UNET`.
+
+For FLUX.2 klein, install its three model files (docs/COMFYUI.md section 5), then use
+`export MWQ_IMAGE_PROVIDER=comfyui-flux2-klein`. Klein receives each room's floor plan as
+a reference image, so no ControlNet is needed.
 
 ## Provider configuration and secrets
 
-The image provider is selected on the server with `MWQ_IMAGE_PROVIDER` (`mock` or
-`comfyui-sdxl`); unknown values stop the API at startup. A hosted provider is planned
+The image provider is selected on the server with `MWQ_IMAGE_PROVIDER` (`mock`,
+`comfyui-sdxl` or `comfyui-flux2-klein`); unknown values stop the API at startup. A hosted provider is planned
 for Milestone 5. Its credential can already be supplied through exactly one of
 `MWQ_IMAGE_API_KEY` or `MWQ_IMAGE_API_KEY_FILE`. Prefer a key file outside the
 repository and data directory, with `chmod 600`. Keys never reach the browser,

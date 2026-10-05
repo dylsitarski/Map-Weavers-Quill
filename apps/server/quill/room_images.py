@@ -8,8 +8,9 @@ from PIL import Image
 from pydantic import Field, JsonValue
 
 from quill.backgrounds import BackgroundResult
-from quill.comfyui import ComfyProvider
+from quill.comfyui import ComfyBase, ComfyProvider
 from quill.exports import artwork_size, composite_artwork
+from quill.flux2 import ROOM_TEMPLATE, Flux2Provider, room_instruction
 from quill.layout_guidance import room_scale, scale_prompt, wall_guide, working_guide
 from quill.models import Bounds, Contract, GenerationRecord, Point, Project, RasterLayer
 from quill.projects import project_store, validate_project
@@ -47,9 +48,14 @@ def generate_room(request: RoomImageRequest) -> BackgroundResult:
         raise ValueError("Room generation prompts support at most 4000 characters.")
     prompt, effective_style = room_style_prompt(room, project.map.style)
     provider = create_provider()
+    # Local ComfyUI families share the working transform, clean context and scale data.
+    comfy = isinstance(provider, ComfyBase)
     sdxl = isinstance(provider, ComfyProvider)
+    klein = isinstance(provider, Flux2Provider)
     if sdxl:
         prompt = prompt_text(room.prompt, effective_style, room=True)
+    elif klein:
+        prompt = room_instruction(room.prompt, effective_style)
     profile, alignment = raster_profile(provider)
     size = max(artwork_size(project, store), profile, key=lambda size: size[0])
     mask = polygon_mask(room.polygon, size)
@@ -59,11 +65,11 @@ def generate_room(request: RoomImageRequest) -> BackgroundResult:
     if crop[2] - crop[0] > descriptor.maxWidth or crop[3] - crop[1] > descriptor.maxHeight:
         raise ValueError("This room crop exceeds the configured provider's dimension limits.")
     asyncio.run(check_provider(provider))
-    context, excluded = clean_context(project, room.id) if sdxl else (project, [])
+    context, excluded = clean_context(project, room.id) if comfy else (project, [])
     source = composite_artwork(context, store, size=size)
     source_hash, mask_hash = store.put_asset(png(source)), store.put_asset(png(mask))
     source_crop, mask_crop = source.crop(crop).convert("RGB"), mask.crop(crop)
-    transform = RoomTransform(*source_crop.size) if sdxl else None
+    transform = RoomTransform(*source_crop.size) if comfy else None
     if transform:
         source_crop, mask_crop = transform.prepare(source_crop, mask_crop)
     if source_crop.width > descriptor.maxWidth or source_crop.height > descriptor.maxHeight:
@@ -72,9 +78,13 @@ def generate_room(request: RoomImageRequest) -> BackgroundResult:
     layout_details: dict[str, JsonValue] = {}
     extensions: dict[str, dict[str, JsonValue]] = {}
     if transform:
-        controlled = isinstance(provider, ComfyProvider) and provider.config.controlnet is not None
+        controlled = "control_image" in descriptor.capabilities
         scale = room_scale(project, room, size, transform)
-        prompt = scale_prompt(scale, controlled=controlled) + "\n" + prompt
+        if klein:
+            # Instruction first for the edit model, then scale and wall facts.
+            prompt = prompt + "\n" + scale_prompt(scale, controlled=controlled)
+        else:
+            prompt = scale_prompt(scale, controlled=controlled) + "\n" + prompt
         layout_details = {"physicalScale": scale, "layoutConditioning": controlled}
         if controlled:
             guide = wall_guide(project, size)
@@ -145,10 +155,14 @@ def generate_room(request: RoomImageRequest) -> BackgroundResult:
                 "crop": list(crop),
                 "width": size[0],
                 "height": size[1],
-                "promptTemplate": "sdxl-room-layout-v1" if sdxl else "room-style-v1",
+                "promptTemplate": "sdxl-room-layout-v1"
+                if sdxl
+                else ROOM_TEMPLATE
+                if klein
+                else "room-style-v1",
                 **(
                     {
-                        "negativePrompt": NEGATIVE,
+                        **({"negativePrompt": NEGATIVE} if sdxl else {}),
                         "roomTransform": transform.metadata(),
                         "excludedContextLayers": [str(item) for item in excluded],
                     }

@@ -14,6 +14,7 @@ from quill.backgrounds import BackgroundRequest, BackgroundResult, generate_back
 from quill.comfyui import ComfyProvider
 from quill.doors import DoorRequest, DoorResult, reconcile_doors
 from quill.exports import ExportRequest, export_image
+from quill.flux2 import Flux2Provider
 from quill.geometry import GeometryRequest, GeometryResult, validate_geometry
 from quill.jobs import GenerationJob, JobConflict, JobQueueFull, JobService
 from quill.models import Project
@@ -58,6 +59,8 @@ def readiness_message(provider: ImageProvider) -> str:
         return "Offline test pattern"
     if isinstance(provider, ComfyProvider) and provider.config.inpaint_unet:
         return "Ready · dedicated SDXL inpainting model for rooms"
+    if isinstance(provider, Flux2Provider):
+        return f"Ready · {provider.config.variant} model"
     return "Ready"
 
 

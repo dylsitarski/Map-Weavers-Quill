@@ -109,7 +109,7 @@ def validate_project(project: Project, *, derive_missing: bool = False) -> Proje
                 raise ValueError("A room references an unavailable or mismatched render layer.")
     for record in project.generations:
         if (
-            record.providerId not in {"mock", "comfyui-sdxl"}
+            record.providerId not in {"mock", "comfyui-sdxl", "comfyui-flux2-klein"}
             or record.capability not in {"text_to_image", "inpainting"}
             or record.status != "succeeded"
             or record.outputHash is None
@@ -121,7 +121,7 @@ def validate_project(project: Project, *, derive_missing: bool = False) -> Proje
             and len(record.inputHashes)
             != (
                 3
-                if record.providerId == "comfyui-sdxl"
+                if record.providerId in {"comfyui-sdxl", "comfyui-flux2-klein"}
                 and record.parameters.get("layoutConditioning") is True
                 else 2
             )

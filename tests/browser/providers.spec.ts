@@ -42,3 +42,39 @@ test('SDXL readiness gates generation, supports retry, and explains cancellation
   await expect(generate).toBeEnabled();
   await expect(page.getByText(/Room editing/)).toBeVisible();
 });
+
+test('FLUX.2 klein provider is identified in the AI panel', async ({
+  page,
+}) => {
+  await page.route('**/api/providers/readiness', async (route) => {
+    await route.fulfill({
+      json: {
+        descriptor: {
+          contractVersion: '0.1.0',
+          id: 'comfyui-flux2-klein',
+          capabilities: [
+            'text_to_image',
+            'inpainting',
+            'seed',
+            'control_image',
+          ],
+          maxWidth: 1024,
+          maxHeight: 1024,
+          local: true,
+        },
+        ready: true,
+        message: 'Ready · distilled model',
+      },
+    });
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Map', exact: true }).click();
+  await page.getByRole('tab', { name: 'AI', exact: true }).click();
+  await expect(
+    page.getByText('Local FLUX.2 klein · ComfyUI', { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText(/Ready · distilled model/)).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Generate preview', exact: true }),
+  ).toBeEnabled();
+});

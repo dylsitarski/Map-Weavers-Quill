@@ -104,9 +104,12 @@ criterion to its tests.
     fire pit) continuing the surrounding scene. Edge guidance works; the model does not
     treat a large enclosed area as indoors. Further SDXL guidance tuning was judged
     unlikely to fix this, and work moved to a FLUX.2 klein provider.
+11. **FLUX.2 klein provider (ADR-0032).** A second local model family through ComfyUI core
+    nodes. The ComfyUI transport was factored into a shared base class with SDXL unchanged.
+    Rooms are edited from two reference images (context with the room blanked, and a
+    floor plan); backgrounds are text-to-image. Verified offline only; owner trial pending.
 
-Outstanding before Milestone 3 can close: an owner GPU trial of ADR-0029 conditioning
-(same seed, guidance on and off), a base-versus-inpainting-model comparison (ADR-0031),
+Outstanding before Milestone 3 can close: an owner GPU trial of FLUX.2 klein (ADR-0032),
 recorded runtime and peak VRAM, explicit building/open-air intent, and geometry-aware backgrounds
 (ADR-0023). Flux Fill was considered and deferred; hosted generation moved to
 Milestone 5.

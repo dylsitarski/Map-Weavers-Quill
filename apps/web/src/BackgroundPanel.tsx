@@ -63,7 +63,9 @@ export function BackgroundPanel(p: {
     provider.state.descriptor.capabilities.includes(
       p.room ? 'inpainting' : 'text_to_image',
     );
-  const localSdxl = provider.state?.descriptor.id === 'comfyui-sdxl';
+  const providerId = provider.state?.descriptor.id;
+  const klein = providerId === 'comfyui-flux2-klein';
+  const localComfy = providerId === 'comfyui-sdxl' || klein;
   const key = recoveryKey(p.projectId, p.room?.id);
   const [recovery, setRecovery] = useState<{
     key: string;
@@ -278,9 +280,11 @@ export function BackgroundPanel(p: {
             ? 'Checking image provider…'
             : provider.state?.descriptor.id === 'mock'
               ? 'Offline mock: generates a deterministic test pattern, not AI artwork.'
-              : localSdxl
-                ? 'Local SDXL · ComfyUI'
-                : 'Image provider unavailable'}
+              : klein
+                ? 'Local FLUX.2 klein · ComfyUI'
+                : localComfy
+                  ? 'Local SDXL · ComfyUI'
+                  : 'Image provider unavailable'}
         </p>
         {provider.state && (
           <p>
@@ -303,17 +307,21 @@ export function BackgroundPanel(p: {
         >
           Check provider
         </button>
-        {localSdxl && !p.room && (
+        {localComfy && !p.room && (
           <p>Backgrounds do not yet follow drawn buildings or entrances.</p>
         )}
-        {localSdxl && p.room && (
+        {localComfy && p.room && (
           <p>
-            {provider.state?.descriptor.capabilities.includes('control_image')
-              ? 'Wall and door guidance enabled. Physical scale is included; inspect the preview for accuracy.'
-              : 'Wall and door guidance is not enabled. Configure the SDXL ControlNet model to use the drawn layout.'}
+            {klein
+              ? 'The room floor plan (walls and doorways) is sent as a reference image. Physical scale is included; inspect the preview for accuracy.'
+              : provider.state?.descriptor.capabilities.includes(
+                    'control_image',
+                  )
+                ? 'Wall and door guidance enabled. Physical scale is included; inspect the preview for accuracy.'
+                : 'Wall and door guidance is not enabled. Configure the SDXL ControlNet model to use the drawn layout.'}
           </p>
         )}
-        {localSdxl && (
+        {localComfy && (
           <p>
             960 × 640 map artwork. Cancelling discards the preview; ComfyUI may
             continue working.

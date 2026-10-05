@@ -7,7 +7,7 @@ from uuid import uuid4
 
 from pydantic import Field
 
-from quill.comfyui import ComfyProvider
+from quill.comfyui import ComfyBase, ComfyProvider
 from quill.models import Bounds, Contract, GenerationRecord, MapStyle, Point, RasterLayer
 from quill.projects import project_store
 from quill.provider_config import (
@@ -49,8 +49,10 @@ def generate_background(request: BackgroundRequest) -> BackgroundResult:
             f"\nCamera: {request.style.camera}. Baked lighting: {request.style.bakedLighting}."
         )
     provider = create_provider()
+    comfy = isinstance(provider, ComfyBase)
+    # Negative prompts are SDXL-only; FLUX.2 klein's distilled workflow ignores them.
     sdxl = isinstance(provider, ComfyProvider)
-    if sdxl:
+    if comfy:
         prompt = prompt_text(request.prompt, effective if request.style else {}, room=False)
     size, _ = raster_profile(provider)
     asyncio.run(check_provider(provider))
@@ -103,7 +105,7 @@ def generate_background(request: BackgroundRequest) -> BackgroundResult:
                 "height": size[1],
                 "backgroundPrompt": request.prompt,
                 "promptTemplate": TEMPLATE
-                if sdxl
+                if comfy
                 else ("map-style-v1" if request.style else "background-v0"),
                 **({"negativePrompt": NEGATIVE} if sdxl else {}),
                 "mapStyle": request.style.model_dump(mode="json") if request.style else None,

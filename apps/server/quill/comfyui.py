@@ -7,7 +7,7 @@ import os
 from collections.abc import Mapping
 from dataclasses import dataclass
 from io import BytesIO
-from typing import Any
+from typing import Any, Protocol
 from urllib.parse import urlsplit
 from uuid import uuid4
 
@@ -35,6 +35,45 @@ def failure(code: str, message: str) -> ProviderFailure:
     return ProviderFailure(ProviderError.model_validate({"code": code, "message": message}))
 
 
+def validate_endpoint(url: str, timeout: float) -> None:
+    """Loopback HTTP with an explicit port only; bounded overall deadline."""
+    try:
+        parsed = urlsplit(url)
+        valid = (
+            parsed.scheme == "http"
+            and parsed.hostname in {"127.0.0.1", "::1", "localhost"}
+            and parsed.username is None
+            and parsed.password is None
+            and parsed.path in {"", "/"}
+            and not parsed.query
+            and not parsed.fragment
+            and parsed.port is not None
+        )
+    except ValueError:
+        valid = False
+    if not valid:
+        raise ValueError("ComfyUI URL must be an HTTP loopback address with an explicit port.")
+    if not 1 <= timeout <= 1800:
+        raise ValueError("ComfyUI timeout must be between 1 and 1800 seconds.")
+
+
+def validate_model_file(name: str, label: str) -> None:
+    if (
+        not name.endswith(".safetensors")
+        or name.startswith(".")
+        or len(name) > 200
+        or any(c in name for c in "/\\\r\n")
+    ):
+        raise ValueError(f"Use a {label} safetensors filename without a directory.")
+
+
+def env_timeout(env: Mapping[str, str]) -> float:
+    try:
+        return float(env.get("MWQ_IMAGE_COMFY_TIMEOUT", "600"))
+    except ValueError:
+        raise ValueError("ComfyUI timeout must be a number of seconds.") from None
+
+
 @dataclass(frozen=True)
 class ComfyConfig:
     url: str = "http://127.0.0.1:8188"
@@ -45,22 +84,7 @@ class ComfyConfig:
     inpaint_unet: str | None = None
 
     def __post_init__(self) -> None:
-        try:
-            parsed = urlsplit(self.url)
-            valid = (
-                parsed.scheme == "http"
-                and parsed.hostname in {"127.0.0.1", "::1", "localhost"}
-                and parsed.username is None
-                and parsed.password is None
-                and parsed.path in {"", "/"}
-                and not parsed.query
-                and not parsed.fragment
-                and parsed.port is not None
-            )
-        except ValueError:
-            valid = False
-        if not valid:
-            raise ValueError("ComfyUI URL must be an HTTP loopback address with an explicit port.")
+        validate_endpoint(self.url, self.timeout)
         if (
             not self.checkpoint.endswith(".safetensors")
             or any(c in self.checkpoint for c in "/\\\r\n")
@@ -72,27 +96,16 @@ class ComfyConfig:
             (self.controlnet, "ControlNet"),
             (self.inpaint_unet, "inpainting UNet"),
         ):
-            if name is not None and (
-                not name.endswith(".safetensors")
-                or name.startswith(".")
-                or len(name) > 200
-                or any(c in name for c in "/\\\r\n")
-            ):
-                raise ValueError(f"Use a {label} safetensors filename without a directory.")
-        if not 1 <= self.timeout <= 1800:
-            raise ValueError("ComfyUI timeout must be between 1 and 1800 seconds.")
+            if name is not None:
+                validate_model_file(name, label)
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> "ComfyConfig":
         env = os.environ if env is None else env
-        try:
-            timeout = float(env.get("MWQ_IMAGE_COMFY_TIMEOUT", "600"))
-        except ValueError:
-            raise ValueError("ComfyUI timeout must be a number of seconds.") from None
         return cls(
             env.get("MWQ_IMAGE_COMFY_URL", "http://127.0.0.1:8188"),
             env.get("MWQ_IMAGE_COMFY_CHECKPOINT", "sd_xl_base_1.0.safetensors"),
-            timeout,
+            env_timeout(env),
             env.get("MWQ_IMAGE_COMFY_CONTROLNET") or None,
             env.get("MWQ_IMAGE_COMFY_INPAINT_UNET") or None,
         )
@@ -194,26 +207,48 @@ def workflow(
     return graph
 
 
-class ComfyProvider:
-    def __init__(
-        self, config: ComfyConfig, *, transport: httpx.AsyncBaseTransport | None = None
-    ) -> None:
+class Endpoint(Protocol):
+    @property
+    def url(self) -> str: ...
+
+    @property
+    def timeout(self) -> float: ...
+
+
+class ComfyBase:
+    """Shared local ComfyUI transport: upload, queue once, poll, download, protect pixels.
+
+    Model families supply the fixed graph, readiness checks, uploads and provenance.
+    Never accepts user-supplied graphs and never calls ComfyUI's global interrupt.
+    """
+
+    config: Endpoint
+
+    def __init__(self, config: Endpoint, *, transport: httpx.AsyncBaseTransport | None = None):
         self.config = config
         self.transport = transport
         self.assets: dict[str, bytes] = {}
         self.last_run: dict[str, Any] = {}
 
     def descriptor(self) -> ProviderDescriptor:
-        capabilities: list[Capability] = ["text_to_image", "inpainting", "seed", "negative_prompt"]
-        if self.config.controlnet:
-            capabilities.append("control_image")
-        return ProviderDescriptor(
-            id="comfyui-sdxl",
-            capabilities=capabilities,
-            maxWidth=1024,
-            maxHeight=1024,
-            local=True,
-        )
+        raise NotImplementedError
+
+    def _check_info(self, info: dict[str, Any]) -> None:
+        raise NotImplementedError
+
+    def _accepts_layout(self) -> bool:
+        return False
+
+    def _uploads(
+        self, source: Image.Image | None, mask: Image.Image | None, control: Image.Image | None
+    ) -> list[tuple[str, str, Image.Image]]:
+        raise NotImplementedError
+
+    def _graph(self, request: GenerateRequest, names: dict[str, str]) -> dict[str, Any]:
+        raise NotImplementedError
+
+    def _provenance(self, request: GenerateRequest, names: dict[str, str]) -> dict[str, Any]:
+        raise NotImplementedError
 
     def put(self, data: bytes) -> str:
         key = hashlib.sha256(data).hexdigest()
@@ -252,50 +287,10 @@ class ComfyProvider:
         return value
 
     async def check(self) -> None:
-        """Check connectivity, required core nodes, and checkpoint; never queues GPU work."""
+        """Check connectivity, required core nodes and model files; never queues GPU work."""
         try:
             async with asyncio.timeout(30), self.client() as client:
-                info = await self._json(client, "GET", "/object_info")
-                graph = workflow(
-                    self.config,
-                    GenerateRequest(requestId="check", prompt="", width=1024, height=1024),
-                    "check.png",
-                    "control.png" if self.config.controlnet else None,
-                )
-                required = {node["class_type"] for node in graph.values()} | {"EmptyLatentImage"}
-                if not required.issubset(info):
-                    raise failure(
-                        "unsupported_capability", "ComfyUI is missing required core workflow nodes."
-                    )
-                names = info["CheckpointLoaderSimple"]["input"]["required"]["ckpt_name"][0]
-                if not isinstance(names, list) or self.config.checkpoint not in names:
-                    raise failure(
-                        "unavailable", "The configured SDXL checkpoint is not installed in ComfyUI."
-                    )
-                if self.config.inpaint_unet:
-                    names = info["UNETLoader"]["input"]["required"]["unet_name"][0]
-                    if not isinstance(names, list) or self.config.inpaint_unet not in names:
-                        raise failure(
-                            "unavailable",
-                            "The configured SDXL inpainting UNet is not installed in ComfyUI.",
-                        )
-                if (
-                    self.config.controlnet
-                    and self.config.inpaint_unet
-                    and is_control_lora(self.config.controlnet)
-                ):
-                    raise failure(
-                        "unsupported_capability",
-                        "Control-LoRA guidance cannot condition the dedicated inpainting UNet. "
-                        "Use a full SDXL ControlNet, or unset one of the two settings.",
-                    )
-                if self.config.controlnet:
-                    names = info["ControlNetLoader"]["input"]["required"]["control_net_name"][0]
-                    if not isinstance(names, list) or self.config.controlnet not in names:
-                        raise failure(
-                            "unavailable",
-                            "The configured SDXL ControlNet is not installed in ComfyUI.",
-                        )
+                self._check_info(await self._json(client, "GET", "/object_info"))
         except (TimeoutError, httpx.TimeoutException):
             raise failure("timeout", "ComfyUI readiness check timed out.") from None
         except httpx.HTTPError:
@@ -304,6 +299,21 @@ class ComfyProvider:
             raise failure(
                 "invalid_output", "ComfyUI returned invalid readiness information."
             ) from None
+
+    @staticmethod
+    def _require_nodes(info: dict[str, Any], graph: dict[str, Any], *extra: str) -> None:
+        if not ({node["class_type"] for node in graph.values()} | set(extra)).issubset(info):
+            raise failure(
+                "unsupported_capability", "ComfyUI is missing required core workflow nodes."
+            )
+
+    @staticmethod
+    def _require_file(
+        info: dict[str, Any], node: str, field: str, filename: str, label: str
+    ) -> None:
+        names = info[node]["input"]["required"][field][0]
+        if not isinstance(names, list) or filename not in names:
+            raise failure("unavailable", f"The configured {label} is not installed in ComfyUI.")
 
     async def health(self) -> bool:
         try:
@@ -336,7 +346,7 @@ class ComfyProvider:
             layout = request.extensions.get("quill.layout")
             if (
                 not isinstance(request, InpaintRequest)
-                or not self.config.controlnet
+                or not self._accepts_layout()
                 or set(request.extensions) != {"quill.layout"}
                 or not isinstance(layout, dict)
                 or set(layout) != {"controlRef"}
@@ -382,57 +392,40 @@ class ComfyProvider:
     async def inpaint(self, request: InpaintRequest) -> GenerationResult:
         return await self._run(request)
 
+    async def _upload(self, client: httpx.AsyncClient, name: str, picture: Image.Image) -> None:
+        uploaded = await self._json(
+            client,
+            "POST",
+            "/upload/image",
+            files={"image": (name, self._png(picture), "image/png")},
+            data={"type": "input", "overwrite": "false"},
+        )
+        if (
+            uploaded.get("name") != name
+            or uploaded.get("subfolder", "") != ""
+            or uploaded.get("type") != "input"
+        ):
+            raise ValueError
+
     async def _run(self, request: GenerateRequest) -> GenerationResult:
         self._validate(request)
         self.last_run = {}
         size = (request.width, request.height)
-        source = mask = None
-        upload = None
+        source = mask = control = None
         if isinstance(request, InpaintRequest):
             source = self._image(request.sourceRef, size, "RGB")
             mask = self._image(request.maskRef, size, "L")
-            upload = f"quill-{uuid4().hex}.png"
-        control = None
-        control_upload = None
         if request.extensions:
             control = self._image(
                 str(request.extensions["quill.layout"]["controlRef"]), size, "RGB"
             )
-            control_upload = f"quill-control-{uuid4().hex}.png"
-        graph = workflow(self.config, request, upload, control_upload)
+        uploads = self._uploads(source, mask, control)
+        names = {role: name for role, name, _ in uploads}
+        graph = self._graph(request, names)
         try:
             async with asyncio.timeout(self.config.timeout), self.client() as client:
-                if source is not None and mask is not None:
-                    rgba = source.convert("RGBA")
-                    # LoadImage returns 1-alpha as its mask: white means edit.
-                    rgba.putalpha(ImageChops.invert(mask))
-                    uploaded = await self._json(
-                        client,
-                        "POST",
-                        "/upload/image",
-                        files={"image": (upload, self._png(rgba), "image/png")},
-                        data={"type": "input", "overwrite": "false"},
-                    )
-                    if (
-                        uploaded.get("name") != upload
-                        or uploaded.get("subfolder", "") != ""
-                        or uploaded.get("type") != "input"
-                    ):
-                        raise ValueError
-                if control is not None:
-                    uploaded_control = await self._json(
-                        client,
-                        "POST",
-                        "/upload/image",
-                        files={"image": (control_upload, self._png(control), "image/png")},
-                        data={"type": "input", "overwrite": "false"},
-                    )
-                    if (
-                        uploaded_control.get("name") != control_upload
-                        or uploaded_control.get("subfolder", "") != ""
-                        or uploaded_control.get("type") != "input"
-                    ):
-                        raise ValueError
+                for _, name, picture in uploads:
+                    await self._upload(client, name, picture)
                 queued = await self._json(
                     client, "POST", "/prompt", json={"prompt": graph, "client_id": str(uuid4())}
                 )
@@ -489,42 +482,22 @@ class ComfyProvider:
                 )
                 result_image = self._decode(data, size, "RGB")
                 if source is not None and mask is not None:
+                    # Outside-mask pixels always come from the source, whatever the model did.
                     result_image = Image.composite(result_image, source, mask)
                 output_hash = self.put(self._png(result_image))
                 self.last_run = {
-                    "workflowVersion": LAYOUT_WORKFLOW_VERSION
-                    if control is not None
-                    else INPAINT_WORKFLOW_VERSION
-                    if upload is not None
-                    else WORKFLOW_VERSION,
-                    **({"inpaintModel": self.config.inpaint_unet} if upload is not None else {}),
-                    **(
-                        {
-                            "controlnet": self.config.controlnet,
-                            "controlStrength": 1.0,
-                            "controlStart": 0.0,
-                            "controlEnd": 1.0,
-                            "controlHash": request.extensions["quill.layout"]["controlRef"],
-                        }
-                        if control is not None
-                        else {}
-                    ),
+                    **self._provenance(request, names),
                     "workflowSha256": hashlib.sha256(
                         json.dumps(graph, sort_keys=True).encode()
                     ).hexdigest(),
-                    "checkpoint": self.config.checkpoint,
                     "promptId": prompt_id,
                     "seed": request.seed,
-                    "steps": 20,
-                    "cfg": 7.0,
-                    "sampler": "euler",
-                    "scheduler": "normal",
                     "width": request.width,
                     "height": request.height,
                 }
                 return GenerationResult(
                     requestId=request.requestId,
-                    providerId="comfyui-sdxl",
+                    providerId=self.descriptor().id,
                     assetHash=output_hash,
                     width=request.width,
                     height=request.height,
@@ -543,3 +516,107 @@ class ComfyProvider:
             raise failure(
                 "invalid_output", "ComfyUI returned an invalid workflow result."
             ) from None
+
+
+class ComfyProvider(ComfyBase):
+    """SDXL family: base checkpoint, optional inpainting UNet and ControlNet (ADR-0025–0031)."""
+
+    config: ComfyConfig
+
+    def __init__(
+        self, config: ComfyConfig, *, transport: httpx.AsyncBaseTransport | None = None
+    ) -> None:
+        super().__init__(config, transport=transport)
+
+    def descriptor(self) -> ProviderDescriptor:
+        capabilities: list[Capability] = ["text_to_image", "inpainting", "seed", "negative_prompt"]
+        if self.config.controlnet:
+            capabilities.append("control_image")
+        return ProviderDescriptor(
+            id="comfyui-sdxl",
+            capabilities=capabilities,
+            maxWidth=1024,
+            maxHeight=1024,
+            local=True,
+        )
+
+    def _check_info(self, info: dict[str, Any]) -> None:
+        graph = workflow(
+            self.config,
+            GenerateRequest(requestId="check", prompt="", width=1024, height=1024),
+            "check.png",
+            "control.png" if self.config.controlnet else None,
+        )
+        self._require_nodes(info, graph, "EmptyLatentImage")
+        self._require_file(
+            info, "CheckpointLoaderSimple", "ckpt_name", self.config.checkpoint, "SDXL checkpoint"
+        )
+        if self.config.inpaint_unet:
+            self._require_file(
+                info, "UNETLoader", "unet_name", self.config.inpaint_unet, "SDXL inpainting UNet"
+            )
+        if (
+            self.config.controlnet
+            and self.config.inpaint_unet
+            and is_control_lora(self.config.controlnet)
+        ):
+            raise failure(
+                "unsupported_capability",
+                "Control-LoRA guidance cannot condition the dedicated inpainting UNet. "
+                "Use a full SDXL ControlNet, or unset one of the two settings.",
+            )
+        if self.config.controlnet:
+            self._require_file(
+                info,
+                "ControlNetLoader",
+                "control_net_name",
+                self.config.controlnet,
+                "SDXL ControlNet",
+            )
+
+    def _accepts_layout(self) -> bool:
+        return self.config.controlnet is not None
+
+    def _uploads(
+        self, source: Image.Image | None, mask: Image.Image | None, control: Image.Image | None
+    ) -> list[tuple[str, str, Image.Image]]:
+        """(role, unique upload name, image) for this family's LoadImage inputs."""
+        uploads = []
+        if source is not None and mask is not None:
+            rgba = source.convert("RGBA")
+            # LoadImage returns 1-alpha as its mask: white means edit.
+            rgba.putalpha(ImageChops.invert(mask))
+            uploads.append(("source", f"quill-{uuid4().hex}.png", rgba))
+        if control is not None:
+            uploads.append(("control", f"quill-control-{uuid4().hex}.png", control))
+        return uploads
+
+    def _graph(self, request: GenerateRequest, names: dict[str, str]) -> dict[str, Any]:
+        return workflow(self.config, request, names.get("source"), names.get("control"))
+
+    def _provenance(self, request: GenerateRequest, names: dict[str, str]) -> dict[str, Any]:
+        control = "control" in names
+        return {
+            "workflowVersion": LAYOUT_WORKFLOW_VERSION
+            if control
+            else INPAINT_WORKFLOW_VERSION
+            if "source" in names
+            else WORKFLOW_VERSION,
+            **({"inpaintModel": self.config.inpaint_unet} if "source" in names else {}),
+            **(
+                {
+                    "controlnet": self.config.controlnet,
+                    "controlStrength": 1.0,
+                    "controlStart": 0.0,
+                    "controlEnd": 1.0,
+                    "controlHash": request.extensions["quill.layout"]["controlRef"],
+                }
+                if control
+                else {}
+            ),
+            "checkpoint": self.config.checkpoint,
+            "steps": 20,
+            "cfg": 7.0,
+            "sampler": "euler",
+            "scheduler": "normal",
+        }

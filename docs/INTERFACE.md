@@ -137,7 +137,8 @@ or dismissing panels must never resize or shift the canvas. No document scrollin
 - Room → AI (with a room selected): room prompt and style overrides. Blank fields
   inherit the map value, shown as a placeholder. Apply is one undoable change that
   keeps existing artwork until a replacement is accepted.
-- The AI tab shows provider identity, readiness and capabilities. Check provider
+- The AI tab shows provider identity (offline mock, local SDXL or local FLUX.2 klein),
+  readiness and capabilities. Check provider
   re-runs readiness; generation stays disabled until it passes.
 - Generate preview queues a job and shows queued/running state. The preview renders on
   the map in the target layer's stack position, at full opacity, without entering

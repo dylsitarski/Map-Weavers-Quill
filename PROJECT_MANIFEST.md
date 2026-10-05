@@ -1081,7 +1081,9 @@ Milestone 3 status:
   (ADR-0027); 1024 × 1024 room working transform and SDXL prompts (ADR-0028); physical
   scale prompts and optional ControlNet wall/door guidance (ADR-0029); room inpainting
   through `InpaintModelConditioning` with an optional dedicated SD-XL Inpainting 0.1 UNet
-  (ADR-0031). All are covered by offline tests only.
+  (ADR-0031); a second local family, FLUX.2 [klein] through ComfyUI core nodes, editing
+  rooms from a blanked context image and a floor-plan reference (ADR-0032). All are
+  covered by offline tests only.
 - Owner trials: the first found abstract room art and oblique perspective (addressed by
   ADR-0028); the second found coherent top-down images but wrong furniture scale,
   invented partitions and backgrounds that ignore the architecture (addressed in part
@@ -1090,8 +1092,8 @@ Milestone 3 status:
   its own layout instead of walls at the boundary; Control-LoRA guidance is incompatible
   with it (ADR-0031). Fourth trial: with a full canny ControlNet, walls are partly
   followed but a large enclosed room still turns partly outdoors.
-- Next: a FLUX.2 klein provider as a second local option; then explicit building/open-air intent and geometry-aware
-  backgrounds (ADR-0023).
+- Next: owner GPU trial of FLUX.2 klein (rooms and backgrounds, time and peak VRAM);
+  then explicit building/open-air intent and geometry-aware backgrounds (ADR-0023).
 - Not implemented: hosted generation, geometry-aware exteriors, exact furniture sizing,
   hard architectural pixel enforcement, provider-side job interruption. Flux Fill is
   deferred. A deterministic wall/door overlay was prototyped and parked (docs/HISTORY.md).
