@@ -21,6 +21,13 @@ def validate_size(size: tuple[int, int]) -> None:
         raise ValueError("Supported map raster sizes are 480 × 320 and 960 × 640.")
 
 
+def native_to_pixel(
+    x: float, y: float, size: tuple[int, int], map_size: tuple[float, float] = (1200.0, 800.0)
+) -> tuple[float, float]:
+    """Continuous native (+y up) to image-edge coordinates (+y down); pixel i spans [i, i+1)."""
+    return x * size[0] / map_size[0], (map_size[1] - y) * size[1] / map_size[1]
+
+
 def polygon_mask(points: list[Point], size: tuple[int, int] = DEFAULT_SIZE) -> Image.Image:
     """Binary pixel-center coverage on the fixed 1200x800 native map; +y is up."""
     validate_size(size)

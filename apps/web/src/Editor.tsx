@@ -48,6 +48,8 @@ import {
   worldToScreen,
   zoomAt,
 } from './viewport';
+import { useWallArt, WallArtImage } from './WallArtImage';
+import { changeWallArt, wallArtRequest, wallArtSettings } from './wallArt';
 import { nearestWall } from './wallSelection';
 import { overScrollablePanel } from './wheelRouting';
 
@@ -141,6 +143,17 @@ export function Editor({ status }: { status: string }) {
       grid: { ...project.map.grid, visible: grid, snap },
     },
   };
+  const wallArt = wallArtSettings(currentProject.settings);
+  const wallArtImage = useWallArt(
+    wallArt.visible && scene.rooms.length
+      ? wallArtRequest(
+          scene.rooms,
+          scene.doors,
+          currentProject.map.style.wallThicknessPx,
+          wallArt.material,
+        )
+      : null,
+  );
   const fingerprint = projectFingerprint(currentProject);
   const dirty = fingerprint !== savedFingerprint;
   useEffect(() => {
@@ -656,6 +669,13 @@ export function Editor({ status }: { status: string }) {
           roomArtPreview?.assetHash ?? backgroundPreview?.assetHash ?? ''
         }
         data-background-hash={backgroundLayer?.assetHash ?? ''}
+        data-wall-art={
+          wallArt.visible
+            ? wallArtImage.loading
+              ? 'loading'
+              : 'ready'
+            : 'hidden'
+        }
         data-room-art-count={
           scene.rooms.filter((room) => room.renderLayerId !== null).length
         }
@@ -812,6 +832,7 @@ export function Editor({ status }: { status: string }) {
                   onError={setError}
                 />
               ))}
+            <WallArtImage image={wallArtImage.image} view={view} />
             {gridLines.map((line) => (
               <Line
                 key={`${line[0].x},${line[0].y}:${line[1].x},${line[1].y}`}
@@ -835,6 +856,10 @@ export function Editor({ status }: { status: string }) {
                 points={points([wall.start, wall.end])}
                 stroke={selectedWall?.id === wall.id ? '#efc766' : '#25362b'}
                 strokeWidth={selectedWall?.id === wall.id ? 5 : 2.5}
+                // Keep geometry guides visible without hiding rendered wall art.
+                opacity={
+                  wallArtImage.image && selectedWall?.id !== wall.id ? 0.35 : 1
+                }
               />
             ))}
             {scene.doors.map((door) => {
@@ -854,6 +879,13 @@ export function Editor({ status }: { status: string }) {
                   points={segment}
                   stroke={door.id === selectedDoor?.id ? '#efc766' : '#78472b'}
                   strokeWidth={7}
+                  opacity={
+                    wallArtImage.image &&
+                    door.id !== selectedDoor?.id &&
+                    door.id !== doorPreview?.id
+                      ? 0.35
+                      : 1
+                  }
                   dash={
                     door.state === 'open'
                       ? [3, 5]
@@ -979,7 +1011,20 @@ export function Editor({ status }: { status: string }) {
               dispatchScene({
                 type: 'commit',
                 before: scene,
-                scene: { ...scene, mapAuthoring: { style, settings } },
+                scene: {
+                  ...scene,
+                  mapAuthoring: {
+                    // Only the authored fields: a stale draft must not revert
+                    // wall thickness changed in Layers.
+                    style: {
+                      ...currentProject.map.style,
+                      environment: style.environment,
+                      renderStyle: style.renderStyle,
+                      palette: style.palette,
+                    },
+                    settings,
+                  },
+                },
               });
               setNotice('Map prompt and style applied. Save to keep them.');
             }}
@@ -1075,6 +1120,28 @@ export function Editor({ status }: { status: string }) {
           />
         }
         layers={scene.layers ?? []}
+        wallArt={{
+          ...wallArt,
+          thickness: currentProject.map.style.wallThicknessPx,
+          error: wallArtImage.error,
+        }}
+        changeWallArt={(changes) => {
+          if (pending.current) return;
+          dispatchScene({
+            type: 'commit',
+            before: scene,
+            scene: {
+              ...scene,
+              mapAuthoring: changeWallArt(
+                {
+                  style: currentProject.map.style,
+                  settings: currentProject.settings,
+                },
+                changes,
+              ),
+            },
+          });
+        }}
         reorderArtwork={(id, target) => {
           if (pending.current) return;
           const layers = moveArtwork(scene.layers ?? [], id, target);

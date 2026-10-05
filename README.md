@@ -255,7 +255,8 @@ third-party model weights or private assets.
 
 File → Export PNG or Export WebP downloads the current accepted artwork at 480 × 320
 pixels. Export respects layer order, visibility and opacity, including unsaved applied
-edits. It excludes previews, grid and editing guides. Both formats are lossless; empty
+edits. Visible walls and doors (below) are drawn on top. It excludes previews, grid and
+editing guides. Both formats are lossless; empty
 areas use the neutral map background. Export does not save the project or change undo
 history. Higher-resolution output and Foundry metadata bundles are not implemented.
 See docs/adr/0018-flattened-artwork-export.md.
@@ -372,3 +373,21 @@ described in [docs/COMFYUI.md](docs/COMFYUI.md). The AI panel reports whether gu
 is enabled. This is soft conditioning; verify furniture scale, partitions and doorway
 clearance in previews. Background building alignment remains unimplemented (ADR-0023).
 See ADR-0029 for provenance, tests and limitations.
+
+### Walls and doors drawn from geometry
+
+Walls and doors are now drawn by Quill itself, not by the image model. Layers → Walls &
+doors shows a textured wall band along every room boundary, with an opening and door
+leaf at each door (open, closed and locked look different). Secret doors look like
+plain wall; windows show glass. The overlay sits above all artwork and is included in
+PNG/WebP export, so visible walls always match the wall geometry. Choose Stone, Timber
+or Plaster and a thickness of 1–50 map units (default 10, one foot with the default
+grid). Each change is undoable and saved with the project. Existing projects show
+stone walls by default; untick Show walls and doors to export artwork alone.
+
+SDXL room prompts now ask for the floor only when walls are shown, and record the wall
+settings in provenance. Wall art is never sent to the AI as context. The ControlNet guide
+(ADR-0029) is unchanged. Limitations: one material and thickness per map, no wall shadows,
+and the editor preview softens at high zoom. Door appearance follows the editor's
+door state; how doors should look in a Foundry export is still to be decided.
+See [ADR-0030](docs/adr/0030-deterministic-wall-door-art.md).

@@ -23,6 +23,7 @@ from quill.providers import InpaintRequest
 from quill.raster import context_crop, image, masked_layer, png, polygon_mask
 from quill.sdxl_authoring import NEGATIVE, RoomTransform, clean_context, prompt_text
 from quill.styles import room_style_prompt
+from quill.wall_art import RENDERER, WALL_ART_PROMPT, wall_art_settings
 
 
 class RoomImageRequest(Contract):
@@ -76,6 +77,16 @@ def generate_room(request: RoomImageRequest) -> BackgroundResult:
         scale = room_scale(project, room, size, transform)
         prompt = scale_prompt(scale, controlled=controlled) + "\n" + prompt
         layout_details = {"physicalScale": scale, "layoutConditioning": controlled}
+        walls = wall_art_settings(project)
+        if walls.visible:
+            # Deterministic wall art covers the boundary (ADR-0030); ask only for the floor.
+            prompt = WALL_ART_PROMPT + prompt
+        layout_details["wallArt"] = {
+            "renderer": RENDERER,
+            "visible": walls.visible,
+            "material": walls.material,
+            "thickness": project.map.style.wallThicknessPx,
+        }
         if controlled:
             guide = wall_guide(project, size)
             input_hashes.append(store.put_asset(png(guide)))
@@ -145,7 +156,7 @@ def generate_room(request: RoomImageRequest) -> BackgroundResult:
                 "crop": list(crop),
                 "width": size[0],
                 "height": size[1],
-                "promptTemplate": "sdxl-room-layout-v1" if sdxl else "room-style-v1",
+                "promptTemplate": "sdxl-room-layout-v2" if sdxl else "room-style-v1",
                 **(
                     {
                         "negativePrompt": NEGATIVE,

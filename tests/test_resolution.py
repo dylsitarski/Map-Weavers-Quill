@@ -66,6 +66,8 @@ class ResolutionTests(unittest.TestCase):
         saved = self.store.save(SaveRequest(project=self.project, expectedRevision=None))
         reopened = self.store.open(saved.projectId)
         self.assertEqual(self.store.get_asset(original_hash), data)
+        # Artwork detail itself is lossless; wall art is covered in test_wall_art.
+        reopened.settings["quill.wallArt"] = {"visible": False, "material": "stone"}
         for format in ("png", "webp"):
             output = image(export_image(ExportRequest(project=reopened, format=format)))
             self.assertEqual(output.size, SDXL_SIZE)

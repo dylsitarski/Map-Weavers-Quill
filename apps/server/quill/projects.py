@@ -14,6 +14,7 @@ from pydantic import Field
 from quill.doors import validate_doors
 from quill.models import Contract, Project
 from quill.raster import image, polygon_mask, validate_size
+from quill.wall_art import validate_thickness, wall_art_settings
 from quill.walls import RoomBoundary, WallDerivationRequest, derive_walls
 
 
@@ -46,6 +47,8 @@ def validate_project(project: Project, *, derive_missing: bool = False) -> Proje
             raise ValueError("Background settings require a prompt of at most 4000 characters.")
     if not project.name.strip():
         raise ValueError("Project name cannot be blank.")
+    wall_art_settings(project)
+    validate_thickness(project.map.style.wallThicknessPx)
     if project.map.width != 1200 or project.map.height != 800 or project.map.grid.sizePx != 50:
         raise ValueError("This editor supports 1200 × 800 maps with a 50-unit grid.")
     if any(

@@ -183,7 +183,14 @@ same interaction when object editing is implemented.
 
 File offers Export PNG and Export WebP (480 × 320). Export uses accepted artwork with
 current layer settings, excluding on-map previews and all editing guides. It includes
-unsaved applied edits without saving or changing history.
+unsaved applied edits without saving or changing history. Visible wall/door art is
+drawn above all artwork in exports, as on the canvas.
+
+Layers starts with **Walls & doors**: Show walls and doors, Material (Stone, Timber,
+Plaster) and Thickness (1–50 map units). This art is rendered from room and door
+geometry, not by AI. It is a fixed overlay above all artwork and below grid and editing
+guides; it is not reorderable. Each change is one undoable edit that persists through
+Save. While it is shown, wall and unselected door guides are dimmed. See ADR-0030.
 
 AI generation displays queued/running job state and Cancel preview sends server-side
 cancellation. Job completion still requires explicit acceptance. Room interiors have no

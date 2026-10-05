@@ -21,6 +21,7 @@ from quill.providers import (
     ProviderReadiness,
 )
 from quill.room_images import RoomImageRequest
+from quill.wall_art import WallArtRequest
 from quill.walls import WallDerivationRequest, WallDerivationResult
 
 
@@ -54,6 +55,7 @@ class GeometryContracts(BaseModel):
     wallResult: WallDerivationResult
     doorRequest: DoorRequest
     doorResult: DoorResult
+    wallArtRequest: WallArtRequest
 
 
 ROOT = Path(__file__).resolve().parents[1]

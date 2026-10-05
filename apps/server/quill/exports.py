@@ -8,6 +8,7 @@ from PIL import Image, ImageChops
 from quill.models import Contract, Project
 from quill.projects import ProjectStore, project_store, validate_project
 from quill.raster import DEFAULT_SIZE, image, polygon_mask, validate_size
+from quill.wall_art import project_wall_art
 
 
 class ExportRequest(Contract):
@@ -55,6 +56,13 @@ def composite_artwork(
     return source
 
 
+def flattened_map(project: Project, store: ProjectStore) -> Image.Image:
+    """Artwork plus deterministic wall/door art. Never used as AI generation context."""
+    composite = composite_artwork(project, store)
+    walls = project_wall_art(project, composite.size)
+    return composite if walls is None else Image.alpha_composite(composite, walls)
+
+
 def export_image(request: ExportRequest) -> bytes:
     project = validate_project(request.project, derive_missing=True)
     store = project_store()
@@ -64,7 +72,7 @@ def export_image(request: ExportRequest) -> bytes:
     finally:
         db.close()
     output = BytesIO()
-    composite = composite_artwork(project, store).convert("RGB")
+    composite = flattened_map(project, store).convert("RGB")
     if request.format == "webp":
         composite.save(output, format="WEBP", lossless=True, method=4)
     else:

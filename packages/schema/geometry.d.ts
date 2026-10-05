@@ -81,13 +81,26 @@ export type Width3 = number;
 export type Error = string | null;
 export type Valid = boolean;
 export type Contractversion3 = "0.1.0";
+/**
+ * @maxItems 1024
+ */
+export type Doors2 = DoorInput[];
 export type Height2 = number;
+export type Material = "stone" | "timber" | "plaster";
 /**
  * @maxItems 128
  */
 export type Rooms1 = RoomBoundary[];
+export type Thickness = number;
 export type Width4 = number;
 export type Contractversion4 = "0.1.0";
+export type Height3 = number;
+/**
+ * @maxItems 128
+ */
+export type Rooms2 = RoomBoundary[];
+export type Width5 = number;
+export type Contractversion5 = "0.1.0";
 /**
  * @maxItems 8192
  */
@@ -98,6 +111,7 @@ export interface GeometryContracts {
   doorResult: DoorResult;
   request: GeometryRequest;
   result: GeometryResult;
+  wallArtRequest: WallArtRequest;
   wallRequest: WallDerivationRequest;
   wallResult: WallDerivationResult;
   [k: string]: unknown;
@@ -180,13 +194,22 @@ export interface GeometryResult {
   error: Error;
   valid: Valid;
 }
-export interface WallDerivationRequest {
+export interface WallArtRequest {
   contractVersion?: Contractversion3;
+  doors: Doors2;
   height: Height2;
+  material: Material;
   rooms: Rooms1;
+  thickness: Thickness;
   width: Width4;
 }
-export interface WallDerivationResult {
+export interface WallDerivationRequest {
   contractVersion?: Contractversion4;
+  height: Height3;
+  rooms: Rooms2;
+  width: Width5;
+}
+export interface WallDerivationResult {
+  contractVersion?: Contractversion5;
   walls: Walls1;
 }

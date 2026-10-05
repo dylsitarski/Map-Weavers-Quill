@@ -445,6 +445,68 @@
       "title": "Wall",
       "type": "object"
     },
+    "WallArtRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "contractVersion": {
+          "const": "0.1.0",
+          "default": "0.1.0",
+          "title": "Contractversion",
+          "type": "string"
+        },
+        "doors": {
+          "items": {
+            "$ref": "#/$defs/DoorInput"
+          },
+          "maxItems": 1024,
+          "title": "Doors",
+          "type": "array"
+        },
+        "height": {
+          "exclusiveMinimum": 0,
+          "title": "Height",
+          "type": "integer"
+        },
+        "material": {
+          "enum": [
+            "stone",
+            "timber",
+            "plaster"
+          ],
+          "title": "Material",
+          "type": "string"
+        },
+        "rooms": {
+          "items": {
+            "$ref": "#/$defs/RoomBoundary"
+          },
+          "maxItems": 128,
+          "title": "Rooms",
+          "type": "array"
+        },
+        "thickness": {
+          "maximum": 50.0,
+          "minimum": 1.0,
+          "title": "Thickness",
+          "type": "number"
+        },
+        "width": {
+          "exclusiveMinimum": 0,
+          "title": "Width",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "width",
+        "height",
+        "thickness",
+        "material",
+        "rooms",
+        "doors"
+      ],
+      "title": "WallArtRequest",
+      "type": "object"
+    },
     "WallDerivationRequest": {
       "additionalProperties": false,
       "properties": {
@@ -522,6 +584,9 @@
     "result": {
       "$ref": "#/$defs/GeometryResult"
     },
+    "wallArtRequest": {
+      "$ref": "#/$defs/WallArtRequest"
+    },
     "wallRequest": {
       "$ref": "#/$defs/WallDerivationRequest"
     },
@@ -535,7 +600,8 @@
     "wallRequest",
     "wallResult",
     "doorRequest",
-    "doorResult"
+    "doorResult",
+    "wallArtRequest"
   ],
   "title": "GeometryContracts",
   "type": "object"
