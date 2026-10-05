@@ -26,8 +26,9 @@ locally, but image quality is not yet acceptable and hardware measurements are n
 recorded. Open problems are furniture scale, invented interior partitions, and
 backgrounds that ignore the placed rooms. Rooms can optionally use a dedicated SDXL
 inpainting model (ADR-0031), but SDXL still does not reliably draw a large enclosed room
-as indoors. A second local model family, FLUX.2 klein, is now available (ADR-0032).
-Next: an owner GPU trial of FLUX.2 klein rooms and backgrounds.
+as indoors. A second local model family, FLUX.2 klein (ADR-0032), draws whole rooms
+indoors with walls in place in about 20 seconds; its first trial left placeholder colors
+in the room. Next: a trial of klein's new sketch reference.
 
 Verification evidence and the development log are in [docs/HISTORY.md](docs/HISTORY.md).
 
@@ -171,8 +172,8 @@ passes. For better SDXL room artwork, also install the optional SD-XL Inpainting
 and set `MWQ_IMAGE_COMFY_INPAINT_UNET`.
 
 For FLUX.2 klein, install its three model files (docs/COMFYUI.md section 5), then use
-`export MWQ_IMAGE_PROVIDER=comfyui-flux2-klein`. Klein receives each room's floor plan as
-a reference image, so no ControlNet is needed.
+`export MWQ_IMAGE_PROVIDER=comfyui-flux2-klein`. Klein receives each room's walls and
+doors as a sketch in a reference image, so no ControlNet is needed.
 
 ## Provider configuration and secrets
 

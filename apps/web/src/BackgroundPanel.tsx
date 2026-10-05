@@ -313,7 +313,7 @@ export function BackgroundPanel(p: {
         {localComfy && p.room && (
           <p>
             {klein
-              ? 'The room floor plan (walls and doorways) is sent as a reference image. Physical scale is included; inspect the preview for accuracy.'
+              ? 'The room walls and doors (with open or closed states) are sent as a layout reference. Physical scale is included; inspect the preview for accuracy.'
               : provider.state?.descriptor.capabilities.includes(
                     'control_image',
                   )

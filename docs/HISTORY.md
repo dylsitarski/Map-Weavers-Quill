@@ -107,9 +107,17 @@ criterion to its tests.
 11. **FLUX.2 klein provider (ADR-0032).** A second local model family through ComfyUI core
     nodes. The ComfyUI transport was factored into a shared base class with SDXL unchanged.
     Rooms are edited from two reference images (context with the room blanked, and a
-    floor plan); backgrounds are text-to-image. Verified offline only; owner trial pending.
+    floor plan); backgrounds are text-to-image.
+12. **Fifth owner trial (2026-10-05, FLUX.2 klein distilled).** The large partial-octagon
+    room was fully indoors, with walls following the plan nearly exactly and doors in the
+    right places, a clear improvement on SDXL. The gray placeholder floor and white plan
+    wall lines remained under the furniture, and doors were drawn closed regardless of
+    state; about 20 seconds per room (SDXL with guidance: about 17). Response: a default
+    one-image `sketch` reference with door states, and placeholder wording for the
+    `plan` prompt (ADR-0032).
 
-Outstanding before Milestone 3 can close: an owner GPU trial of FLUX.2 klein (ADR-0032),
+Outstanding before Milestone 3 can close: an owner trial of the FLUX.2 klein sketch
+reference (ADR-0032),
 recorded runtime and peak VRAM, explicit building/open-air intent, and geometry-aware backgrounds
 (ADR-0023). Flux Fill was considered and deferred; hosted generation moved to
 Milestone 5.

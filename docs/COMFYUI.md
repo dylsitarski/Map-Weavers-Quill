@@ -117,8 +117,9 @@ either provider.
 ## 5. Use FLUX.2 klein instead
 
 FLUX.2 [klein] 4B follows prompts better than SDXL and edits images from reference
-pictures. Quill sends each room as two references: the surroundings with the room blanked
-out, and a floor plan of the room (gray floor, white walls, gaps for doorways). It needs a
+pictures. By default Quill sends each room as one reference: the surroundings with an
+architectural sketch of the room drawn in (off-white floor, dark walls, gaps for open
+doors, brown bars for closed doors). It needs a
 ComfyUI version recent enough to offer the `flux2` text-encoder type; update ComfyUI if
 readiness says so. No ControlNet is needed. The 4B model is Apache-2.0; check each model
 card for the text encoder and VAE.
@@ -142,6 +143,7 @@ export MWQ_IMAGE_PROVIDER=comfyui-flux2-klein
 # export MWQ_IMAGE_COMFY_FLUX2_VAE=flux2-vae.safetensors
 # export MWQ_IMAGE_COMFY_FLUX2_VARIANT=distilled   # or base (with the base model file)
 # export MWQ_IMAGE_COMFY_FLUX2_TEXT_ENCODER_DEVICE=cpu   # keep the encoder off an 8 GB GPU
+# export MWQ_IMAGE_COMFY_FLUX2_ROOM_REFERENCE=plan   # or sketch (default)
 make dev
 ```
 
@@ -152,11 +154,14 @@ make dev
 | `MWQ_IMAGE_COMFY_FLUX2_VAE` | `flux2-vae.safetensors` | VAE file in `models/vae` |
 | `MWQ_IMAGE_COMFY_FLUX2_VARIANT` | `distilled` | `distilled`: 4 steps, CFG 1. `base`: 20 steps, CFG 5; needs the base model file |
 | `MWQ_IMAGE_COMFY_FLUX2_TEXT_ENCODER_DEVICE` | `default` | `cpu` runs the text encoder on the CPU to save GPU memory |
+| `MWQ_IMAGE_COMFY_FLUX2_ROOM_REFERENCE` | `sketch` | `sketch`: one image with the room sketched in. `plan`: blanked context plus a separate floor plan (see ADR-0032) |
 
 The AI panel shows "Local FLUX.2 klein · ComfyUI" and "Ready · distilled model" (or
 base). Backgrounds are text-to-image at 960 × 640 with the same camera-first prompt as
-SDXL. Rooms use the same working transform, context, scale and wall data as SDXL, but
-the prompt is an edit instruction that refers to both reference images (ADR-0032). Pixels
+SDXL. Rooms use the same working transform, context and scale data as SDXL, but the
+prompt is an edit instruction that refers to the reference images (ADR-0032). Door states
+are shown in the sketch: open doors as gaps, closed or locked doors as brown bars; secret
+doors are drawn as plain wall. Pixels
 outside the room are always protected exactly. The smoke command in this document tests
 SDXL only.
 
@@ -278,8 +283,9 @@ Still to record (SDXL items 1–3, then FLUX.2 klein):
 3. Record elapsed time, peak VRAM, whether `--lowvram` was needed, the ComfyUI commit
    (`git rev-parse HEAD`) and checkpoint SHA-256
    (`sha256sum models/checkpoints/sd_xl_base_1.0.safetensors`).
-4. FLUX.2 klein (distilled): generate a background and the large partial-octagon room from
-   the fourth SDXL trial. Check that the whole room is drawn as an interior, that walls
-   follow the plan and doorways stay open, that the room joins its surroundings and
-   neighbours, and record time, peak VRAM and whether CPU text encoding or `--lowvram`
-   was needed.
+4. FLUX.2 klein (distilled), first trial done with the `plan` reference: the room was fully
+   indoors and walls followed the plan, but the gray placeholder floor and white plan
+   walls stayed in the image and doors were drawn closed; about 20 seconds. Next: the
+   default `sketch` reference on the same room with one open and one closed door, then
+   `plan` for comparison. Check that no placeholder colors remain, walls follow the
+   sketch, door states match, and record time (soft limit about 30 seconds).

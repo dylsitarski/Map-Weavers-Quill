@@ -2,7 +2,15 @@
 
 import unittest
 
-from quill.layout_guidance import room_scale, scale_prompt, wall_guide, working_guide
+from quill.layout_guidance import (
+    SKETCH_DOOR,
+    SKETCH_WALL,
+    room_scale,
+    room_sketch,
+    scale_prompt,
+    wall_guide,
+    working_guide,
+)
 from quill.sdxl_authoring import RoomTransform
 from test_projects import document
 
@@ -50,3 +58,46 @@ class LayoutGuidanceTests(unittest.TestCase):
         self.assertEqual(work.getpixel((0, 0)), (0, 0, 0))
         project.doors = []
         self.assertEqual(wall_guide(project, (960, 640)).getpixel(pixel(door.position)), 255)
+
+    def test_room_sketch_draws_wall_thickness_and_door_states(self):
+        project = document()
+        door = project.doors[0]
+        wall = next(w for w in project.walls if w.id == door.wallId)
+
+        def pixel(t, offset=0.0):
+            # Native point along the door's (vertical) wall, offset across it.
+            return (
+                round((wall.start.x + offset + (wall.end.x - wall.start.x) * t) * 0.8),
+                round(640 - (wall.start.y + (wall.end.y - wall.start.y) * t) * 0.8),
+            )
+
+        project.map.style.wallThicknessPx = 10  # 8 px at 960 x 640.
+        closed = room_sketch(project, (960, 640), project.rooms[0])
+        self.assertEqual(closed.getpixel(pixel(0.05)), SKETCH_WALL)
+        self.assertEqual(closed.getpixel(pixel(0.05, offset=3)), SKETCH_WALL)  # Thick wall.
+        self.assertEqual(closed.getpixel(pixel(door.position)), SKETCH_DOOR)  # Closed bar.
+        self.assertEqual(closed.getpixel((160, 480)), (0, 0, 0))  # Room interior empty.
+        self.assertEqual(closed.getpixel((80, 80)), (0, 0, 0))  # No y-axis mirroring.
+        door.state = "open"
+        self.assertEqual(
+            room_sketch(project, (960, 640), project.rooms[0]).getpixel(pixel(door.position)),
+            (0, 0, 0),
+        )
+        door.secret = True
+        self.assertEqual(
+            room_sketch(project, (960, 640), project.rooms[0]).getpixel(pixel(door.position)),
+            SKETCH_WALL,
+        )
+        door.secret, door.doorType = False, "window"
+        self.assertEqual(
+            room_sketch(project, (960, 640), project.rooms[0]).getpixel(pixel(door.position)),
+            SKETCH_WALL,
+        )
+        # Only the target room's walls: room 1's far wall (native x=500) is not drawn.
+        self.assertEqual(closed.getpixel((400, 480)), (0, 0, 0))
+        other = room_sketch(project, (960, 640), project.rooms[1])
+        self.assertEqual(other.getpixel((400, 480)), SKETCH_WALL)
+        self.assertEqual(other.getpixel((80, 480)), (0, 0, 0))  # Room 0's far wall omitted.
+        # RGB sketches keep their colors through the working transform.
+        work = working_guide(closed, (64, 384, 256, 640), RoomTransform(192, 256))
+        self.assertIn(SKETCH_WALL, {c for _, c in work.getcolors(1024 * 1024)})

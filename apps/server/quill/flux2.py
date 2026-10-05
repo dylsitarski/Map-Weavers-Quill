@@ -2,8 +2,10 @@
 
 Graphs follow ComfyUI's official klein templates: UNETLoader, CLIPLoader (type flux2),
 VAELoader, ReferenceLatent edits, EmptyFlux2LatentImage, Flux2Scheduler, CFGGuider and
-SamplerCustomAdvanced. Room edits pass two reference images: the context crop with the
-room blanked, and a floor plan of the room and its walls.
+SamplerCustomAdvanced. Room edits use one of two reference strategies:
+- sketch (default): one image, the context crop with an architectural sketch of the room
+  drawn in (off-white floor, dark walls, door states);
+- plan: two images, the context crop with the room blanked, and a separate floor plan.
 """
 
 import os
@@ -27,6 +29,9 @@ from quill.providers import Capability, GenerateRequest, ProviderDescriptor
 WORKFLOW_VERSION = "comfy-flux2-klein-v1"
 EDIT_WORKFLOW_VERSION = "comfy-flux2-klein-edit-v1"
 PLAN_VERSION = "room-plan-v1"
+SKETCH_VERSION = "room-sketch-v1"
+ROOM_REFERENCES = ("sketch", "plan")
+SKETCH_FLOOR = (236, 232, 222)  # Off-white "paper" floor inside the room.
 # Distilled klein: 4 steps, CFG 1, zeroed negative. Base klein: 20 steps, CFG 5.
 VARIANTS: dict[str, tuple[int, float]] = {"distilled": (4, 1.0), "base": (20, 5.0)}
 BLANK = (128, 128, 128)  # Room area in the context reference: "paint here".
@@ -43,6 +48,8 @@ class Flux2Config:
     variant: str = "distilled"
     # "cpu" keeps the 4B text encoder off small GPUs at the cost of prompt-encoding time.
     text_encoder_device: str = "default"
+    # How the room layout reaches the model (ADR-0032): sketch or plan.
+    room_reference: str = "sketch"
 
     def __post_init__(self) -> None:
         validate_endpoint(self.url, self.timeout)
@@ -53,6 +60,8 @@ class Flux2Config:
             raise ValueError("FLUX.2 klein variant must be distilled or base.")
         if self.text_encoder_device not in {"default", "cpu"}:
             raise ValueError("FLUX.2 text encoder device must be default or cpu.")
+        if self.room_reference not in ROOM_REFERENCES:
+            raise ValueError("FLUX.2 room reference must be sketch or plan.")
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> "Flux2Config":
@@ -66,6 +75,7 @@ class Flux2Config:
             env.get("MWQ_IMAGE_COMFY_FLUX2_VAE") or defaults.vae,
             env.get("MWQ_IMAGE_COMFY_FLUX2_VARIANT") or defaults.variant,
             env.get("MWQ_IMAGE_COMFY_FLUX2_TEXT_ENCODER_DEVICE") or defaults.text_encoder_device,
+            env.get("MWQ_IMAGE_COMFY_FLUX2_ROOM_REFERENCE") or defaults.room_reference,
         )
 
 
@@ -145,6 +155,16 @@ def workflow(
     return graph
 
 
+def room_sketch_reference(
+    source: Image.Image, mask: Image.Image, sketch: Image.Image
+) -> Image.Image:
+    """Context with the room filled off-white, then sketch strokes (non-black) on top."""
+    reference = Image.composite(Image.new("RGB", source.size, SKETCH_FLOOR), source, mask)
+    strokes = sketch.convert("L").point(lambda v: 255 if v > 0 else 0)
+    reference.paste(sketch, mask=strokes)
+    return reference
+
+
 def room_plan(mask: Image.Image, walls: Image.Image) -> Image.Image:
     """Black outside, gray room floor, white wall lines (door gaps stay unpainted)."""
     plan = Image.new("RGB", mask.size)
@@ -202,7 +222,15 @@ class Flux2Provider(ComfyBase):
         self, source: Image.Image | None, mask: Image.Image | None, control: Image.Image | None
     ) -> list[tuple[str, str, Image.Image]]:
         uploads = []
-        if source is not None and mask is not None:
+        if source is not None and mask is not None and self.config.room_reference == "sketch":
+            # One reference: the surroundings with the room drawn as a sketch to render.
+            reference = (
+                room_sketch_reference(source, mask, control)
+                if control is not None
+                else Image.composite(Image.new("RGB", source.size, SKETCH_FLOOR), source, mask)
+            )
+            uploads.append(("source", f"quill-{uuid4().hex}.png", reference))
+        elif source is not None and mask is not None:
             # The model sees the surroundings, with the room itself blanked out.
             blanked = Image.composite(Image.new("RGB", source.size, BLANK), source, mask)
             uploads.append(("source", f"quill-{uuid4().hex}.png", blanked))
@@ -228,29 +256,51 @@ class Flux2Provider(ComfyBase):
             "scheduler": "Flux2Scheduler",
             **(
                 {
-                    "layoutReference": PLAN_VERSION,
+                    "layoutReference": SKETCH_VERSION
+                    if self.config.room_reference == "sketch"
+                    else PLAN_VERSION,
                     "controlHash": request.extensions["quill.layout"]["controlRef"],
                 }
-                if "plan" in names
+                if request.extensions
                 else {}
             ),
         }
 
 
-ROOM_TEMPLATE = "flux2-klein-room-v1"
+ROOM_TEMPLATES = {"sketch": "flux2-klein-room-sketch-v1", "plan": "flux2-klein-room-plan-v2"}
+_ROOM_INSTRUCTIONS = {
+    "sketch": (
+        "Image 1 is a top-down tabletop battlemap seen from directly above. Inside it is a "
+        "rough architectural sketch of one room: the flat off-white fill is the room's floor "
+        "area, thick dark lines are its walls, gaps in the dark lines are open doorways with "
+        "no door, and brown bars across a gap are closed doors. Replace the entire sketch "
+        "with a finished, detailed roof-removed interior in the same art style as the "
+        "surrounding map: textured walls exactly along the dark lines, textured floor and "
+        "furniture across the whole room, open doorways left open, and closed doors drawn "
+        "as doors. None of the off-white fill, sketch lines or flat placeholder colors may "
+        "remain. Keep everything outside the sketch unchanged and blend the room into its "
+        "surroundings. Orthographic overhead view, no perspective, no text, labels or grid."
+    ),
+    "plan": (
+        "Edit image 1, a top-down tabletop battlemap seen from directly above. The flat gray "
+        "area in image 1 is a placeholder for a single indoor room that must be drawn. Image "
+        "2 is its floor plan: the gray area is the room's floor, white lines are its walls, "
+        "and gaps in the white lines are open doorways. Draw the room as a finished "
+        "roof-removed interior in the same art style as the surrounding map: textured walls "
+        "along the white lines, textured floor and furniture across the entire gray area, "
+        "and no outdoor ground, grass or sky inside the walls. The flat gray and the white "
+        "plan lines are placeholders and must not appear in the result. Keep everything "
+        "outside the room unchanged and make the walls meet it naturally. Orthographic "
+        "overhead view, no perspective, no text, labels or grid."
+    ),
+}
 
 
-def room_instruction(description: str, style: dict[str, str]) -> str:
-    """Edit instruction naming both references; the user's text is included unchanged."""
+def room_instruction(description: str, style: dict[str, str], reference: str) -> str:
+    """Edit instruction for the configured reference strategy; user text is unchanged."""
     styled = ". ".join(f"{key}: {value}" for key, value in style.items() if value.strip())
     return (
-        "Edit image 1, a top-down tabletop battlemap seen from directly above. The flat gray "
-        "area in image 1 is a single indoor room that must be drawn. Image 2 is its floor "
-        "plan: the gray area is the room's floor, white lines are its walls, and gaps in the "
-        "white lines are open doorways. Draw the room as a roof-removed interior: walls along "
-        "the white lines, interior floor and furniture across the entire gray area, and no "
-        "outdoor ground, grass or sky inside the walls. Keep everything outside the room "
-        "unchanged and make the walls meet it naturally. Orthographic overhead view, no "
-        "perspective, no text, labels or grid.\n"
-        f"Room: {description.strip()}\n" + (f"{styled}." if styled else "")
+        _ROOM_INSTRUCTIONS[reference]
+        + f"\nRoom: {description.strip()}\n"
+        + (f"{styled}." if styled else "")
     )

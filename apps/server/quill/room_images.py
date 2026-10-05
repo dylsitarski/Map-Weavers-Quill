@@ -10,8 +10,14 @@ from pydantic import Field, JsonValue
 from quill.backgrounds import BackgroundResult
 from quill.comfyui import ComfyBase, ComfyProvider
 from quill.exports import artwork_size, composite_artwork
-from quill.flux2 import ROOM_TEMPLATE, Flux2Provider, room_instruction
-from quill.layout_guidance import room_scale, scale_prompt, wall_guide, working_guide
+from quill.flux2 import ROOM_TEMPLATES, Flux2Provider, room_instruction
+from quill.layout_guidance import (
+    room_scale,
+    room_sketch,
+    scale_prompt,
+    wall_guide,
+    working_guide,
+)
 from quill.models import Bounds, Contract, GenerationRecord, Point, Project, RasterLayer
 from quill.projects import project_store, validate_project
 from quill.provider_config import (
@@ -51,11 +57,13 @@ def generate_room(request: RoomImageRequest) -> BackgroundResult:
     # Local ComfyUI families share the working transform, clean context and scale data.
     comfy = isinstance(provider, ComfyBase)
     sdxl = isinstance(provider, ComfyProvider)
-    klein = isinstance(provider, Flux2Provider)
+    # FLUX.2 klein room-reference strategy (ADR-0032), or None for other providers.
+    reference = provider.config.room_reference if isinstance(provider, Flux2Provider) else None
+    klein = reference is not None
     if sdxl:
         prompt = prompt_text(room.prompt, effective_style, room=True)
-    elif klein:
-        prompt = room_instruction(room.prompt, effective_style)
+    elif reference is not None:
+        prompt = room_instruction(room.prompt, effective_style, reference)
     profile, alignment = raster_profile(provider)
     size = max(artwork_size(project, store), profile, key=lambda size: size[0])
     mask = polygon_mask(room.polygon, size)
@@ -87,7 +95,8 @@ def generate_room(request: RoomImageRequest) -> BackgroundResult:
             prompt = scale_prompt(scale, controlled=controlled) + "\n" + prompt
         layout_details = {"physicalScale": scale, "layoutConditioning": controlled}
         if controlled:
-            guide = wall_guide(project, size)
+            sketch = reference == "sketch"
+            guide = room_sketch(project, size, room) if sketch else wall_guide(project, size)
             input_hashes.append(store.put_asset(png(guide)))
             control_ref = provider.put(png(working_guide(guide, crop, transform)))
             extensions = {"quill.layout": {"controlRef": control_ref}}
@@ -157,8 +166,8 @@ def generate_room(request: RoomImageRequest) -> BackgroundResult:
                 "height": size[1],
                 "promptTemplate": "sdxl-room-layout-v1"
                 if sdxl
-                else ROOM_TEMPLATE
-                if klein
+                else ROOM_TEMPLATES[reference]
+                if reference
                 else "room-style-v1",
                 **(
                     {

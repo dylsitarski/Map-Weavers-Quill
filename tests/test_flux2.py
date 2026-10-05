@@ -20,11 +20,13 @@ from quill.flux2 import (
     BLANK,
     PLAN_FLOOR,
     PLAN_WALL,
+    SKETCH_FLOOR,
     Flux2Config,
     Flux2Provider,
     room_plan,
     workflow,
 )
+from quill.layout_guidance import SKETCH_WALL
 from quill.main import app, readiness_message
 from quill.projects import ProjectStore, SaveRequest
 from quill.provider_config import create_provider, load_provider_config, provider_config
@@ -160,7 +162,44 @@ class Flux2ProtocolTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((run["variant"], run["steps"], run["cfg"]), ("distilled", 4, 1.0))
         self.assertNotIn("layoutReference", run)
 
-    async def test_room_edit_sends_blanked_context_and_plan_and_protects_outside_pixels(self):
+    async def test_sketch_reference_is_one_image_and_protects_outside_pixels(self):
+        size = (1024, 1024)
+        source = Image.new("RGB", size, (200, 10, 10))
+        mask = Image.new("L", size)
+        mask.paste(255, (256, 256, 768, 768))
+        sketch = Image.new("RGB", size)
+        ImageDraw.Draw(sketch).rectangle((250, 250, 773, 773), outline=SKETCH_WALL, width=12)
+        refs = [self.provider.put(png(i)) for i in (source, mask, sketch)]
+        await self.provider.inpaint(
+            InpaintRequest(
+                requestId="r",
+                prompt="Image 1",
+                width=1024,
+                height=1024,
+                seed=3,
+                sourceRef=refs[0],
+                maskRef=refs[1],
+                maskConvention="white-edit-black-preserve",
+                extensions={"quill.layout": {"controlRef": refs[2]}},
+            )
+        )
+        ((name, reference),) = self.fake.uploads
+        reference = decode(reference)
+        self.assertEqual(reference.getpixel((10, 10)), (200, 10, 10))  # Surroundings kept.
+        self.assertEqual(reference.getpixel((512, 512)), SKETCH_FLOOR)  # Room is "paper".
+        self.assertEqual(reference.getpixel((252, 512)), SKETCH_WALL)  # Wall drawn over context.
+        g = self.fake.graph
+        self.assertEqual(g["20"]["inputs"]["image"], name)
+        self.assertNotIn("24", g)  # Single reference image.
+        self.assertEqual(g["12"]["inputs"]["positive"], ["22", 0])
+        self.assertEqual(g["12"]["inputs"]["negative"], ["23", 0])
+        result = decode(self.provider.assets[next(reversed(self.provider.assets))])
+        self.assertEqual(result.getpixel((10, 10)), (200, 10, 10))
+        self.assertEqual(result.getpixel((512, 512)), (9, 99, 199))
+        self.assertEqual(self.provider.last_run["layoutReference"], "room-sketch-v1")
+
+    async def test_plan_reference_sends_blanked_context_and_plan(self):
+        self.provider = self.make(Flux2Config(room_reference="plan"))
         size = (1024, 1024)
         source = Image.new("RGB", size, (200, 10, 10))
         mask = Image.new("L", size)
@@ -236,6 +275,7 @@ class Flux2ProtocolTests(unittest.IsolatedAsyncioTestCase):
             {"variant": "turbo"},
             {"text_encoder_device": "gpu"},
             {"model": "../klein.safetensors"},
+            {"room_reference": "mask"},
             {"vae": "vae.ckpt"},
             {"url": "http://example.com:8188"},
         ):
@@ -246,8 +286,11 @@ class Flux2ProtocolTests(unittest.IsolatedAsyncioTestCase):
                 "MWQ_IMAGE_COMFY_FLUX2_MODEL": "flux-2-klein-base-4b-fp8.safetensors",
                 "MWQ_IMAGE_COMFY_FLUX2_VARIANT": "base",
                 "MWQ_IMAGE_COMFY_FLUX2_TEXT_ENCODER_DEVICE": "cpu",
+                "MWQ_IMAGE_COMFY_FLUX2_ROOM_REFERENCE": "plan",
             }
         )
+        self.assertEqual(config.room_reference, "plan")
+        self.assertEqual(Flux2Config.from_env({}).room_reference, "sketch")
         self.assertEqual(
             (config.model, config.variant, config.text_encoder_device, config.vae),
             ("flux-2-klein-base-4b-fp8.safetensors", "base", "cpu", "flux2-vae.safetensors"),
@@ -331,16 +374,22 @@ class Flux2EditorTests(unittest.TestCase):
         result = BackgroundResult.model_validate_json(json.dumps(job["result"]))
         generation = result.generation
         self.assertEqual(generation.providerId, "comfyui-flux2-klein")
-        self.assertTrue(generation.prompt.startswith("Edit image 1"))
+        self.assertTrue(generation.prompt.startswith("Image 1 is a top-down"))
         self.assertIn("each grid cell is 5 ft", generation.prompt)
         parameters = generation.parameters
-        self.assertEqual(parameters["promptTemplate"], "flux2-klein-room-v1")
+        self.assertEqual(parameters["promptTemplate"], "flux2-klein-room-sketch-v1")
         self.assertTrue(parameters["layoutConditioning"])
         self.assertNotIn("negativePrompt", parameters)
         self.assertEqual(parameters["comfyui"]["workflowVersion"], "comfy-flux2-klein-edit-v1")
         self.assertEqual(len(generation.inputHashes), 3)
-        # Both references were uploaded at the 1024 x 1024 working size.
-        self.assertEqual([decode(data).size for _, data in self.fake.uploads], [(1024, 1024)] * 2)
+        self.assertEqual(parameters["comfyui"]["layoutReference"], "room-sketch-v1")
+        # One sketch reference at the working size, with off-white floor and dark walls.
+        ((_, data),) = self.fake.uploads
+        reference = decode(data)
+        self.assertEqual(reference.size, (1024, 1024))
+        colors = {color for _, color in reference.getcolors(1024 * 1024)}
+        self.assertIn(SKETCH_FLOOR, colors)
+        self.assertIn(SKETCH_WALL, colors)
         room.renderLayerId = result.layer.id
         project.layers = [bg.layer, result.layer]
         project.generations = [bg.generation, generation]
