@@ -2,6 +2,9 @@
 
 Status: Accepted architecture; implementation begins in Milestone 1.
 
+Update 2026-10-05: implemented in Milestone 1 as scene-snapshot undo/redo (rooms, walls,
+doors, artwork and map authoring). Language-operation transactions remain Milestone 7.
+
 Document mutations enter through validated commands. One user action is one atomic
 transaction with enough prior state for undo. Selection and viewport changes are
 editor state rather than persistent geometry. Failed validation leaves the document

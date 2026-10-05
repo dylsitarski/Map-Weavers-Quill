@@ -1,8 +1,8 @@
 # Map-Weaver's Quill: Project Manifest and Implementation Plan
 
 **Document status:** Canonical implementation brief  
-**Version:** 0.3.0
-**Last updated:** 2026-09-22
+**Version:** 0.3.1
+**Last updated:** 2026-10-05
 **Audience:** Human maintainers and AI software-engineering agents  
 **Project name:** Map-Weaver's Quill  
 
@@ -1045,24 +1045,53 @@ These questions should be resolved near the stated milestone, not guessed by an 
 
 ## 22. Current project state
 
-As of this manifest version:
+As of 2026-10-05. Verification evidence for each milestone is in
+[docs/HISTORY.md](docs/HISTORY.md); decision status is indexed in
+[docs/adr/README.md](docs/adr/README.md).
 
-- Product architecture and staged implementation plan are defined.
-- Milestone 0 is complete: strict Python structural models, generated JSON Schema with drift checking, continuous coordinate transforms, two valid project fixtures, and five invalid fixtures are implemented.
-- The unreleased structural schema now covers every planned entity category, namespaced metadata, style, and generation provenance. Polygon topology and cross-entity validation for the supported rooms/walls/doors editor profile are implemented before persistence; unsupported future entity profiles are rejected.
-- React/TypeScript and FastAPI shells, generated TypeScript declarations, cross-runtime fixture validation, image-provider contracts, an offline mock, Python lint/format/type checks, and an Ubuntu CI workflow are implemented. Dependency auditing is configured but requires network access. See README.md and docs/adr for current scope and limitations.
-- Local ComfyUI/SDXL is selected as the first real image backend (ADR-0025). Hosted provider and Foundry version remain undecided.
-- The project name is **Map-Weaver's Quill**.
-- Native geometry uses a bottom-left origin, +y upward, and counter-clockwise angles; target adapters own all coordinate conversion.
-- Distribution is planned as a public, free, noncommercial release, with Linux prioritized before Windows 11.
-- Node 24 is enforced, frontend lint/format checks are enabled, and Playwright shell tests are included in Ubuntu CI. Clean-checkout CI run 35686075197 passed on code commit 2af87f4, including 20 Python tests, 10 TypeScript tests, 3 browser tests, build, typing, linting, schema drift checks, and dependency audits. Repeated termination signals no longer interrupt service cleanup.
-- Provider contracts include versioning, optional references and parameters, namespaced extensions, typed failures, and explicit unsupported cancellation. Python and TypeScript agree on namespace rejection. ADR-0001 through ADR-0007 are recorded. Language operations and asynchronous orchestration remain their scheduled later milestones.
-- All Milestone 0 exit criteria are demonstrated by clean Ubuntu CI, cross-runtime project round trips, generated-file drift checks, and mock provider contract tests. Windows 11 and Foundry compatibility remain unverified.
-- Milestone 1 is complete for the current editor scope. The React/Konva viewport implements pan/zoom/resize, grid/snapping, rectangle and polygon room proposals, single-room selection, movement, vertex editing, a name/prompt/geometry inspector and deletion. Geometry changes use stateless Shapely validation; accepted additions, edits and deletions support undo/redo. File New/Save/Open now persists native snapshots locally; refresh discards only unsaved session changes, and saved projects can be reopened. Read-only derived walls now split intersections, deduplicate shared boundaries, retain IDs for unchanged endpoints and expose source-room provenance. See ADR-0013 for the versioned API, limits and asynchronous inspection behavior. Constrained doors now support placement, inspection, editing/deletion and atomic room/wall/door undo snapshots. Attachments follow whole-room translations and compatible wall splits; orphaning or ambiguous edits are rejected (ADR-0014). Atomic SQLite persistence and cross-entity validation for the supported rooms/walls/doors profile are implemented (ADR-0015). Unsupported future entity collections and map profiles are explicitly rejected. All Milestone 1 exit criteria are demonstrated by [Ubuntu CI](https://github.com/dylsitarski/Map-Weavers-Quill/actions/runs/36094044452) on code commit `200338f`, including connected rooms plus a door, native and pixel-identical save/reopen, invalid-data rejection, and 50 scene commands through undo/redo. See ADR-0009 and ADR-0011.
+| Milestone | State | Notes |
+|---|---|---|
+| 0 Repository and contracts | Complete | All exit criteria demonstrated in clean Ubuntu CI |
+| 1 Deterministic editor foundation | Complete for the supported editor profile | Rooms, derived walls, constrained doors, undo/redo, atomic local snapshots (ADR-0009 to ADR-0015) |
+| 2 Layered raster pipeline and mock generation | Complete for the mock profile | Exit criteria reviewed in docs/MILESTONE_2_ACCEPTANCE.md (ADR-0016 to ADR-0022) |
+| 3 First real image provider | In progress | See below |
+| 4 Foundry vertical slice | Not started | Foundry version undecided |
+| 5 Second provider | Not started | Hosted provider deferred here by ADR-0025 |
+| 6–8 | Not started | |
 
-- Milestone 2 is complete for the supported local mock profile. Its first increment adds SHA-256-addressed PNG assets in SQLite, one base-background raster layer, offline mock preview/accept/reject/regenerate, stale-preview rejection, undoable visibility/opacity and native save/reopen with generation provenance (ADR-0016). Cancellation now uses the durable job workflow described below. Room crops, binary polygon masks, enforced outside-mask preservation, independent room artwork and validated room/layer bindings are implemented (ADR-0017). Geometry edits clear affected art with undo. Artwork ordering, visibility and opacity controls are implemented with undo/redo and save/open. Flattened PNG/lossless WebP export is implemented at the canonical 480 × 320 raster resolution (ADR-0018), respecting accepted layer order/visibility/opacity. Durable queued generation, polling, idempotent cancellation and interrupted-job recovery are implemented (ADR-0019). Active synchronous mock computation is not forcibly interrupted; late output cannot publish. Explicit browser preview recovery with project-fingerprint validation is implemented (ADR-0020). See docs/MILESTONE_2_ACCEPTANCE.md for the exit-criteria review. The room style-override inspector, map-style inheritance and deterministic provider prompt/provenance are implemented (ADR-0021). Persistent map background prompts and editable map-wide style defaults now complete the map-level authoring workflow (ADR-0022), including undo after Save and inherited room defaults. Real-provider interruption and model-specific prompt tuning belong to Milestone 3.
+Standing facts:
 
-- Milestone 3 is in progress: server-only provider configuration, bounded secret-file/environment loading, startup validation and a shared discovery/generation factory are implemented (ADR-0024). The editor defaults to mock and can now select comfyui-sdxl (ADR-0027). A standalone local ComfyUI/SDXL adapter, full-resolution smoke command, safe error mapping and offline protocol tests are implemented (ADR-0025). The owner reports SDXL working locally; adapter-specific hardware measurements and visual acceptance remain outstanding. Resolution-aware storage, masks, crop transforms, mixed-resolution composition and lossless exports now support legacy 480 × 320 and SDXL 960 × 640 full-map assets (ADR-0026), with original bytes preserved. Queued ComfyUI generation, readiness/capability display, aligned room crops, safe failures and persisted workflow provenance are implemented (ADR-0027). Offline tests cover the adapter-to-editor path. The first owner trial found abstract room artwork and insufficient top-down consistency; revised user prompts did not resolve them. ADR-0028 adds a 1024 × 1024 aspect-preserving room working transform, clean generation context and SDXL-specific positive/negative prompts. The next owner trial found coherent top-down imagery but incorrect scale and invented partitions. ADR-0029 now supplies physical grid/room scale and optional SDXL ControlNet wall/door guidance, with offline tests and explicit capability/readiness UI. Next: owner-run conditioned room acceptance, then explicit building grouping/roof intent and geometry-aware backgrounds. Exact furniture sizing and hard architectural pixel enforcement remain unimplemented. Flux Fill is deferred. Hosted generation and geometry-aware exteriors remain unimplemented.
+- The project name is **Map-Weaver's Quill**. Distribution is planned as a public, free,
+  noncommercial release, Linux first, then Windows 11. No license is selected yet.
+- Native geometry uses a bottom-left origin, +y up and counter-clockwise angles; target
+  adapters own all coordinate conversion.
+- The unreleased 0.1.0 schema covers every planned entity category. The editor's
+  save/open profile supports rooms, derived walls, doors, one background, room
+  artwork and generation records on a fixed 1200 × 800 map with a 50-unit grid. Other
+  entity collections are rejected rather than stripped.
+- CI on Ubuntu runs lint, typing, Python/TypeScript/browser tests, schema drift checks
+  and dependency audits. Windows 11 and Foundry compatibility are unverified.
+
+Milestone 3 status:
+
+- Done: server-only provider configuration and secret handling (ADR-0024); local
+  ComfyUI/SDXL adapter and smoke command (ADR-0025); resolution-aware storage, masks,
+  composition and export for 480 × 320 and 960 × 640 rasters (ADR-0026); queued SDXL
+  generation in the editor with readiness display, safe failures and provenance
+  (ADR-0027); 1024 × 1024 room working transform and SDXL prompts (ADR-0028); physical
+  scale prompts and optional ControlNet wall/door guidance (ADR-0029). All are covered
+  by offline tests only.
+- Owner trials: the first found abstract room art and oblique perspective (addressed by
+  ADR-0028); the second found coherent top-down images but wrong furniture scale,
+  invented partitions and backgrounds that ignore the architecture (addressed in part
+  by ADR-0029, not yet trialled).
+- Next: owner GPU trial of ADR-0029 conditioning with recorded runtime and peak VRAM;
+  improve inpainting quality (the current workflow uses base SDXL with
+  `VAEEncodeForInpaint`); then explicit building/open-air intent and geometry-aware
+  backgrounds (ADR-0023).
+- Not implemented: hosted generation, geometry-aware exteriors, exact furniture sizing,
+  hard architectural pixel enforcement, provider-side job interruption. Flux Fill is
+  deferred. A deterministic wall/door overlay was prototyped and parked (docs/HISTORY.md).
 
 ## 23. First implementation ticket
 

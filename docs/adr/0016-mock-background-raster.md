@@ -2,6 +2,9 @@
 
 Status: Implemented first Milestone 2 increment; remaining exit criteria are pending.
 
+Update 2026-10-05: Milestone 2 is complete for the mock profile (docs/MILESTONE_2_ACCEPTANCE.md).
+The fixed 480 × 320 raster size is extended by ADR-0026.
+
 ## Data and assets
 
 Reuse native RasterLayer and GenerationRecord without changing Project schema 0.1.0.

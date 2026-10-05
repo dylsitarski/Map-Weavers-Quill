@@ -3,6 +3,8 @@
 Status: Accepted and implemented; ComfyUI editor integration is next.
 Extends ADR-0016 through ADR-0018 and satisfies the resolution gate in ADR-0025.
 
+Update 2026-10-05: ComfyUI editor integration is implemented (ADR-0027).
+
 ## Contract
 
 Native geometry remains 1200 × 800, bottom-left origin, +y up. Full-map PNG

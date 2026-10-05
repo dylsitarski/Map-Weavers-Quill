@@ -3,6 +3,9 @@
 Status: Implemented mock workflow increment; real-provider interruption and a job-history
 recovery UI remain future work. Run one API process/worker against this data directory.
 
+Update 2026-10-05: the same queue also runs ComfyUI/SDXL jobs (ADR-0027). Provider-side
+interruption and a job-history UI are still not implemented.
+
 The editor creates a UUID before submitting POST /api/jobs/{id}/background or /room,
 using the existing strict request contract and a 4 MiB JSON/local-origin guard. The
 202 response and GET /api/jobs/{id} return GenerationJob: id, status (queued, running,

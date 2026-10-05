@@ -1,5 +1,8 @@
 # Milestone 2 acceptance review
 
+Historical record of Milestone 2 completion. Limits and next steps below describe the
+project at that time; for current status see README.md and PROJECT_MANIFEST.md §22.
+
 The Milestone 2 local mock raster workflow is implemented. Recovery and style checks are
 part of Ubuntu CI; real AI image quality and Windows 11 remain unverified.
 

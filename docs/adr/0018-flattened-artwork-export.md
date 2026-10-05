@@ -2,6 +2,9 @@
 
 Status: Implemented Milestone 2 increment. Persistent generation jobs remain unfinished.
 
+Update 2026-10-05: durable jobs are implemented (ADR-0019). Export now uses the highest
+stored resolution, 480 × 320 or 960 × 640 (ADR-0026).
+
 POST /api/export/image accepts contractVersion 0.1.0, the current native Project and
 format (png or webp). JSON-only loopback-origin guards and a streamed 4 MiB body limit
 match native persistence. Strict contract, geometry, layer bindings and asset/mask

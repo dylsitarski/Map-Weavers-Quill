@@ -2,6 +2,8 @@
 
 Status: Implemented for the local mock workflow.
 
+Update 2026-10-05: recovery also covers ComfyUI/SDXL jobs (ADR-0027).
+
 Store one small browser-local recovery record per project/target (background or room
 UUID): durable job ID, SHA-256 of the canonical project fingerprint, prompt and seed.
 No full project or image is stored in browser storage. A storage failure is reported;

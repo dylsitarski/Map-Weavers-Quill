@@ -3,6 +3,9 @@
 Status: Accepted design, 2026-09-24. Generation and layer controls are planned,
 not implemented by this clarification. Existing JSON structures are unchanged.
 
+Update 2026-10-05: background generation, room artwork and artwork layer controls are
+implemented (ADR-0016 to ADR-0018). Object and effect layers remain planned.
+
 Map selects the base environmental background for generation/regeneration, not
 merely AI context and not the flattened scene. Room targets bounded architecture
 and its render layer. Object represents independently manipulable visual content

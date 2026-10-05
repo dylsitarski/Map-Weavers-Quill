@@ -3,6 +3,9 @@
 Status: Implemented Milestone 2 increment; artwork ordering/visibility/opacity controls are implemented. Persistent
 jobs remain unfinished; flattened export is implemented in ADR-0018.
 
+Update 2026-10-05: durable jobs are implemented (ADR-0019); masks and crops are
+resolution-aware (ADR-0026).
+
 ## Raster convention and protection
 
 Canonical raster size remains 480 × 320 for a 1200 × 800 native map: 2.5 native units
