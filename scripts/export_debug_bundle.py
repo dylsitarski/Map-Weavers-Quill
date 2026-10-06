@@ -27,6 +27,9 @@ from quill.projects import ProjectStore
 
 # Input hash order written by background/room generation (ADR-0017, ADR-0029).
 INPUT_ROLES = ("source", "mask", "guide")
+# Masks and guides/sketches need exact pixels and compress well; artwork does not.
+EXACT_ROLES = {"mask", "guide"}
+WARN_BYTES = 25 * 1024 * 1024
 
 
 def slug(text: str) -> str:
@@ -82,8 +85,9 @@ def load(db: sqlite3.Connection, project_id: str, revision: int | None) -> Proje
 class Writer:
     """Writes assets by hash, remembering any that are missing or corrupt."""
 
-    def __init__(self, db: sqlite3.Connection):
+    def __init__(self, db: sqlite3.Connection, *, lossless: bool = False):
         self.db = db
+        self.lossless = lossless
         self.missing: list[str] = []
 
     def image(self, key: str) -> Image.Image | None:
@@ -95,13 +99,19 @@ class Writer:
         with Image.open(BytesIO(data)) as opened:
             return opened.copy()
 
-    def save(self, key: str, path: Path, crop: list[int] | None = None) -> None:
+    def save(
+        self, key: str, path: Path, crop: list[int] | None = None, *, exact: bool = False
+    ) -> None:
+        """Save as PNG when exact (or --lossless), otherwise as compact WebP."""
         picture = self.image(key)
         if picture is None:
             return
-        picture.save(path)
+        png = exact or self.lossless
+        suffix = ".png" if png else ".webp"
+        options = {} if png else {"quality": 85, "method": 4}
+        picture.save(path.with_suffix(suffix), **options)
         if crop is not None and len(crop) == 4:
-            picture.crop(tuple(crop)).save(path.with_name(path.stem + "-crop.png"))
+            picture.crop(tuple(crop)).save(path.with_name(path.name + "-crop" + suffix), **options)
 
 
 def write_generation(
@@ -116,9 +126,9 @@ def write_generation(
     crop = crop if isinstance(crop, list) else None
     for index, key in enumerate(record.inputHashes):
         role = INPUT_ROLES[index] if index < len(INPUT_ROLES) else f"input-{index + 1}"
-        writer.save(key, folder / f"input-{index + 1}-{role}.png", crop)
+        writer.save(key, folder / f"input-{index + 1}-{role}", crop, exact=role in EXACT_ROLES)
     if record.outputHash:
-        writer.save(record.outputHash, folder / "output.png", crop)
+        writer.save(record.outputHash, folder / "output", crop)
 
 
 def summary(project: Project) -> str:
@@ -165,14 +175,18 @@ def export(
     *,
     revision: int | None = None,
     background_jobs: bool = False,
+    last: int = 3,
+    lossless: bool = False,
 ) -> Path:
+    """Export a bundle. `last` keeps only the most recent N accepted generations and N
+    previews (0 keeps all); artwork is WebP unless `lossless`."""
     if output.exists():
         raise SystemExit(f"{output} already exists; choose another --output.")
     db = connect(data_dir)
     try:
         project_id = resolve(db, query)
         project = load(db, project_id, revision)
-        writer = Writer(db)
+        writer = Writer(db, lossless=lossless)
         output.mkdir(parents=True)
         (output / "project.json").write_text(project.model_dump_json(indent=2) + "\n")
         (output / "summary.txt").write_text(summary(project))
@@ -189,7 +203,7 @@ def export(
                 if role.get("role") == "background"
                 else f"room-{slug(rooms.get(str(role.get('roomId')), 'room'))}"
             )
-            filename = f"{layer.zIndex:02d}-{name}.png"
+            filename = f"{layer.zIndex:02d}-{name}" + (".png" if lossless else ".webp")
             writer.save(layer.assetHash, layers / filename)
             layer_info.append(
                 {
@@ -203,7 +217,9 @@ def export(
         (layers / "layers.json").write_text(json.dumps(layer_info, indent=2) + "\n")
 
         accepted = {record.outputHash for record in project.generations}
-        for number, record in enumerate(project.generations, 1):
+        numbered = list(enumerate(project.generations, 1))
+        kept_generations = numbered[-last:] if last else numbered
+        for number, record in kept_generations:
             target = record.metadata.get("quill.generation")
             target = target.get("target", "unknown") if isinstance(target, dict) else "unknown"
             write_generation(
@@ -218,12 +234,12 @@ def export(
         rows = (
             db.execute(
                 "SELECT id, target, request, status, result, error, created_at "
-                "FROM generation_jobs WHERE request IS NOT NULL ORDER BY created_at, id"
+                "FROM generation_jobs WHERE request IS NOT NULL ORDER BY created_at, rowid"
             ).fetchall()
             if has_jobs
             else []
         )
-        number = 0
+        matching = []
         for job_id, target, request, status, result, error, created in rows:
             payload = json.loads(request)
             if target == "room":
@@ -240,7 +256,10 @@ def export(
                 about = {key: payload.get(key) for key in ("prompt", "seed", "style")}
             else:
                 continue
-            number += 1
+            matching.append((job_id, target, status, result, error, created, about))
+        numbered_jobs = list(enumerate(matching, 1))
+        kept_jobs = numbered_jobs[-last:] if last else numbered_jobs
+        for number, (job_id, target, status, result, error, created, about) in kept_jobs:
             folder = output / "jobs" / f"{number:02d}-{status}-{target}-{job_id[:8]}"
             extra = {"job": {"id": job_id, "status": status, "created": created, **about}}
             if result:
@@ -258,9 +277,17 @@ def export(
             "project.json    the saved project document\n"
             "layers/         current artwork layers by zIndex, plus layers.json\n"
             "generations/    accepted generations: prompt.txt (exact model prompt),\n"
-            "                record.json (all parameters), input and output PNGs;\n"
-            "                *-crop.png files show the room's working crop\n"
+            "                record.json (all parameters), input and output images;\n"
+            "                *-crop files show the room's working crop\n"
             "jobs/           queued previews for this project, including unaccepted ones\n"
+            f"\nIncluded {len(kept_generations)} of {len(numbered)} accepted generations and "
+            f"{len(kept_jobs)} of {len(numbered_jobs)} previews"
+            + (" (the most recent; use --last 0 for all).\n" if last else ".\n")
+            + (
+                "Images are PNG.\n"
+                if lossless
+                else "Artwork is WebP (quality 85); masks, guides and sketches are exact PNG.\n"
+            )
             + (
                 "                (background jobs from every project are included)\n"
                 if background_jobs
@@ -290,6 +317,15 @@ def main() -> None:
         help="Also include background previews; these are not linked to a project",
     )
     parser.add_argument(
+        "--last",
+        type=int,
+        default=3,
+        help="Keep the most recent N accepted generations and N previews (0: all; default 3)",
+    )
+    parser.add_argument(
+        "--lossless", action="store_true", help="Save artwork as PNG instead of WebP (larger)"
+    )
+    parser.add_argument(
         "--data-dir",
         type=Path,
         default=Path(os.environ.get("MWQ_DATA_DIR", "data")),
@@ -315,8 +351,13 @@ def main() -> None:
         output,
         revision=args.revision,
         background_jobs=args.background_jobs,
+        last=max(0, args.last),
+        lossless=args.lossless,
     )
-    print(f"Wrote {output}/ and {archive}")
+    size = archive.stat().st_size
+    print(f"Wrote {output}/ and {archive} ({size / 1024 / 1024:.1f} MB)")
+    if size > WARN_BYTES:
+        print("That is over 25 MB; try a smaller --last (for example --last 1).")
     print("It contains your prompts and images for this project; share it privately.")
 
 

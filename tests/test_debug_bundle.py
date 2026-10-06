@@ -106,7 +106,7 @@ class DebugBundleTests(unittest.TestCase):
             json.loads((out / "project.json").read_text())["projectId"], str(self.project.projectId)
         )
         layers = json.loads((out / "layers" / "layers.json").read_text())
-        self.assertEqual([layer["file"] for layer in layers][0], "00-background.png")
+        self.assertEqual([layer["file"] for layer in layers][0], "00-background.webp")
         for layer in layers:
             self.assertTrue((out / "layers" / layer["file"]).exists())
         generations = sorted(p.name for p in (out / "generations").iterdir())
@@ -117,9 +117,11 @@ class DebugBundleTests(unittest.TestCase):
         record = json.loads((room / "record.json").read_text())
         self.assertEqual(record["outputHash"], self.room_output)
         self.assertEqual((room / "prompt.txt").read_text().strip(), record["prompt"])
-        for name in ("input-1-source", "input-2-mask", "output"):
-            self.assertTrue((room / f"{name}.png").exists(), name)
-            self.assertTrue((room / f"{name}-crop.png").exists(), name)
+        # Artwork is compact WebP; masks stay exact PNG.
+        for name in ("input-1-source.webp", "input-2-mask.png", "output.webp"):
+            self.assertTrue((room / name).exists(), name)
+            stem, suffix = name.rsplit(".", 1)
+            self.assertTrue((room / f"{stem}-crop.{suffix}").exists(), name)
         jobs = sorted(p.name for p in (out / "jobs").iterdir())
         self.assertEqual(len(jobs), 2)  # This project's room jobs only.
         succeeded = next(p for p in jobs if "-succeeded-room-" in p)
@@ -154,3 +156,17 @@ class DebugBundleTests(unittest.TestCase):
         out = self.data / "first"
         export(self.data, str(self.project.projectId), out, revision=1)
         self.assertEqual(json.loads((out / "project.json").read_text())["revision"], 1)
+
+    def test_last_limits_generations_and_previews_and_lossless_keeps_png(self):
+        out = self.data / "latest"
+        export(self.data, str(self.project.projectId), out, last=1, lossless=True)
+        (generation,) = (out / "generations").iterdir()
+        self.assertTrue(generation.name.startswith("02-room-"))  # The most recent one.
+        self.assertTrue((generation / "output.png").exists())
+        (job,) = (out / "jobs").iterdir()
+        self.assertIn("-failed-room-", job.name)  # The most recent preview.
+        readme = (out / "README.txt").read_text()
+        self.assertIn("Included 1 of 2 accepted generations and 1 of 2 previews", readme)
+        everything = self.data / "everything"
+        export(self.data, str(self.project.projectId), everything, last=0)
+        self.assertEqual(len(list((everything / "generations").iterdir())), 2)

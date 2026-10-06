@@ -121,8 +121,12 @@ To share a project for debugging, run `make debug-bundle PROJECT="Your project n
 writes a folder and a `.zip` under the data directory containing a readable summary of
 prompts, rooms and doors, the project JSON, current artwork layers, and every accepted
 generation and queued preview for that project with its exact model prompt, parameters
-and input/output images. It only reads the database, so it is safe while Quill runs. The
-bundle is private project content; never commit it.
+and input/output images. To keep it small enough to attach, it includes only the 3 most
+recent accepted generations and previews, and saves artwork as WebP; it prints the zip
+size. Run the script directly for more control, for example
+`PYTHONPATH=apps/server .venv/bin/python scripts/export_debug_bundle.py "Name" --last 1`
+(`--last 0` for everything, `--lossless` for PNG). It only reads the database, so it is
+safe while Quill runs. The bundle is private project content; never commit it.
 
 Projects are stored in `data/projects.sqlite3` under the server's working directory.
 Set `MWQ_DATA_DIR` before `make dev` to use another directory. Stop the server before
