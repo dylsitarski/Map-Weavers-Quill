@@ -5,7 +5,7 @@ ADR changes a decision, the earlier record stays and gets a dated update line un
 its status, rather than being rewritten. Start new ADRs from [template.md](template.md)
 and add them to this table. Contract changes require an ADR (see AGENTS.md).
 
-Status as of 2026-10-05.
+Status as of 2026-10-06.
 
 | ADR | Decision | Current status | Related |
 | --- | --- | --- | --- |
@@ -29,17 +29,18 @@ Status as of 2026-10-05.
 | [0018](0018-flattened-artwork-export.md) | Flattened PNG and lossless WebP export | Implemented (M2); resolution from 0026 | 0026 |
 | [0019](0019-durable-generation-jobs.md) | Durable local generation jobs | Implemented; provider interruption not implemented | 0027 |
 | [0020](0020-preview-recovery.md) | Explicit preview recovery after reload | Implemented (mock and SDXL) | |
-| [0021](0021-room-style-inspector.md) | Room style overrides and prompt assembly | Implemented; SDXL prompts per 0028 | 0022, 0028 |
-| [0022](0022-map-authoring.md) | Persistent map prompt and style defaults | Implemented (M2) | 0021 |
+| [0021](0021-room-style-inspector.md) | Room style overrides and prompt assembly | Implemented; SDXL prompts per 0028; Environment dropped by 0033 | 0022, 0028, 0033 |
+| [0022](0022-map-authoring.md) | Persistent map prompt and style defaults | Implemented (M2); Environment dropped by 0033 | 0021, 0033 |
 | [0023](0023-exterior-background-and-room-interiors.md) | Geometry-aware exterior background under interior layers | **Accepted design, not implemented** (M3) | 0029 |
 | [0024](0024-server-provider-configuration.md) | Server-only provider configuration and secrets | Implemented (M3); sequencing superseded by 0025 | 0025 |
 | [0025](0025-local-sdxl-first.md) | Local ComfyUI/SDXL as first real provider | Implemented; GPU acceptance pending | 0026, 0027 |
 | [0026](0026-resolution-aware-raster-assets.md) | Resolution-aware raster assets (480 × 320 and 960 × 640) | Implemented (M3) | 0016–0018 |
 | [0027](0027-queued-sdxl-editor.md) | Queued SDXL generation in the editor | Implemented; visual acceptance pending | 0019, 0025 |
-| [0028](0028-sdxl-room-working-resolution.md) | SDXL 1024 × 1024 room working transform and prompts | Implemented; GPU trial pending | 0027 |
+| [0028](0028-sdxl-room-working-resolution.md) | SDXL 1024 × 1024 room working transform and prompts | Implemented; crop replaced by 0033's fixed window | 0027, 0033 |
 | [0029](0029-scale-and-room-layout-conditioning.md) | Physical scale prompts and optional ControlNet wall guidance | Implemented; GPU trial pending | 0028, 0023 |
 | 0030 | Deterministic wall/door overlay drawn by Quill | **Parked**; exists only on the PR #1 branch, not on main | |
 | [0031](0031-sdxl-inpainting-model.md) | `InpaintModelConditioning` and optional dedicated SDXL inpainting UNet for rooms | Implemented; trialled: context good, walls partly followed with a full ControlNet, interiors not reliably indoors | 0025, 0029 |
-| [0032](0032-flux2-klein-provider.md) | Local FLUX.2 klein provider: reference-image room edits (sketch or plan) | Implemented; first trial done; sketch reference trial pending | 0025, 0031, 0023 |
+| [0032](0032-flux2-klein-provider.md) | Local FLUX.2 klein provider: reference-image room edits (sketch or plan) | Implemented; plan and sketch trials done; sketch and prompts revised by 0033 | 0025, 0031, 0023, 0033 |
+| [0033](0033-fixed-room-window-and-room-prompts.md) | Fixed-scale room window, room-first prompts, floor-plan door symbols, no Environment, random seeds, history pruning | Implemented; GPU trial pending | 0028, 0032, 0021, 0022 |
 
 M0–M8 refer to milestones in [PROJECT_MANIFEST.md](../../PROJECT_MANIFEST.md) §16.

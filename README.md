@@ -27,8 +27,10 @@ recorded. Open problems are furniture scale, invented interior partitions, and
 backgrounds that ignore the placed rooms. Rooms can optionally use a dedicated SDXL
 inpainting model (ADR-0031), but SDXL still does not reliably draw a large enclosed room
 as indoors. A second local model family, FLUX.2 klein (ADR-0032), draws whole rooms
-indoors with walls in place in about 20 seconds; its first trial left placeholder colors
-in the room. Next: a trial of klein's new sketch reference.
+indoors with walls in place in about 20 seconds. Its sketch-reference trial showed
+furniture scale varying with room size, placeholder floors, and doors not always
+honoured; rooms now use a fixed-scale context window, room-first prompts with a door
+list, and floor-plan door symbols (ADR-0033). Next: a trial of those changes.
 
 Verification evidence and the development log are in [docs/HISTORY.md](docs/HISTORY.md).
 
@@ -140,9 +142,15 @@ useful for exercising the workflow without a GPU. To generate real images, set u
 local SDXL (below).
 
 - **Map background**: choose Map, open the AI tab, enter a background prompt and map
-  style (Environment, Render style, Palette), Apply, then **Generate preview**.
+  style (Render style, Palette), Apply, then **Generate preview**. Describe the setting
+  (forest, desert) in the background prompt and in each room's prompt.
 - **Room artwork**: select a room, open AI, enter its prompt and optional style
   overrides (blank fields inherit the map style), Apply, then **Generate preview**.
+  Describe the room's contents and floor; door positions and states come from the map.
+
+Each generation uses a new random seed; check **Lock seed** (or type a seed) to reuse
+one. Accepting artwork drops the history records of artwork it replaces, so
+regenerating never reaches the 128-record limit.
 
 Previews appear on the map but change nothing until you **Accept**; Reject or
 Regenerate instead. Accepting is one undoable step. Any edit made while a preview is
@@ -203,7 +211,8 @@ variables before `make dev`, and never use `VITE_` variables for secrets. See
 - Fixed 1200 × 800 map with a 50-unit (5 ft) grid. Stored raster sizes are 480 × 320
   (mock) and 960 × 640 (SDXL).
 - Up to 128 rooms, 2048 room vertices in total, 8192 walls, 1024 doors, 129 artwork
-  layers and 128 generation records. Save requests are limited to 4 MiB.
+  layers and 128 generation records (only records for current artwork are kept). Save
+  requests are limited to 4 MiB.
 - Lights, objects, regions and sounds exist in the schema but are rejected by the
   editor's save/open validation rather than silently dropped.
 - No standalone walls, wall overrides or room-shape reordering.

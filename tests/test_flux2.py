@@ -18,11 +18,13 @@ from PIL import Image, ImageDraw
 from quill.backgrounds import BackgroundResult
 from quill.flux2 import (
     BLANK,
+    DEFAULT_FLOOR,
     PLAN_FLOOR,
     PLAN_WALL,
     SKETCH_FLOOR,
     Flux2Config,
     Flux2Provider,
+    room_instruction,
     room_plan,
     workflow,
 )
@@ -314,6 +316,30 @@ class Flux2ProtocolTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(plan.getpixel((5, 0)), (PLAN_WALL,) * 3)
         self.assertEqual(plan.getpixel((5, 5)), (0, 0, 0))
 
+    def test_room_instruction_puts_room_facts_first(self):
+        style = {"renderStyle": "inked", "palette": " "}
+        text = room_instruction(
+            "Cluttered storeroom with crates", style, "sketch", ["a closed door in the top wall"]
+        )
+        lines = text.splitlines()
+        self.assertEqual(
+            lines[:4],
+            [
+                "Cluttered storeroom with crates",
+                DEFAULT_FLOOR,
+                "Doors: a closed door in the top wall.",
+                "Rendering style: inked.",
+            ],
+        )
+        self.assertTrue(lines[4].startswith("Edit image 1"))
+        self.assertNotIn("Palette", text)
+        self.assertNotIn("same art style", text)
+        self.assertIn("its own furnishings, materials and colors", text)
+        described = room_instruction("Bedroom, mossy flagstone FLOORS", {}, "plan", [])
+        self.assertNotIn(DEFAULT_FLOOR, described)
+        self.assertIn("Doors: this room has no doors.", described)
+        self.assertIn("Image 2 is its floor plan", described)
+
 
 class Flux2EditorTests(unittest.TestCase):
     def setUp(self):
@@ -374,10 +400,15 @@ class Flux2EditorTests(unittest.TestCase):
         result = BackgroundResult.model_validate_json(json.dumps(job["result"]))
         generation = result.generation
         self.assertEqual(generation.providerId, "comfyui-flux2-klein")
-        self.assertTrue(generation.prompt.startswith("Image 1 is a top-down"))
-        self.assertIn("each grid cell is 5 ft", generation.prompt)
+        # Room facts first: the description, then doors from geometry, then the edit.
+        lines = generation.prompt.splitlines()
+        self.assertEqual(lines[0], room.prompt)
+        self.assertIn("Doors: a closed door in the right wall.", lines)
+        self.assertTrue(generation.prompt.index("Doors:") < generation.prompt.index("Edit image 1"))
+        self.assertIn("one 5-ft grid square is 128 pixels wide", generation.prompt)
+        self.assertNotIn("Follow the supplied wall lines", generation.prompt)
         parameters = generation.parameters
-        self.assertEqual(parameters["promptTemplate"], "flux2-klein-room-sketch-v1")
+        self.assertEqual(parameters["promptTemplate"], "flux2-klein-room-sketch-v2")
         self.assertTrue(parameters["layoutConditioning"])
         self.assertNotIn("negativePrompt", parameters)
         self.assertEqual(parameters["comfyui"]["workflowVersion"], "comfy-flux2-klein-edit-v1")

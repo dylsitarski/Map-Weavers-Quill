@@ -4,6 +4,9 @@ Status: Implemented; visual improvement requires an owner-run GPU trial.
 Supersedes the unscaled SDXL crop path and prompt assembly in ADR-0027. Mock output,
 native geometry, full-map storage and project schemas remain unchanged.
 
+Update 2026-10-06: the per-room padded crop is replaced by a fixed 40-ft window of real
+map context, so every room has the same working scale (ADR-0033).
+
 ## Reason
 
 The first owner trial produced abstract room bands and backgrounds with an oblique

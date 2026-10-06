@@ -130,12 +130,15 @@ class RoomImageTests(unittest.TestCase):
         changed = generate_room(RoomImageRequest(project=self.project, roomId=target.id, seed=0))
         self.assertEqual(
             changed.generation.parameters["effectiveStyle"],
-            {
-                "environment": self.project.map.style.environment,
-                "palette": "icy blue",
-                "renderStyle": "ink drawing",
-            },
+            {"palette": "icy blue", "renderStyle": "ink drawing"},
         )
+        # Environment is no longer a style default (ADR-0033): saved values are ignored.
+        target.styleOverrides = {"environment": "stone abbey", "palette": "icy blue"}
+        ignored = generate_room(RoomImageRequest(project=self.project, roomId=target.id, seed=0))
+        self.assertNotIn("environment", ignored.generation.parameters["effectiveStyle"])
+        self.assertNotIn("stone abbey", ignored.generation.prompt)
+        self.assertNotIn(self.project.map.style.environment, ignored.generation.prompt)
+        target.styleOverrides = {"palette": "icy blue", "renderStyle": "ink drawing"}
         self.assertEqual(changed.generation.parameters["styleOverrides"], target.styleOverrides)
         self.assertEqual(changed.generation.parameters["roomPrompt"], target.prompt)
         self.assertIn('"palette": "icy blue"', changed.generation.prompt)

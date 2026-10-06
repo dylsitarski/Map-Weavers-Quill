@@ -132,10 +132,12 @@ or dismissing panels must never resize or shift the canvas. No document scrollin
 
 ### AI generation
 
-- Map → AI: background prompt and map-wide Environment, Render style and Palette.
-  Apply is one undoable change; pending (unapplied) drafts disable generation.
-- Room → AI (with a room selected): room prompt and style overrides. Blank fields
-  inherit the map value, shown as a placeholder. Apply is one undoable change that
+- Map → AI: background prompt and map-wide Render style and Palette. Describe the
+  setting in the prompts; the old Environment field is not shown, and a saved value
+  is listed with a button to clear it. Apply is one undoable change; pending
+  (unapplied) drafts disable generation.
+- Room → AI (with a room selected): room prompt and Render style and Palette
+  overrides. Blank fields inherit the map value, shown as a placeholder. Apply is one undoable change that
   keeps existing artwork until a replacement is accepted.
 - The AI tab shows provider identity (offline mock, local SDXL or local FLUX.2 klein),
   readiness and capabilities. Check provider
@@ -145,6 +147,10 @@ or dismissing panels must never resize or shift the canvas. No document scrollin
   history or save data. Accept applies it as one undoable step; Reject, Regenerate and
   Cancel preview are available. Cancel sends server-side cancellation. Results never
   auto-apply, and job failures stay visible until dismissed.
+- Each generation uses a new random seed, shown in the Seed field and the preview.
+  Lock seed reuses the shown seed; typing a seed locks it.
+- Accepting artwork keeps only generation records still shown by an artwork layer,
+  so regenerating never fills the 128-record history limit. Undo restores them.
 - Any document change makes an open preview stale; stale previews explain why they
   cannot be accepted. Leaving the target scope removes the preview overlay.
 - After a reload, reopen the saved map, choose the same Map or room target, and use

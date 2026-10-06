@@ -10,7 +10,10 @@ test('map prompt and defaults save, reopen, undo after save and reach generation
   const palette = page.getByRole('textbox', { name: 'Map palette' });
   await prompt.fill('Ancient ruins');
   await palette.fill('ochre and grey');
-  await page.getByRole('textbox', { name: 'Map environment' }).fill('desert');
+  // Environment is no longer a map default (ADR-0033).
+  await expect(
+    page.getByRole('textbox', { name: 'Map environment' }),
+  ).toHaveCount(0);
   await expect(
     page.getByRole('button', { name: 'Generate preview', exact: true }),
   ).toBeDisabled();
@@ -74,4 +77,41 @@ test('map prompt and defaults save, reopen, undo after save and reach generation
   await expect(
     page.getByRole('textbox', { name: 'Palette', exact: true }),
   ).toHaveAttribute('placeholder', 'blue');
+});
+
+test('each generation uses a new random seed unless the seed is locked', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Map', exact: true }).click();
+  await page.getByRole('tab', { name: 'AI', exact: true }).click();
+  const generate = page.getByRole('button', {
+    name: /^(Generate|Regenerate) preview$/,
+  });
+  const accept = page.getByRole('button', { name: 'Accept background' });
+  const seeds: number[] = [];
+  for (let i = 0; i < 2; i++) {
+    const request = page.waitForRequest('**/api/jobs/*/background');
+    await generate.click();
+    seeds.push((await request).postDataJSON().seed);
+    await expect(accept).toBeEnabled();
+  }
+  expect(Number.isInteger(seeds[0])).toBe(true);
+  expect(seeds[0]).not.toBe(seeds[1]);
+  const seed = page.getByRole('spinbutton', { name: 'Seed', exact: true });
+  await expect(seed).toHaveValue(String(seeds[1]));
+  // Typing a seed locks it; it is then reused for every generation.
+  await seed.fill('7');
+  const lock = page.getByRole('checkbox', { name: 'Lock seed' });
+  await expect(lock).toBeChecked();
+  for (let i = 0; i < 2; i++) {
+    const request = page.waitForRequest('**/api/jobs/*/background');
+    await generate.click();
+    expect((await request).postDataJSON().seed).toBe(7);
+    await expect(accept).toBeEnabled();
+  }
+  await lock.uncheck();
+  const request = page.waitForRequest('**/api/jobs/*/background');
+  await generate.click();
+  expect((await request).postDataJSON().seed).not.toBe(7);
 });

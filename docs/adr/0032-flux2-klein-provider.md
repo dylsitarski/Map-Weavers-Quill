@@ -4,6 +4,11 @@ Status: Implemented. First owner trial recorded (below); the sketch reference th
 followed it is not yet trialled. Adds a second local model family alongside
 SDXL (ADR-0025); SDXL remains available and unchanged.
 
+Update 2026-10-06: the sketch reference was trialled (results in ADR-0033). The room
+window, sketch (`room-sketch-v2`, floor-plan door symbols) and prompts
+(`flux2-klein-room-sketch-v2`, `flux2-klein-room-plan-v3`, room facts first) changed in
+ADR-0033.
+
 ## Context
 
 Owner trials with SDXL (ADR-0028, ADR-0029, ADR-0031) showed that wall *edges* can be

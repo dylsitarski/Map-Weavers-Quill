@@ -36,7 +36,6 @@ export function PromptPanel({
       <p>Room style · leave blank to inherit the map style.</p>
       {(
         [
-          ['environment', 'Environment'],
           ['renderStyle', 'Render style'],
           ['palette', 'Palette'],
         ] as const

@@ -23,7 +23,7 @@ from quill.projects import ProjectStore, SaveRequest
 from quill.provider_config import create_provider, load_provider_config, provider_config
 from quill.providers import GenerateRequest
 from quill.raster import image, png, polygon_mask
-from quill.sdxl_authoring import NEGATIVE, RoomTransform
+from quill.sdxl_authoring import NEGATIVE, RoomWindow
 from test_projects import document
 
 
@@ -185,16 +185,14 @@ class ComfyEditorTests(unittest.TestCase):
                 )
                 self.assertEqual(job["status"], "succeeded", job)
                 proposal = BackgroundResult.model_validate_json(json.dumps(job["result"]))
-                crop = proposal.generation.parameters["crop"]
-                self.assertEqual((crop[2] - crop[0]) % 64, 0)
-                self.assertEqual((crop[3] - crop[1]) % 64, 0)
+                full_mask = polygon_mask(room.polygon, (960, 640))
+                # A fixed 40-ft (320 px) window of real map context around each room.
+                window = RoomWindow.around(full_mask, 320, 16)
+                self.assertEqual(proposal.generation.parameters["crop"], list(window.crop))
+                self.assertEqual(window.side, 320)
                 self.assertEqual(self.fake.upload.size, (1024, 1024))
                 self.assertEqual(self.fake.graph["3"]["inputs"]["text"], NEGATIVE)
-                full_mask = polygon_mask(room.polygon, (960, 640))
-                crop_mask = full_mask.crop(crop)
-                _, expected_mask = RoomTransform(*crop_mask.size).prepare(
-                    Image.new("RGB", crop_mask.size), crop_mask
-                )
+                _, expected_mask = window.prepare(Image.new("RGB", (960, 640)), full_mask)
                 np.testing.assert_array_equal(
                     np.asarray(self.fake.upload.getchannel("A")),
                     255 - np.asarray(expected_mask),
@@ -344,7 +342,7 @@ class ComfyEditorTests(unittest.TestCase):
                     self.assertEqual(
                         self.fake.graph["10"]["inputs"]["image"][:14], "quill-control-"
                     )
-                    self.assertIn("each grid cell is 5 ft", self.fake.graph["2"]["inputs"]["text"])
+                    self.assertIn("one 5-ft grid square", self.fake.graph["2"]["inputs"]["text"])
                     self.assertEqual(self.fake.upload.size, (1024, 1024))
                     room.renderLayerId = result.layer.id
                     project.layers = [result.layer]

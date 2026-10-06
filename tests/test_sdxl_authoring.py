@@ -6,42 +6,68 @@ from uuid import uuid4
 import numpy as np
 from PIL import Image
 from quill.models import Bounds, GenerationRecord, Point, RasterLayer
-from quill.sdxl_authoring import NEGATIVE, RoomTransform, clean_context, prompt_text
+from quill.sdxl_authoring import (
+    NEGATIVE,
+    RoomWindow,
+    background_scale,
+    clean_context,
+    prompt_text,
+)
 from test_projects import document
 
 
 class SdxlAuthoringTests(unittest.TestCase):
-    def test_transform_preserves_axes_aspect_and_protected_padding(self):
-        for width, height in ((64, 64), (192, 320), (960, 64), (64, 640), (319, 193)):
-            with self.subTest(size=(width, height)):
-                # Smooth two-axis gradient detects stretching, flipping and misplaced padding.
-                pixels = np.zeros((height, width, 3), dtype=np.uint8)
-                pixels[:, :, 0] = np.linspace(0, 255, width).astype(np.uint8)[None, :]
-                pixels[:, :, 1] = np.linspace(0, 255, height).astype(np.uint8)[:, None]
-                source = Image.fromarray(pixels)
+    def test_window_has_fixed_physical_size_real_context_and_exact_return(self):
+        # Smooth two-axis gradient detects stretching, flipping and misplaced crops.
+        pixels = np.zeros((640, 960, 3), dtype=np.uint8)
+        pixels[:, :, 0] = np.linspace(0, 255, 960).astype(np.uint8)[None, :]
+        pixels[:, :, 1] = np.linspace(0, 255, 640).astype(np.uint8)[:, None]
+        source = Image.fromarray(pixels)
+        for box in ((400, 300, 480, 380), (0, 0, 64, 64), (900, 600, 960, 640), (100, 50, 300, 90)):
+            with self.subTest(room=box):
                 mask = Image.new("L", source.size)
-                mask.paste(255, (0, 0, width // 2, height // 2))
-                transform = RoomTransform(width, height)
-                work, work_mask = transform.prepare(source, mask)
-                self.assertEqual(work.size, (1024, 1024))
+                mask.paste(255, box)
+                window = RoomWindow.around(mask, 320, 16)
+                # Same window, so the same working scale, for rooms of different sizes.
+                self.assertEqual((window.side, window.scale), (320, 3.2))
+                left, top, right, bottom = window.crop
+                self.assertEqual((right - left, bottom - top), (320, 320))  # No padding.
+                self.assertTrue(left <= box[0] and top <= box[1])
+                self.assertTrue(right >= box[2] and bottom >= box[3])
+                work, work_mask = window.prepare(source, mask)
+                self.assertEqual((work.size, work_mask.size), ((1024, 1024), (1024, 1024)))
                 self.assertEqual(set(np.unique(work_mask)), {0, 255})
-                restored = transform.restore(work)
-                self.assertEqual(restored.size, source.size)
-                self.assertLessEqual(np.abs(np.asarray(restored).astype(int) - pixels).max(), 2)
-                left, top = transform.offset
-                # At a protected padding corner, the mask stays black.
-                if left or top:
-                    self.assertEqual(work_mask.getpixel((0, 0)), 0)
-                expected = (
-                    left * 1024 / transform.side,
-                    top * 1024 / transform.side,
-                    (left + width // 2) * 1024 / transform.side,
-                    (top + height // 2) * 1024 / transform.side,
-                )
+                expected = [
+                    round(v) for v in (*window.to_working(*box[:2]), *window.to_working(*box[2:]))
+                ]
                 for actual, desired in zip(work_mask.getbbox(), expected, strict=True):
                     self.assertLessEqual(abs(actual - desired), 1)
+                restored = window.restore(work)
+                self.assertEqual(restored.size, (320, 320))
+                original = np.asarray(source.crop(window.crop)).astype(int)
+                self.assertLessEqual(np.abs(np.asarray(restored).astype(int) - original).max(), 2)
         with self.assertRaises(ValueError):
-            RoomTransform(64, 64).restore(Image.new("RGB", (64, 64)))
+            window.restore(Image.new("RGB", (64, 64)))
+        with self.assertRaises(ValueError):
+            RoomWindow.around(Image.new("L", (960, 640)), 320, 16)
+
+    def test_window_grows_for_large_rooms_and_pads_only_past_the_map(self):
+        source = Image.new("RGB", (960, 640), (10, 200, 30))
+        mask = Image.new("L", source.size)
+        mask.paste(255, (100, 100, 600, 300))
+        window = RoomWindow.around(mask, 320, 16)
+        self.assertEqual(window.side, 532)  # Room width plus margins.
+        self.assertEqual(window.crop[2] - window.crop[0], 532)
+        mask = Image.new("L", source.size)
+        mask.paste(255, (10, 4, 950, 636))  # Wider than the map is tall.
+        window = RoomWindow.around(mask, 320, 16)
+        self.assertEqual(window.side, 972)
+        self.assertEqual(window.crop, (0, 0, 960, 640))
+        work, work_mask = window.prepare(source, mask)
+        # Padding repeats edge colors and stays protected by the mask.
+        self.assertEqual(work.getpixel((0, 0)), (10, 200, 30))
+        self.assertEqual(work_mask.getpixel((0, 0)), 0)
+        self.assertEqual(window.restore(work).size, (960, 640))
 
     def test_context_excludes_target_and_known_mock_without_mutating_document(self):
         project = document()
@@ -101,18 +127,20 @@ class SdxlAuthoringTests(unittest.TestCase):
         self.assertEqual(project.model_dump_json(), original)
 
     def test_templates_distinguish_exterior_and_interior_and_keep_authored_content(self):
-        style = {
-            "environment": "Cottage interior",
-            "renderStyle": "Ink and watercolor",
-            "palette": "warm brown",
-        }
+        style = {"renderStyle": "Ink and watercolor", "palette": "warm brown"}
         room = prompt_text("Kitchen with a hearth", style, room=True)
-        exterior = prompt_text("Forest path to a cottage", style, room=False)
+        exterior = prompt_text(
+            "Forest path to a cottage", style, room=False, scale=background_scale(960)
+        )
         self.assertTrue(room.startswith("Orthographic top-down"))
         self.assertIn("roof removed", room)
         self.assertIn("building roofs", exterior)
         self.assertIn("Kitchen with a hearth", room)
-        self.assertIn("Cottage interior", room)
+        self.assertIn("renderStyle: Ink and watercolor", room)
+        self.assertIn("readable floor surfaces", room)
+        self.assertNotIn("floor surfaces", exterior)
+        self.assertIn("120 by 80 feet", exterior)
+        self.assertIn("one 5-foot square is 40 pixels wide", exterior)
         self.assertNotIn("{", room)
         self.assertIn("isometric", NEGATIVE)
         self.assertIn("checkerboard", NEGATIVE)

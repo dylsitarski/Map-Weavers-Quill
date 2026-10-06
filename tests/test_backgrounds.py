@@ -131,7 +131,8 @@ def app():
         a = generate_background(request)
         self.assertEqual(a.generation.parameters["backgroundPrompt"], "Ancient ruins")
         self.assertEqual(a.generation.parameters["mapStyle"]["palette"], "ochre")
-        self.assertIn('"environment": "desert"', a.generation.prompt)
+        self.assertIn('"palette": "ochre"', a.generation.prompt)
+        self.assertNotIn("desert", a.generation.prompt)  # Environment is not sent (ADR-0033).
         request.style.palette = "blue"
         b = generate_background(request)
         self.assertNotEqual(a.layer.assetHash, b.layer.assetHash)

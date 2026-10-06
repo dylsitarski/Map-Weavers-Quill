@@ -4,11 +4,14 @@ import json
 
 from quill.models import MapStyle, Room
 
-STYLE_KEYS = ("environment", "renderStyle", "palette")
+STYLE_KEYS = ("renderStyle", "palette")
+# Environment is no longer a style default (ADR-0033): describe each room's setting in
+# its own prompt. Saved values remain valid but are never sent to a provider.
+IGNORED_KEYS = ("environment",)
 
 
 def room_style_prompt(room: Room, style: MapStyle) -> tuple[str, dict[str, str]]:
-    unknown = set(room.styleOverrides) - set(STYLE_KEYS)
+    unknown = set(room.styleOverrides) - set(STYLE_KEYS) - set(IGNORED_KEYS)
     if unknown:
         raise ValueError("Unsupported room style overrides: " + ", ".join(sorted(unknown)))
     effective = {}

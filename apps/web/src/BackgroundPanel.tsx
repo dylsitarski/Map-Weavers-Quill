@@ -32,6 +32,12 @@ const validJob = ajv.compile<GenerationJob>({
   $defs: schema.$defs,
   $ref: '#/$defs/GenerationJob',
 });
+const MAX_SEED = 2147483647;
+export function randomSeed(): number {
+  const value = new Uint32Array(1);
+  crypto.getRandomValues(value);
+  return value[0] % (MAX_SEED + 1);
+}
 function cancelJob(id: string) {
   void fetch(`/api/jobs/${id}/cancel`, {
     method: 'POST',
@@ -95,7 +101,9 @@ export function BackgroundPanel(p: {
     !p.room &&
     (prompt !== p.mapPrompt ||
       JSON.stringify(styleDraft) !== JSON.stringify(p.mapStyle));
-  const [seed, setSeed] = useState(0);
+  // A new random seed per generation unless the seed is locked (typing one locks it).
+  const [seed, setSeed] = useState(randomSeed);
+  const [seedLocked, setSeedLocked] = useState(false);
   const [working, setWorking] = useState(false);
   const [jobStatus, setJobStatus] = useState('queued');
   const jobId = useRef<string | null>(null);
@@ -157,12 +165,14 @@ export function BackgroundPanel(p: {
     setJobStatus('queued');
     const id = resume?.id ?? crypto.randomUUID();
     jobId.current = id;
+    const used = resume?.seed ?? (seedLocked ? seed : randomSeed());
+    setSeed(used);
     try {
       const value = resume ?? {
         id,
         signature: await previewSignature(p.fingerprint),
         prompt: p.room?.prompt ?? p.mapPrompt ?? prompt,
-        seed,
+        seed: used,
       };
       if (attempt !== sequence.current) return;
       remembered.current = { key, value };
@@ -172,9 +182,6 @@ export function BackgroundPanel(p: {
           ? ''
           : 'Browser storage is unavailable. This preview cannot be recovered after reload.',
       );
-      if (resume) {
-        setSeed(resume.seed);
-      }
       const response = resume
         ? await fetch(`/api/jobs/${id}`, { signal: abort.signal })
         : await fetch(`/api/jobs/${id}/${target}`, {
@@ -182,11 +189,11 @@ export function BackgroundPanel(p: {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(
               p.room
-                ? { project: p.project, roomId: p.room.id, seed }
+                ? { project: p.project, roomId: p.room.id, seed: used }
                 : {
                     prompt: p.mapPrompt ?? prompt,
                     style: p.mapStyle,
-                    seed,
+                    seed: used,
                     baseRevision: p.revision,
                   },
             ),
@@ -313,7 +320,7 @@ export function BackgroundPanel(p: {
         {localComfy && p.room && (
           <p>
             {klein
-              ? 'The room walls and doors (with open or closed states) are sent as a layout reference. Physical scale is included; inspect the preview for accuracy.'
+              ? 'The room is sent as a floor-plan sketch with its doors (open or closed), and the doors are listed in the prompt. Every room uses the same physical scale; describe the floor and contents, then inspect the preview.'
               : provider.state?.descriptor.capabilities.includes(
                     'control_image',
                   )
@@ -347,11 +354,28 @@ export function BackgroundPanel(p: {
               onChange={(e) => setPrompt(e.target.value)}
             />
           </label>
-          <p>Map defaults · inherited by rooms unless overridden.</p>
+          <p>
+            Map defaults · inherited by rooms unless overridden. Describe the
+            setting in the background and room prompts.
+          </p>
+          {styleDraft?.environment && (
+            <p>
+              Map environment "{styleDraft.environment}" is no longer used.{' '}
+              <button
+                type="button"
+                disabled={working || p.busy}
+                onClick={() =>
+                  styleDraft &&
+                  setStyleDraft({ ...styleDraft, environment: '' })
+                }
+              >
+                Clear unused environment
+              </button>
+            </p>
+          )}
           {styleDraft &&
             (
               [
-                ['environment', 'Map environment'],
                 ['renderStyle', 'Map render style'],
                 ['palette', 'Map palette'],
               ] as const
@@ -383,8 +407,20 @@ export function BackgroundPanel(p: {
           step="1"
           value={Number.isFinite(seed) ? seed : ''}
           disabled={working}
-          onChange={(e) => setSeed(e.target.valueAsNumber)}
+          onChange={(e) => {
+            setSeed(e.target.valueAsNumber);
+            setSeedLocked(true);
+          }}
         />
+      </label>
+      <label>
+        <input
+          type="checkbox"
+          checked={seedLocked}
+          disabled={working}
+          onChange={(e) => setSeedLocked(e.target.checked)}
+        />
+        Lock seed
       </label>
       <button
         type="button"
@@ -394,9 +430,8 @@ export function BackgroundPanel(p: {
           p.busy ||
           mapDraftDirty ||
           p.count >= 128 ||
-          !Number.isInteger(seed) ||
-          seed < 0 ||
-          seed > 2147483647
+          (seedLocked &&
+            (!Number.isInteger(seed) || seed < 0 || seed > MAX_SEED))
         }
         onClick={() => void generate()}
       >

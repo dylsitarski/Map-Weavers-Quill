@@ -116,8 +116,26 @@ criterion to its tests.
     one-image `sketch` reference with door states, and placeholder wording for the
     `plan` prompt (ADR-0032).
 
-Outstanding before Milestone 3 can close: an owner trial of the FLUX.2 klein sketch
-reference (ADR-0032),
+13. **Debugging bundle and sixth owner trial (2026-10-06, klein `sketch`).** A read-only
+    `make debug-bundle` export let the owner share the test cottage map (37 generation
+    records: 17 mock, 7 SDXL, 13 klein). Rooms were indoors, but: the working scale
+    depended on room size (about 64 px/ft for 10-ft rooms, 26 px/ft for the 36-ft main
+    room), so small rooms got miniature furniture and thick sketch walls; non-square
+    crops were padded with smeared edge pixels; floors had to be described or stayed
+    off-white; doors were not always honoured; rooms looked alike despite distinct
+    descriptions; the map Environment ("Mystical fantasy forest") was inherited into
+    every interior; 28 of 37 generations used seed 0; the background cottage was drawn in
+    perspective without any scale in its prompt. The owner wants the dark wall tops kept
+    if small and consistent.
+14. **Fixed-scale window and room-first prompts (ADR-0033).** Rooms are edited in a fixed
+    40-ft window of real map context (same working scale for every room); the klein sketch
+    is drawn at that scale with floor-plan door symbols; klein prompts start with the room
+    description, a default floor line and a door list from geometry; Environment is no
+    longer used; backgrounds state the map's physical scale; seeds are random unless
+    locked; accepting artwork prunes history records of replaced artwork. Verified with
+    111 Python, 32 TypeScript and 41 browser tests; not yet trialled on a GPU.
+
+Outstanding before Milestone 3 can close: an owner trial of ADR-0033's room changes,
 recorded runtime and peak VRAM, explicit building/open-air intent, and geometry-aware backgrounds
 (ADR-0023). Flux Fill was considered and deferred; hosted generation moved to
 Milestone 5.

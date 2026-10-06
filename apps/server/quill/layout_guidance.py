@@ -3,11 +3,11 @@
 import math
 
 from PIL import Image, ImageDraw
-from shapely.geometry import Polygon  # type: ignore[import-untyped]
+from shapely.geometry import Point, Polygon  # type: ignore[import-untyped]
 
 from quill.doors import owners
 from quill.models import Project, Room, Wall
-from quill.sdxl_authoring import RoomTransform
+from quill.sdxl_authoring import WORKING_SIDE, RoomWindow
 
 # Sketch colors for reference-image room edits (ADR-0032). Pure black means "no sketch".
 SKETCH_WALL = (30, 30, 30)
@@ -58,74 +58,121 @@ def wall_guide(project: Project, size: tuple[int, int]) -> Image.Image:
     return guide
 
 
-def room_sketch(project: Project, size: tuple[int, int], room: Room) -> Image.Image:
-    """Architectural sketch of one room's walls on black: thick dark walls at the project's
-    wall thickness, open doors as gaps, closed/locked doors as brown bars, secret doors as
-    plain wall, windows as wall. Other rooms' walls are omitted so only the target room
-    reads as a sketch. Black pixels are transparent when composited."""
-    sketch = Image.new("RGB", size)
+def _inward(room: Room, wall: Wall) -> tuple[float, float]:
+    """Unit normal of a wall pointing into the room, in native coordinates (+y up)."""
+    dx, dy = wall.end.x - wall.start.x, wall.end.y - wall.start.y
+    length = math.hypot(dx, dy)
+    nx, ny = -dy / length, dx / length
+    mx, my = (wall.start.x + wall.end.x) / 2, (wall.start.y + wall.end.y) / 2
+    inside = Polygon([(p.x, p.y) for p in room.polygon]).contains(Point(mx + nx, my + ny))
+    return (nx, ny) if inside else (-nx, -ny)
+
+
+def _room_doors(project: Project, room: Room) -> list[tuple[Wall, float, list]]:
+    walls = []
+    for wall in project.walls:
+        if str(room.id) in owners(wall):
+            length = math.hypot(wall.end.x - wall.start.x, wall.end.y - wall.start.y)
+            walls.append((wall, length, _openings(project, wall, length, secret=False)))
+    return walls
+
+
+SIDES = ("right", "top-right", "top", "top-left", "left", "bottom-left", "bottom", "bottom-right")
+DOOR_STATES = {
+    "open": "an open door swung into the room",
+    "closed": "a closed door",
+    "locked": "a closed door",
+}
+
+
+def door_list(project: Project, room: Room) -> list[str]:
+    """Plain-language door facts for one room, as seen in the image (top is +y)."""
+    lines = []
+    for wall, _, openings in _room_doors(project, room):
+        nx, ny = _inward(room, wall)
+        side = SIDES[round(math.degrees(math.atan2(-ny, -nx)) / 45) % 8]
+        lines += [f"{DOOR_STATES[door.state]} in the {side} wall" for _, _, door in openings]
+    return lines
+
+
+def room_sketch(
+    project: Project, size: tuple[int, int], room: Room, window: RoomWindow | None = None
+) -> Image.Image:
+    """Floor-plan sketch of one room's walls on black, in working space for ``window``
+    or at map raster ``size`` without one (the stored provenance copy).
+
+    Walls are dark bands at the project's wall thickness, so they have the same physical
+    width in every room. Doors use floor-plan symbols: a closed or locked door is a brown
+    leaf across its opening; an open door is a leaf swung into the room from its hinge
+    with a thin quarter-circle swing arc. Secret doors and windows are drawn as wall.
+    Other rooms' walls are omitted. Black pixels are transparent when composited.
+    """
+    sketch = Image.new("RGB", (WORKING_SIDE,) * 2 if window else size)
     draw = ImageDraw.Draw(sketch)
     sx, sy = size[0] / project.map.width, size[1] / project.map.height
-    width = max(3, round(project.map.style.wallThicknessPx * sx))
-    bar = max(2, width // 2)
+    zoom = window.scale if window else 1.0
+    width = max(3, round(project.map.style.wallThicknessPx * sx * zoom))
+    leaf, arc = max(2, width // 2), max(1, width // 4)
 
     def point(wall: Wall, t: float) -> tuple[float, float]:
-        return (
-            (wall.start.x + (wall.end.x - wall.start.x) * t) * sx,
-            size[1] - (wall.start.y + (wall.end.y - wall.start.y) * t) * sy,
-        )
+        x = (wall.start.x + (wall.end.x - wall.start.x) * t) * sx
+        y = size[1] - (wall.start.y + (wall.end.y - wall.start.y) * t) * sy
+        return window.to_working(x, y) if window else (x, y)
 
-    for wall in project.walls:
-        if str(room.id) not in owners(wall):
-            continue
-        length = math.hypot(wall.end.x - wall.start.x, wall.end.y - wall.start.y)
-        openings = _openings(project, wall, length, secret=False)
+    for wall, _, openings in _room_doors(project, room):
         for low, high in _solid(openings):
             ends = [point(wall, low), point(wall, high)]
             draw.line(ends, fill=SKETCH_WALL, width=width)
             for x, y in ends:  # Round joints so corners have no notches.
                 r = width / 2
                 draw.ellipse((x - r, y - r, x + r, y + r), fill=SKETCH_WALL)
+        nx, ny = _inward(room, wall)
         for low, high, door in openings:
+            hinge, jamb = point(wall, low), point(wall, high)
             if door.state != "open":
-                draw.line([point(wall, low), point(wall, high)], fill=SKETCH_DOOR, width=bar)
+                draw.line([hinge, jamb], fill=SKETCH_DOOR, width=leaf)
+                continue
+            radius = math.dist(hinge, jamb)
+            tip = (hinge[0] + nx * radius, hinge[1] - ny * radius)  # Rows point down.
+            draw.line([hinge, tip], fill=SKETCH_DOOR, width=leaf)
+            angles = [
+                math.degrees(math.atan2(y - hinge[1], x - hinge[0])) % 360 for x, y in (tip, jamb)
+            ]
+            if (angles[1] - angles[0]) % 360 > 180:
+                angles.reverse()
+            box = (hinge[0] - radius, hinge[1] - radius, hinge[0] + radius, hinge[1] + radius)
+            draw.arc(box, angles[0], angles[1], fill=SKETCH_DOOR, width=arc)
     return sketch
 
 
-def working_guide(
-    guide: Image.Image, crop: tuple[int, int, int, int], transform: RoomTransform
-) -> Image.Image:
-    square = Image.new(guide.mode, (transform.side, transform.side))
-    square.paste(guide.crop(crop), transform.offset)
-    return square.resize((1024, 1024), Image.Resampling.NEAREST).convert("RGB")
-
-
-def room_scale(
-    project: Project, room: Room, size: tuple[int, int], transform: RoomTransform
-) -> dict:
+def room_scale(project: Project, room: Room, size: tuple[int, int], window: RoomWindow) -> dict:
     grid = project.map.grid
     factor = grid.distance / grid.sizePx
     xs, ys = [p.x for p in room.polygon], [p.y for p in room.polygon]
+    raster = size[0] / project.map.width
     return {
-        "version": "room-layout-v1",
+        "version": "room-layout-v2",
         "units": grid.units,
         "cellDistance": grid.distance,
         "nativeCellSize": grid.sizePx,
         "boundsWidth": (max(xs) - min(xs)) * factor,
         "boundsHeight": (max(ys) - min(ys)) * factor,
         "area": Polygon([(p.x, p.y) for p in room.polygon]).area * factor * factor,
-        "workingPixelsPerUnit": size[0] / project.map.width / factor * 1024 / transform.side,
+        "windowSize": round(window.side / raster * factor, 4),
+        "workingPixelsPerUnit": round(raster * window.scale / factor, 4),
     }
 
 
 def scale_prompt(scale: dict, *, controlled: bool) -> str:
+    units = scale["units"]
+    cell = scale["cellDistance"] * scale["workingPixelsPerUnit"]
     text = (
-        f"Physical scale: each grid cell is {scale['cellDistance']:g} {scale['units']}. "
-        f"This single space has bounding dimensions {scale['boundsWidth']:g} by "
-        f"{scale['boundsHeight']:g} {scale['units']}, area {scale['area']:g} square {scale['units']}. "
-        "Use life-size furniture that fits this space, not a miniature house. "
-        "Do not subdivide the space or add interior partitions. "
+        f"Scale: the image shows {scale['windowSize']:g} by {scale['windowSize']:g} {units}; "
+        f"one {scale['cellDistance']:g}-{units} grid square is {cell:.0f} pixels wide. "
+        f"This room measures {scale['boundsWidth']:g} by {scale['boundsHeight']:g} {units}. "
+        "Use life-size furniture for that scale, not a miniature house. "
+        "Do not subdivide the space or add interior partitions."
     )
     if controlled:
-        text += "Follow the supplied wall lines; gaps are door openings. Keep openings clear. "
+        text += " Follow the supplied wall lines; gaps are door openings. Keep openings clear."
     return text

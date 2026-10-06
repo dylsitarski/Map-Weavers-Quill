@@ -3,10 +3,11 @@ import test from 'node:test';
 import {
   moveArtwork,
   orderedArtwork,
+  referencedGenerations,
   reorderArtwork,
 } from '../apps/web/src/artworkLayers';
 import { type Scene, sceneReducer } from '../apps/web/src/sceneHistory';
-import type { RasterLayer } from '../packages/schema/project';
+import type { GenerationRecord, RasterLayer } from '../packages/schema/project';
 
 function layer(id: string, zIndex: number): RasterLayer {
   return {
@@ -78,4 +79,34 @@ test('drag reordering moves across multiple rows and cannot move the background'
   assert.equal(moveArtwork(layers, 'background', 'c'), layers);
   assert.equal(moveArtwork(layers, 'c', 'background'), layers);
   assert.equal(moveArtwork(layers, 'a', 'a'), layers);
+});
+
+test('only generation records shown by an artwork layer are kept', () => {
+  const record = (id: string, output: string | null): GenerationRecord => ({
+    id,
+    kind: 'generation',
+    revision: 0,
+    label: id,
+    metadata: {},
+    providerId: 'mock',
+    capability: 'inpainting',
+    prompt: '',
+    inputHashes: [],
+    outputHash: output,
+    parameters: {},
+    status: 'succeeded',
+    baseRevision: 0,
+  });
+  const shown = { ...layer('room', 1), assetHash: 'b'.repeat(64) };
+  const records = [
+    record('replaced', 'c'.repeat(64)),
+    record('background', 'a'.repeat(64)),
+    record('failed', null),
+    record('room', 'b'.repeat(64)),
+  ];
+  assert.deepEqual(
+    referencedGenerations(records, [layer('bg', 0), shown]).map((r) => r.id),
+    ['background', 'room'],
+  );
+  assert.deepEqual(referencedGenerations(records, []), []);
 });

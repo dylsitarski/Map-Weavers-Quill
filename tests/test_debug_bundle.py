@@ -138,6 +138,9 @@ class DebugBundleTests(unittest.TestCase):
         out = self.data / "with-backgrounds"
         export(self.data, str(self.project.projectId), out, background_jobs=True)
         self.assertEqual(sum("-background-" in p.name for p in (out / "jobs").iterdir()), 1)
+        readme = (out / "README.txt").read_text()
+        # The note belongs to the jobs/ line, before the counts.
+        self.assertLess(readme.index("background jobs from every"), readme.index("Included"))
 
     def test_selection_errors_and_existing_output(self):
         with self.assertRaisesRegex(SystemExit, "No saved project"):

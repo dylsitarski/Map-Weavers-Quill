@@ -18,7 +18,8 @@ from quill.provider_config import (
 )
 from quill.providers import GenerateRequest
 from quill.raster import image
-from quill.sdxl_authoring import NEGATIVE, TEMPLATE, prompt_text
+from quill.sdxl_authoring import NEGATIVE, TEMPLATE, background_scale, prompt_text
+from quill.styles import STYLE_KEYS
 
 
 class BackgroundRequest(Contract):
@@ -38,10 +39,7 @@ class BackgroundResult(Contract):
 def generate_background(request: BackgroundRequest) -> BackgroundResult:
     prompt = request.prompt
     if request.style is not None:
-        effective = {
-            key: getattr(request.style, key).strip()
-            for key in ("environment", "renderStyle", "palette")
-        }
+        effective = {key: getattr(request.style, key).strip() for key in STYLE_KEYS}
         if any(len(value) > 512 for value in effective.values()):
             raise ValueError("Each map style value supports at most 512 characters.")
         prompt += "\nStyle: " + json.dumps(effective, sort_keys=True, ensure_ascii=False)
@@ -52,9 +50,14 @@ def generate_background(request: BackgroundRequest) -> BackgroundResult:
     comfy = isinstance(provider, ComfyBase)
     # Negative prompts are SDXL-only; FLUX.2 klein's distilled workflow ignores them.
     sdxl = isinstance(provider, ComfyProvider)
-    if comfy:
-        prompt = prompt_text(request.prompt, effective if request.style else {}, room=False)
     size, _ = raster_profile(provider)
+    if comfy:
+        prompt = prompt_text(
+            request.prompt,
+            effective if request.style else {},
+            room=False,
+            scale=background_scale(size[0]),
+        )
     asyncio.run(check_provider(provider))
     result = asyncio.run(
         provider.generate(

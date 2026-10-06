@@ -1,8 +1,8 @@
 # Map-Weaver's Quill: Project Manifest and Implementation Plan
 
 **Document status:** Canonical implementation brief  
-**Version:** 0.3.1
-**Last updated:** 2026-10-05
+**Version:** 0.3.2
+**Last updated:** 2026-10-06
 **Audience:** Human maintainers and AI software-engineering agents  
 **Project name:** Map-Weaver's Quill  
 
@@ -1045,7 +1045,7 @@ These questions should be resolved near the stated milestone, not guessed by an 
 
 ## 22. Current project state
 
-As of 2026-10-05. Verification evidence for each milestone is in
+As of 2026-10-06. Verification evidence for each milestone is in
 [docs/HISTORY.md](docs/HISTORY.md); decision status is indexed in
 [docs/adr/README.md](docs/adr/README.md).
 
@@ -1083,8 +1083,9 @@ Milestone 3 status:
   through `InpaintModelConditioning` with an optional dedicated SD-XL Inpainting 0.1 UNet
   (ADR-0031); a second local family, FLUX.2 [klein] through ComfyUI core nodes, editing
   rooms from a layout reference (by default the room sketched into its context, with door
-  states) (ADR-0032). All are
-  covered by offline tests only.
+  states) (ADR-0032); a fixed-scale room window, room-first klein prompts with a door
+  list and floor-plan door symbols, no Environment default, random seeds and pruned
+  generation history (ADR-0033). All are covered by offline tests only.
 - Owner trials: the first found abstract room art and oblique perspective (addressed by
   ADR-0028); the second found coherent top-down images but wrong furniture scale,
   invented partitions and backgrounds that ignore the architecture (addressed in part
@@ -1096,8 +1097,11 @@ Milestone 3 status:
 - Fifth trial (FLUX.2 klein, two-reference plan): rooms fully indoors with walls and doors
   placed correctly in about 20 seconds, but placeholder colors remained and doors were
   drawn closed; a one-image sketch reference with door states is now the default.
-- Next: owner trial of the klein sketch reference (time soft limit about 30 seconds);
-  then explicit building/open-air intent and geometry-aware backgrounds (ADR-0023).
+- Sixth trial (klein sketch reference): fully indoors, but furniture scale varied with
+  room size, undescribed floors stayed off-white, doors were not always honoured, rooms
+  looked alike and the map Environment leaked into interiors (addressed by ADR-0033).
+- Next: owner trial of ADR-0033 (time soft limit about 30 seconds); then explicit
+  building/open-air intent and geometry-aware backgrounds (ADR-0023).
 - Not implemented: hosted generation, geometry-aware exteriors, exact furniture sizing,
   hard architectural pixel enforcement, provider-side job interruption. Flux Fill is
   deferred. A deterministic wall/door overlay was prototyped and parked (docs/HISTORY.md).

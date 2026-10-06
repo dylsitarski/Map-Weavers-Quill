@@ -141,7 +141,7 @@ def summary(project: Project) -> str:
         f"{project.map.grid.sizePx:g} units = {project.map.grid.distance:g} {project.map.grid.units}",
         "",
         "Map style:",
-        f"  environment: {style.environment}",
+        f"  environment (unused since ADR-0033): {style.environment}",
         f"  render style: {style.renderStyle}",
         f"  palette: {style.palette}",
         f"  wall thickness: {style.wallThicknessPx:g}",
@@ -278,20 +278,20 @@ def export(
             "layers/         current artwork layers by zIndex, plus layers.json\n"
             "generations/    accepted generations: prompt.txt (exact model prompt),\n"
             "                record.json (all parameters), input and output images;\n"
-            "                *-crop files show the room's working crop\n"
+            "                *-crop files show the room's working window\n"
             "jobs/           queued previews for this project, including unaccepted ones\n"
-            f"\nIncluded {len(kept_generations)} of {len(numbered)} accepted generations and "
+            + (
+                "                (background jobs from every project are included)\n"
+                if background_jobs
+                else ""
+            )
+            + f"\nIncluded {len(kept_generations)} of {len(numbered)} accepted generations and "
             f"{len(kept_jobs)} of {len(numbered_jobs)} previews"
             + (" (the most recent; use --last 0 for all).\n" if last else ".\n")
             + (
                 "Images are PNG.\n"
                 if lossless
                 else "Artwork is WebP (quality 85); masks, guides and sketches are exact PNG.\n"
-            )
-            + (
-                "                (background jobs from every project are included)\n"
-                if background_jobs
-                else ""
             )
             + (
                 f"\nMissing or corrupt assets: {', '.join(writer.missing)}\n"

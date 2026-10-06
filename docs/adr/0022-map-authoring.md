@@ -2,6 +2,9 @@
 
 Status: Implemented.
 
+Update 2026-10-06: Map environment is no longer used or shown; an old value can be
+cleared from the map panel. Describe the setting in prompts instead (ADR-0033).
+
 Map → AI exposes Background prompt and Map environment, render style and palette.
 Apply map prompt and style commits one scene-history transaction; Save project writes
 the applied values. Draft changes disable background generation until applied. Form

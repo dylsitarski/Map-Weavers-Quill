@@ -6,6 +6,9 @@ Extends ADR-0028. Building-aware backgrounds (ADR-0023) are still pending.
 Update 2026-10-05: with guidance, ControlNet outputs now feed InpaintModelConditioning
 (workflow comfy-sdxl-layout-v2, ADR-0031).
 
+Update 2026-10-06: scale data is `room-layout-v2`; the scale sentence states the fixed
+working window and pixels per grid square (ADR-0033).
+
 ## Problem and scope
 
 The owner reports improved room coherence and top-down views but incorrect furniture

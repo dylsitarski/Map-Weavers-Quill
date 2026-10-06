@@ -9,6 +9,7 @@ SamplerCustomAdvanced. Room edits use one of two reference strategies:
 """
 
 import os
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
@@ -267,40 +268,58 @@ class Flux2Provider(ComfyBase):
         }
 
 
-ROOM_TEMPLATES = {"sketch": "flux2-klein-room-sketch-v1", "plan": "flux2-klein-room-plan-v2"}
+ROOM_TEMPLATES = {"sketch": "flux2-klein-room-sketch-v2", "plan": "flux2-klein-room-plan-v3"}
+MATCH_MAP = (
+    "Match the surrounding map's rendering technique, lighting and level of detail, but "
+    "give this room its own furnishings, materials and colors as described."
+)
 _ROOM_INSTRUCTIONS = {
     "sketch": (
-        "Image 1 is a top-down tabletop battlemap seen from directly above. Inside it is a "
-        "rough architectural sketch of one room: the flat off-white fill is the room's floor "
-        "area, thick dark lines are its walls, gaps in the dark lines are open doorways with "
-        "no door, and brown bars across a gap are closed doors. Replace the entire sketch "
-        "with a finished, detailed roof-removed interior in the same art style as the "
-        "surrounding map: textured walls exactly along the dark lines, textured floor and "
-        "furniture across the whole room, open doorways left open, and closed doors drawn "
-        "as doors. None of the off-white fill, sketch lines or flat placeholder colors may "
-        "remain. Keep everything outside the sketch unchanged and blend the room into its "
-        "surroundings. Orthographic overhead view, no perspective, no text, labels or grid."
+        "Edit image 1, a top-down tabletop battlemap. It contains a floor-plan sketch of the "
+        "room described above: the flat off-white area is the room's floor, dark bands are "
+        "its walls, and brown floor-plan symbols mark its doors. A brown bar across the wall "
+        "is a closed door. A brown bar standing out from the wall with a thin quarter-circle "
+        "arc is an open door, swung into the room. Render the room as a finished "
+        "roof-removed interior seen from directly above: keep the walls exactly along the "
+        "dark bands as narrow dark wall tops of the same width, turn the off-white area into "
+        "the described floor and furnishings, and draw each door as a real door in its shown "
+        "state. No off-white fill or brown symbols may remain. "
+        + MATCH_MAP
+        + " Keep everything outside the room unchanged. Orthographic overhead view, no "
+        "perspective, no text, labels or grid."
     ),
     "plan": (
-        "Edit image 1, a top-down tabletop battlemap seen from directly above. The flat gray "
-        "area in image 1 is a placeholder for a single indoor room that must be drawn. Image "
-        "2 is its floor plan: the gray area is the room's floor, white lines are its walls, "
-        "and gaps in the white lines are open doorways. Draw the room as a finished "
-        "roof-removed interior in the same art style as the surrounding map: textured walls "
-        "along the white lines, textured floor and furniture across the entire gray area, "
-        "and no outdoor ground, grass or sky inside the walls. The flat gray and the white "
-        "plan lines are placeholders and must not appear in the result. Keep everything "
-        "outside the room unchanged and make the walls meet it naturally. Orthographic "
-        "overhead view, no perspective, no text, labels or grid."
+        "Edit image 1, a top-down tabletop battlemap. The flat gray area in image 1 is a "
+        "placeholder for the room described above. Image 2 is its floor plan: the gray area "
+        "is the room's floor, white lines are its walls, and gaps in the white lines are "
+        "door openings. Draw the room as a finished roof-removed interior seen from directly "
+        "above: walls along the white lines, the described floor and furnishings across the "
+        "entire gray area, and no outdoor ground, grass or sky inside the walls. No flat gray "
+        "or white plan lines may remain. "
+        + MATCH_MAP
+        + " Keep everything outside the room unchanged and make the walls meet it naturally. "
+        "Orthographic overhead view, no perspective, no text, labels or grid."
     ),
 }
+STYLE_LABELS = {"renderStyle": "Rendering style", "palette": "Palette"}
+DEFAULT_FLOOR = (
+    "Floor: a textured floor material that suits this room, such as wood planks, flagstones "
+    "or packed earth, never a plain off-white surface."
+)
 
 
-def room_instruction(description: str, style: dict[str, str], reference: str) -> str:
-    """Edit instruction for the configured reference strategy; user text is unchanged."""
-    styled = ". ".join(f"{key}: {value}" for key, value in style.items() if value.strip())
-    return (
-        _ROOM_INSTRUCTIONS[reference]
-        + f"\nRoom: {description.strip()}\n"
-        + (f"{styled}." if styled else "")
-    )
+def room_instruction(
+    description: str, style: dict[str, str], reference: str, doors: list[str]
+) -> str:
+    """Room facts first (the user's description unchanged, floor, doors, style), then
+    the edit instruction for the configured reference strategy."""
+    lines = [description.strip() or "An interior room."]
+    if not re.search(r"\bfloor", description, re.IGNORECASE):
+        lines.append(DEFAULT_FLOOR)
+    lines.append("Doors: " + "; ".join(doors) + "." if doors else "Doors: this room has no doors.")
+    lines += [
+        f"{STYLE_LABELS[key]}: {value.strip()}."
+        for key, value in style.items()
+        if key in STYLE_LABELS and value.strip()
+    ]
+    return "\n".join(lines) + "\n" + _ROOM_INSTRUCTIONS[reference]

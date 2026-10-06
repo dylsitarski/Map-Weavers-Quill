@@ -11,13 +11,7 @@ from quill.backgrounds import BackgroundResult
 from quill.comfyui import ComfyBase, ComfyProvider
 from quill.exports import artwork_size, composite_artwork
 from quill.flux2 import ROOM_TEMPLATES, Flux2Provider, room_instruction
-from quill.layout_guidance import (
-    room_scale,
-    room_sketch,
-    scale_prompt,
-    wall_guide,
-    working_guide,
-)
+from quill.layout_guidance import door_list, room_scale, room_sketch, scale_prompt, wall_guide
 from quill.models import Bounds, Contract, GenerationRecord, Point, Project, RasterLayer
 from quill.projects import project_store, validate_project
 from quill.provider_config import (
@@ -28,7 +22,13 @@ from quill.provider_config import (
 )
 from quill.providers import InpaintRequest
 from quill.raster import context_crop, image, masked_layer, png, polygon_mask
-from quill.sdxl_authoring import NEGATIVE, RoomTransform, clean_context, prompt_text
+from quill.sdxl_authoring import (
+    NEGATIVE,
+    WINDOW_CELLS,
+    RoomWindow,
+    clean_context,
+    prompt_text,
+)
 from quill.styles import room_style_prompt
 
 
@@ -63,43 +63,57 @@ def generate_room(request: RoomImageRequest) -> BackgroundResult:
     if sdxl:
         prompt = prompt_text(room.prompt, effective_style, room=True)
     elif reference is not None:
-        prompt = room_instruction(room.prompt, effective_style, reference)
+        prompt = room_instruction(room.prompt, effective_style, reference, door_list(project, room))
     profile, alignment = raster_profile(provider)
     size = max(artwork_size(project, store), profile, key=lambda size: size[0])
     mask = polygon_mask(room.polygon, size)
     # Keep the same native 20-unit context margin at either pixel density.
-    crop = context_crop(mask, margin=round(20 * size[0] / 1200), alignment=alignment)
+    margin = round(20 * size[0] / 1200)
     descriptor = provider.descriptor()
-    if crop[2] - crop[0] > descriptor.maxWidth or crop[3] - crop[1] > descriptor.maxHeight:
-        raise ValueError("This room crop exceeds the configured provider's dimension limits.")
+    window = None
+    if comfy:
+        # A fixed physical window (ADR-0033) gives every room the same working scale.
+        cells = WINDOW_CELLS * project.map.grid.sizePx * size[0] / project.map.width
+        window = RoomWindow.around(mask, round(cells), margin)
+        crop = window.crop
+    else:
+        crop = context_crop(mask, margin=margin, alignment=alignment)
+        if crop[2] - crop[0] > descriptor.maxWidth or crop[3] - crop[1] > descriptor.maxHeight:
+            raise ValueError("This room crop exceeds the configured provider's dimension limits.")
     asyncio.run(check_provider(provider))
     context, excluded = clean_context(project, room.id) if comfy else (project, [])
     source = composite_artwork(context, store, size=size)
     source_hash, mask_hash = store.put_asset(png(source)), store.put_asset(png(mask))
-    source_crop, mask_crop = source.crop(crop).convert("RGB"), mask.crop(crop)
-    transform = RoomTransform(*source_crop.size) if comfy else None
-    if transform:
-        source_crop, mask_crop = transform.prepare(source_crop, mask_crop)
+    if window:
+        source_crop, mask_crop = window.prepare(source, mask)
+    else:
+        source_crop, mask_crop = source.crop(crop).convert("RGB"), mask.crop(crop)
     if source_crop.width > descriptor.maxWidth or source_crop.height > descriptor.maxHeight:
         raise ValueError("Generation resolution exceeds provider limits.")
     input_hashes = [source_hash, mask_hash]
     layout_details: dict[str, JsonValue] = {}
     extensions: dict[str, dict[str, JsonValue]] = {}
-    if transform:
+    if window:
         controlled = "control_image" in descriptor.capabilities
-        scale = room_scale(project, room, size, transform)
+        scale = room_scale(project, room, size, window)
         if klein:
-            # Instruction first for the edit model, then scale and wall facts.
-            prompt = prompt + "\n" + scale_prompt(scale, controlled=controlled)
+            # Room facts and the edit instruction first, then scale. The sketch itself
+            # explains walls and doors, so the SDXL wall-line sentence is not used.
+            prompt = prompt + "\n" + scale_prompt(scale, controlled=False)
         else:
             prompt = scale_prompt(scale, controlled=controlled) + "\n" + prompt
         layout_details = {"physicalScale": scale, "layoutConditioning": controlled}
         if controlled:
-            sketch = reference == "sketch"
-            guide = room_sketch(project, size, room) if sketch else wall_guide(project, size)
-            input_hashes.append(store.put_asset(png(guide)))
-            control_ref = provider.put(png(working_guide(guide, crop, transform)))
-            extensions = {"quill.layout": {"controlRef": control_ref}}
+            if reference == "sketch":
+                # The stored copy is at map size; the model's copy is drawn directly in
+                # working space so wall width is physically constant and lines are crisp.
+                input_hashes.append(store.put_asset(png(room_sketch(project, size, room))))
+                guide = room_sketch(project, size, room, window)
+            else:
+                full = wall_guide(project, size)
+                input_hashes.append(store.put_asset(png(full)))
+                guide = window.guide(full)
+            extensions = {"quill.layout": {"controlRef": provider.put(png(guide))}}
     result = asyncio.run(
         provider.inpaint(
             InpaintRequest(
@@ -120,8 +134,8 @@ def generate_room(request: RoomImageRequest) -> BackgroundResult:
     expected = source_crop.size
     if output.size != expected or (result.width, result.height) != expected:
         raise ValueError("Provider output dimensions do not match the requested room crop.")
-    if transform:
-        output = transform.restore(output)
+    if window:
+        output = window.restore(output)
     generated = Image.new("RGBA", size)
     generated.paste(output, crop[:2])
     # Enforce outside-mask preservation ourselves, regardless of provider behavior.
@@ -164,7 +178,7 @@ def generate_room(request: RoomImageRequest) -> BackgroundResult:
                 "crop": list(crop),
                 "width": size[0],
                 "height": size[1],
-                "promptTemplate": "sdxl-room-layout-v1"
+                "promptTemplate": "sdxl-room-layout-v2"
                 if sdxl
                 else ROOM_TEMPLATES[reference]
                 if reference
@@ -172,10 +186,10 @@ def generate_room(request: RoomImageRequest) -> BackgroundResult:
                 **(
                     {
                         **({"negativePrompt": NEGATIVE} if sdxl else {}),
-                        "roomTransform": transform.metadata(),
+                        "roomTransform": window.metadata(),
                         "excludedContextLayers": [str(item) for item in excluded],
                     }
-                    if transform
+                    if window
                     else {}
                 ),
                 "roomPrompt": room.prompt,

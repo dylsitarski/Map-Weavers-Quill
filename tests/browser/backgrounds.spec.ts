@@ -28,6 +28,8 @@ test('background preview rejection, acceptance, undo, regeneration and save/open
 }) => {
   await page.goto('/');
   await background(page);
+  // A typed seed is locked, so the regenerated preview below is identical.
+  await page.getByRole('spinbutton', { name: 'Seed', exact: true }).fill('0');
   const blank = await pixels(page);
   await generate(page);
   const preview = await page

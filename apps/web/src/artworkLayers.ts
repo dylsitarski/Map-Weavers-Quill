@@ -1,4 +1,7 @@
-import type { RasterLayer } from '../../../packages/schema/project';
+import type {
+  GenerationRecord,
+  RasterLayer,
+} from '../../../packages/schema/project';
 
 export function orderedArtwork(layers: RasterLayer[]): RasterLayer[] {
   return [...layers].sort(
@@ -43,4 +46,17 @@ export function moveArtwork(
       ? layer
       : { ...layer, zIndex, revision: layer.revision + 1 };
   });
+}
+
+/** Generation records whose output is still shown by an artwork layer. Records for
+ * replaced or removed artwork are dropped so the 128-record limit is never reached
+ * by regenerating; undo restores the earlier records with the earlier scene. */
+export function referencedGenerations(
+  generations: GenerationRecord[],
+  layers: RasterLayer[],
+): GenerationRecord[] {
+  const shown = new Set(layers.map((layer) => layer.assetHash));
+  return generations.filter(
+    (record) => record.outputHash !== null && shown.has(record.outputHash),
+  );
 }

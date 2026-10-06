@@ -3,12 +3,14 @@ import { Circle, Layer, Line, Rect, Stage } from 'react-konva';
 import type { GeometryResult } from '../../../packages/schema/geometry';
 import type {
   Door,
+  GenerationRecord,
   Point,
   Polygon,
   Project,
+  RasterLayer,
   Room,
 } from '../../../packages/schema/project';
-import { moveArtwork } from './artworkLayers';
+import { moveArtwork, referencedGenerations } from './artworkLayers';
 import { BackgroundImage } from './BackgroundImage';
 import { BackgroundPanel } from './BackgroundPanel';
 import {
@@ -142,6 +144,22 @@ export function Editor({ status }: { status: string }) {
     },
   };
   const fingerprint = projectFingerprint(currentProject);
+  // Records for replaced or removed artwork are pruned on the next accept, so only
+  // records still shown count toward the 128-record limit.
+  const generationCount = referencedGenerations(
+    currentProject.generations,
+    currentProject.layers,
+  ).length;
+  const withArtwork = (
+    layers: RasterLayer[],
+    generation: GenerationRecord,
+  ) => ({
+    layers,
+    generations: referencedGenerations(
+      [...(scene.generations ?? []), generation],
+      layers,
+    ),
+  });
   const dirty = fingerprint !== savedFingerprint;
   useEffect(() => {
     if (!dirty) return;
@@ -990,7 +1008,7 @@ export function Editor({ status }: { status: string }) {
             projectId={project.projectId}
             revision={project.revision}
             busy={busy}
-            count={scene.generations?.length ?? 0}
+            count={generationCount}
             accept={(result) => {
               if (pending.current) return;
               const previous = backgroundLayer;
@@ -1006,15 +1024,14 @@ export function Editor({ status }: { status: string }) {
                 before: scene,
                 scene: {
                   ...scene,
-                  layers: previous
-                    ? scene.layers?.map((current) =>
-                        current.id === previous.id ? layer : current,
-                      )
-                    : [layer, ...(scene.layers ?? [])],
-                  generations: [
-                    ...(scene.generations ?? []),
+                  ...withArtwork(
+                    previous
+                      ? (scene.layers ?? []).map((current) =>
+                          current.id === previous.id ? layer : current,
+                        )
+                      : [layer, ...(scene.layers ?? [])],
                     result.generation,
-                  ],
+                  ),
                 },
               });
               setNotice('Background accepted. Save to keep it.');
@@ -1032,7 +1049,7 @@ export function Editor({ status }: { status: string }) {
             projectId={project.projectId}
             revision={project.revision}
             busy={busy}
-            count={scene.generations?.length ?? 0}
+            count={generationCount}
             accept={(result) => {
               if (pending.current || !selected) return;
               const previous = scene.layers?.find(
@@ -1059,15 +1076,14 @@ export function Editor({ status }: { status: string }) {
                         }
                       : room,
                   ),
-                  layers: previous
-                    ? scene.layers?.map((current) =>
-                        current.id === previous.id ? layer : current,
-                      )
-                    : [...(scene.layers ?? []), layer],
-                  generations: [
-                    ...(scene.generations ?? []),
+                  ...withArtwork(
+                    previous
+                      ? (scene.layers ?? []).map((current) =>
+                          current.id === previous.id ? layer : current,
+                        )
+                      : [...(scene.layers ?? []), layer],
                     result.generation,
-                  ],
+                  ),
                 },
               });
               setNotice('Room artwork accepted. Save to keep it.');

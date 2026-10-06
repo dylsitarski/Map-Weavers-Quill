@@ -117,9 +117,9 @@ either provider.
 ## 5. Use FLUX.2 klein instead
 
 FLUX.2 [klein] 4B follows prompts better than SDXL and edits images from reference
-pictures. By default Quill sends each room as one reference: the surroundings with an
-architectural sketch of the room drawn in (off-white floor, dark walls, gaps for open
-doors, brown bars for closed doors). It needs a
+pictures. By default Quill sends each room as one reference: the surroundings with a
+floor-plan sketch of the room drawn in (off-white floor, thin dark walls, floor-plan door
+symbols). It needs a
 ComfyUI version recent enough to offer the `flux2` text-encoder type; update ComfyUI if
 readiness says so. No ControlNet is needed. The 4B model is Apache-2.0; check each model
 card for the text encoder and VAE.
@@ -158,11 +158,16 @@ make dev
 
 The AI panel shows "Local FLUX.2 klein · ComfyUI" and "Ready · distilled model" (or
 base). Backgrounds are text-to-image at 960 × 640 with the same camera-first prompt as
-SDXL. Rooms use the same working transform, context and scale data as SDXL, but the
-prompt is an edit instruction that refers to the reference images (ADR-0032). Door states
-are shown in the sketch: open doors as gaps, closed or locked doors as brown bars; secret
-doors are drawn as plain wall. Pixels
-outside the room are always protected exactly. The smoke command in this document tests
+SDXL. Rooms use the same working window, context and scale data as SDXL, but as an image
+edit (ADR-0032, ADR-0033). The sketch is drawn at the working scale, so walls are the
+project's wall thickness (about 13 px of 1024) in every room. Doors use floor-plan
+symbols: a closed or locked door is a brown leaf across the opening; an open door is a
+leaf swung into the room with a thin quarter-circle arc; secret doors and windows are
+plain wall. The prompt starts with your room description, adds a default floor line if
+the description does not mention a floor (so the off-white placeholder is not read as
+the floor colour), lists the doors by wall side and state, adds render style and
+palette, then gives the edit instruction and the scale. Pixels outside the room are
+always protected exactly. The smoke command in this document tests
 SDXL only.
 
 Memory: the model, its 4B text encoder and the VAE do not fit in 8 GB of VRAM at once.
@@ -175,26 +180,29 @@ memory. Not yet measured on the reference hardware.
 - **Resolution.** The native map is 1200 × 800 units. SDXL backgrounds and room layers
   are stored at 960 × 640 (3:2, multiples of 64). Older 480 × 320 mock layers keep
   their original bytes and are only resampled for composition and context.
-- **Rooms.** Quill crops the room plus a 20-unit context margin, aligned to multiples
-  of 64, pads it to a square by extending edge pixels (padding is protected), and
-  generates at 1024 × 1024. The result is scaled back, placed at the original crop
-  position, and clipped to the exact room mask, so pixels outside the room never
-  change (ADR-0028).
+- **Rooms.** Quill takes a square window of real map context, 8 grid cells (40 ft) on a
+  side, centred on the room and kept inside the map, and generates it at 1024 × 1024, so
+  every room has the same working scale (25.6 px/ft, 128 px per 5-ft square). A room
+  wider than about 36 ft gets a larger window and a smaller scale. The result is scaled
+  back and clipped to the exact room mask, so pixels outside the room never change
+  (ADR-0028, ADR-0033).
 - **Context.** The source image for a room excludes that room's previous artwork and
   any known mock output (identified by provenance, not appearance). Real neighbouring
   artwork is kept.
 - **Prompts.** Both backgrounds and rooms use camera-first, plain-language prompts
-  (template `sdxl-overhead-v2`) with negative prompts against perspective, horizons,
+  (template `sdxl-overhead-v3`) with negative prompts against perspective, horizons,
   text, grids and abstract patterns. Backgrounds ask for terrain and roofs from above;
   rooms ask for roof-removed interiors and furniture from above. Your own prompts and
-  style fields are included unchanged. Override a room's Environment if it inherits an
-  unsuitable exterior description.
-- **Scale.** Room prompts state the grid distance (default 5 ft per cell), the room's
-  dimensions and area, and ask for life-size furniture and no interior partitions
-  (ADR-0029). This is guidance, not a guarantee.
+  the render style and palette are included unchanged. The map Environment field is no
+  longer used: describe the setting in the background and room prompts (ADR-0033).
+- **Scale.** Room prompts state the working window (for example "the image shows 40 by 40
+  ft; one 5-ft grid square is 128 pixels wide"), the room's dimensions, and ask for
+  life-size furniture and no interior partitions (ADR-0029, ADR-0033). Background
+  prompts state the map's 120 × 80 ft size and pixels per 5-ft square. This is
+  guidance, not a guarantee.
 - **Wall/door guidance (optional).** When ControlNet is configured, Quill draws a
   white-on-black guide of the actual walls, with gaps at doors, transforms it with the
-  room crop, and passes it through core ControlNet nodes at strength 1 for the whole
+  room window, and passes it through core ControlNet nodes at strength 1 for the whole
   sampling run. No preprocessor or custom nodes are needed. Backgrounds remain
   text-only.
 - **Masked editing (rooms).** The source and mask go through `InpaintModelConditioning`
@@ -294,3 +302,10 @@ Still to record (SDXL items 1–3, then FLUX.2 klein):
    default `sketch` reference on the same room with one open and one closed door, then
    `plan` for comparison. Check that no placeholder colors remain, walls follow the
    sketch, door states match, and record time (soft limit about 30 seconds).
+5. FLUX.2 klein `sketch` trial done (2026-10-06, see docs/HISTORY.md): rooms indoors, but
+   scale varied by room size, floors had to be described, doors were not always
+   honoured, and rooms looked alike. Next, after ADR-0033: regenerate the bedroom,
+   storeroom and main room with unlocked seeds. Check that furniture scale matches
+   across rooms, wall tops are thin and even, open doors are drawn open where the
+   sketch shows them, undescribed floors are not off-white, and each room's own
+   description (clutter, whimsy) shows through. Record time.

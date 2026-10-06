@@ -5,6 +5,9 @@ Status: Implemented for the mock provider profile.
 Update 2026-10-05: style inheritance is unchanged; with SDXL, prompts are assembled by the
 sdxl-overhead-v2 template instead (ADR-0028).
 
+Update 2026-10-06: Environment is no longer inherited, shown or sent to providers;
+rooms inherit render style and palette only (ADR-0033).
+
 The room AI panel edits Environment, Render style and Palette alongside its prompt.
 Blank fields remove that room override and inherit the current MapStyle value, shown
 as the field placeholder. Apply prompt and style commits all draft values in one
