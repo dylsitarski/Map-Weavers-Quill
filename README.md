@@ -58,6 +58,7 @@ works. For browser tests, run `npx playwright install --with-deps chromium` once
 | `make schema` | Regenerate JSON Schema and TypeScript declarations after changing Python models |
 | `make audit` | Online dependency audit (Python and npm) |
 | `make comfy-check` | Check a running local ComfyUI for the configured SDXL setup |
+| `make debug-bundle PROJECT="name"` | Export one saved project for debugging (see below); without `PROJECT`, list saved projects |
 
 All tests are offline: no credentials, paid APIs or GPUs. GitHub Actions runs
 `make check`, `make browser` and `make audit` on Ubuntu for pushes and pull requests.
@@ -115,6 +116,13 @@ File → **Save project** stores a validated snapshot; **Open saved project** li
 maps; **New project** starts a blank map. New and Open ask before discarding unsaved
 edits. Opening resets selection, view and undo history (undo history is per session).
 Refreshing the browser starts a blank editor, so reopen your map from File.
+
+To share a project for debugging, run `make debug-bundle PROJECT="Your project name"`. It
+writes a folder and a `.zip` under the data directory containing a readable summary of
+prompts, rooms and doors, the project JSON, current artwork layers, and every accepted
+generation and queued preview for that project with its exact model prompt, parameters
+and input/output images. It only reads the database, so it is safe while Quill runs. The
+bundle is private project content; never commit it.
 
 Projects are stored in `data/projects.sqlite3` under the server's working directory.
 Set `MWQ_DATA_DIR` before `make dev` to use another directory. Stop the server before

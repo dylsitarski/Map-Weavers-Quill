@@ -39,3 +39,7 @@ browser:
 .PHONY: comfy-check
 comfy-check:
 	PYTHONPATH=apps/server $(PYTHON) scripts/comfy_smoke.py --check
+
+.PHONY: debug-bundle
+debug-bundle:
+	PYTHONPATH=apps/server $(PYTHON) scripts/export_debug_bundle.py $(if $(PROJECT),"$(PROJECT)",--list)

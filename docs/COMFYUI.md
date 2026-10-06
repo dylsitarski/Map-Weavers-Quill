@@ -273,6 +273,11 @@ canny ControlNet, walls were followed in part, but the right half of a large enc
 became outdoors, continuing the surrounding scene. SDXL guidance tuning has stopped here
 in favour of a FLUX.2 klein provider.
 
+To share a trial, run `make debug-bundle PROJECT="Your project name"` (README) and attach the
+zip. If possible also include the matching ComfyUI files: `ComfyUI/input/quill-*.png` (the
+exact images sent to the model) and `ComfyUI/output/quill/` (raw model output before
+Quill clips it to the room).
+
 Still to record (SDXL items 1–3, then FLUX.2 klein):
 
 1. Generate a background and two adjacent room interiors. Check top-down perspective,
