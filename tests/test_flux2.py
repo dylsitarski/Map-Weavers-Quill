@@ -26,6 +26,7 @@ from quill.flux2 import (
     Flux2Provider,
     room_instruction,
     room_plan,
+    room_refine_instruction,
     workflow,
 )
 from quill.layout_guidance import SKETCH_WALL
@@ -200,6 +201,82 @@ class Flux2ProtocolTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.getpixel((512, 512)), (9, 99, 199))
         self.assertEqual(self.provider.last_run["layoutReference"], "room-sketch-v3")
 
+    async def test_second_pass_edits_the_first_pass_with_the_refine_prompt(self):
+        size = (1024, 1024)
+        source = Image.new("RGB", size, (200, 10, 10))
+        mask = Image.new("L", size)
+        mask.paste(255, (256, 256, 768, 768))
+        images = (source, mask, Image.new("RGB", size))
+        refs = [self.provider.put(png(i)) for i in images]
+        request = InpaintRequest(
+            requestId="r",
+            prompt="Image 1",
+            width=1024,
+            height=1024,
+            seed=3,
+            sourceRef=refs[0],
+            maskRef=refs[1],
+            maskConvention="white-edit-black-preserve",
+            extensions={
+                "quill.layout": {"controlRef": refs[2]},
+                "quill.refine": {"prompt": "Restyle the room"},
+            },
+        )
+        await self.provider.inpaint(request)
+        self.assertEqual(len(self.fake.uploads), 1)  # Still one upload and one submission.
+        self.assertEqual(self.fake.calls.count("/prompt"), 1)
+        g = self.fake.graph
+        self.assertEqual(g["40"]["inputs"]["text"], "Restyle the room")
+        self.assertEqual(g["41"]["inputs"], {"conditioning": ["40", 0]})  # Zeroed negative.
+        # The first pass's latent is the second pass's only reference.
+        self.assertEqual(g["42"]["inputs"], {"conditioning": ["40", 0], "latent": ["13", 0]})
+        self.assertEqual(g["43"]["inputs"], {"conditioning": ["41", 0], "latent": ["13", 0]})
+        self.assertEqual(g["44"]["inputs"]["positive"], ["42", 0])
+        self.assertEqual(g["45"]["inputs"]["guider"], ["44", 0])
+        self.assertEqual(g["45"]["inputs"]["noise"], ["11", 0])
+        self.assertEqual(g["45"]["inputs"]["latent_image"], ["6", 0])
+        # The final image is the second pass; the first is saved only for inspection.
+        self.assertEqual(g["10"]["inputs"]["samples"], ["45", 0])
+        self.assertEqual(g["7"]["inputs"]["images"], ["10", 0])
+        self.assertEqual(g["47"]["inputs"]["filename_prefix"], "quill/pass1")
+        result = decode(self.provider.assets[next(reversed(self.provider.assets))])
+        self.assertEqual(result.getpixel((10, 10)), (200, 10, 10))  # Outside still exact.
+        run = self.provider.last_run
+        self.assertEqual(run["workflowVersion"], "comfy-flux2-klein-edit-2pass-v1")
+        self.assertEqual(run["roomPasses"], 2)
+        # Base variant: an empty-text negative, as in the first pass.
+        base = self.make(Flux2Config(variant="base"))
+        self.assertEqual([base.put(png(i)) for i in images], refs)
+        await base.inpaint(request)
+        self.assertEqual(self.fake.graph["41"]["inputs"]["text"], "")
+        # One-pass configuration, a missing layout or an empty prompt: refused offline.
+        calls = len(self.fake.calls)
+        one_pass = self.make(Flux2Config(room_passes=1))
+        for i in images:
+            one_pass.put(png(i))
+        bad = [
+            (one_pass, request),
+            (
+                self.provider,
+                request.model_copy(update={"extensions": {"quill.refine": {"prompt": "x"}}}),
+            ),
+            (
+                self.provider,
+                request.model_copy(
+                    update={
+                        "extensions": {
+                            "quill.layout": {"controlRef": refs[2]},
+                            "quill.refine": {"prompt": " "},
+                        }
+                    }
+                ),
+            ),
+        ]
+        for provider, bad_request in bad:
+            with self.assertRaises(ProviderFailure):
+                await provider.inpaint(bad_request)
+        self.assertEqual(len(self.fake.calls), calls)
+
     async def test_plan_reference_sends_blanked_context_and_plan(self):
         self.provider = self.make(Flux2Config(room_reference="plan"))
         size = (1024, 1024)
@@ -278,6 +355,7 @@ class Flux2ProtocolTests(unittest.IsolatedAsyncioTestCase):
             {"text_encoder_device": "gpu"},
             {"model": "../klein.safetensors"},
             {"room_reference": "mask"},
+            {"room_passes": 3},
             {"vae": "vae.ckpt"},
             {"url": "http://example.com:8188"},
         ):
@@ -293,6 +371,11 @@ class Flux2ProtocolTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(config.room_reference, "plan")
         self.assertEqual(Flux2Config.from_env({}).room_reference, "sketch")
+        self.assertEqual(Flux2Config.from_env({}).room_passes, 2)
+        passes = {"MWQ_IMAGE_COMFY_FLUX2_ROOM_PASSES": "1"}
+        self.assertEqual(Flux2Config.from_env(passes).room_passes, 1)
+        with self.assertRaises(ValueError):
+            Flux2Config.from_env({"MWQ_IMAGE_COMFY_FLUX2_ROOM_PASSES": "two"})
         self.assertEqual(
             (config.model, config.variant, config.text_encoder_device, config.vae),
             ("flux-2-klein-base-4b-fp8.safetensors", "base", "cpu", "flux2-vae.safetensors"),
@@ -331,6 +414,15 @@ class Flux2ProtocolTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("Palette", text)
         self.assertNotIn("same art style", text)
         self.assertIn("its own furnishings, materials and colors", text)
+        refine = room_refine_instruction("Cluttered storeroom with crates", style)
+        self.assertIn("description:\nCluttered storeroom with crates\n", refine)
+        self.assertIn("must not be plain, flat or pale", refine)
+        self.assertIn("not only along the walls", refine)
+        self.assertIn("Rendering style: inked.", refine)
+        self.assertIn("keep everything outside the room unchanged", refine)
+        self.assertIn(
+            "Make the floor exactly as described", room_refine_instruction("Oak floor", {})
+        )
         described = room_instruction("Bedroom, mossy flagstone FLOORS", {}, "plan")
         self.assertNotIn(DEFAULT_FLOOR, described)
         self.assertIn("Image 2 is its floor plan", described)
@@ -405,7 +497,15 @@ class Flux2EditorTests(unittest.TestCase):
         self.assertEqual(parameters["promptTemplate"], "flux2-klein-room-sketch-v3")
         self.assertTrue(parameters["layoutConditioning"])
         self.assertNotIn("negativePrompt", parameters)
-        self.assertEqual(parameters["comfyui"]["workflowVersion"], "comfy-flux2-klein-edit-v1")
+        # Two passes by default: layout, then a description-only edit of that result.
+        self.assertEqual(
+            parameters["comfyui"]["workflowVersion"], "comfy-flux2-klein-edit-2pass-v1"
+        )
+        self.assertEqual(parameters["refineTemplate"], "flux2-klein-room-refine-v1")
+        self.assertTrue(parameters["refinePrompt"].startswith("Restyle the interior"))
+        self.assertIn(room.prompt, parameters["refinePrompt"])
+        self.assertIn("128 pixels wide", parameters["refinePrompt"])
+        self.assertEqual(self.fake.graph["40"]["inputs"]["text"], parameters["refinePrompt"])
         self.assertEqual(len(generation.inputHashes), 3)
         self.assertEqual(parameters["comfyui"]["layoutReference"], "room-sketch-v3")
         # One sketch reference at the working size, with off-white floor and dark walls.

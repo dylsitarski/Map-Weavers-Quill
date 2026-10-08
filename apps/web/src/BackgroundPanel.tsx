@@ -320,7 +320,7 @@ export function BackgroundPanel(p: {
         {localComfy && p.room && (
           <p>
             {klein
-              ? 'The room is sent as a floor-plan sketch; doors are drawn closed and secret doors as wall. Every room uses the same physical scale; describe the floor and contents, then inspect the preview.'
+              ? 'The room is sent as a floor-plan sketch; doors are drawn closed and secret doors as wall. Every room uses the same physical scale. A second pass restyles the room from your description; describe the floor, contents and character, then inspect the preview.'
               : provider.state?.descriptor.capabilities.includes(
                     'control_image',
                   )

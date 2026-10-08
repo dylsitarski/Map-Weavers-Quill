@@ -119,6 +119,9 @@ def write_generation(
 ) -> None:
     folder.mkdir(parents=True)
     (folder / "prompt.txt").write_text(record.prompt + "\n")
+    refine = record.parameters.get("refinePrompt")
+    if isinstance(refine, str):  # Second klein room pass (ADR-0034).
+        (folder / "refine-prompt.txt").write_text(refine + "\n")
     (folder / "record.json").write_text(
         json.dumps(record.model_dump(mode="json") | (extra or {}), indent=2) + "\n"
     )
@@ -276,7 +279,8 @@ def export(
             "summary.txt     map style, background prompt, rooms with prompts, doors\n"
             "project.json    the saved project document\n"
             "layers/         current artwork layers by zIndex, plus layers.json\n"
-            "generations/    accepted generations: prompt.txt (exact model prompt),\n"
+            "generations/    accepted generations: prompt.txt (exact model prompt;\n"
+            "                refine-prompt.txt for a second klein room pass),\n"
             "                record.json (all parameters), input and output images;\n"
             "                *-crop files show the room's working window\n"
             "jobs/           queued previews for this project, including unaccepted ones\n"

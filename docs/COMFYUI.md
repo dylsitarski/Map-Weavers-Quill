@@ -144,6 +144,7 @@ export MWQ_IMAGE_PROVIDER=comfyui-flux2-klein
 # export MWQ_IMAGE_COMFY_FLUX2_VARIANT=distilled   # or base (with the base model file)
 # export MWQ_IMAGE_COMFY_FLUX2_TEXT_ENCODER_DEVICE=cpu   # keep the encoder off an 8 GB GPU
 # export MWQ_IMAGE_COMFY_FLUX2_ROOM_REFERENCE=plan   # or sketch (default)
+# export MWQ_IMAGE_COMFY_FLUX2_ROOM_PASSES=1   # layout pass only; 2 (default) adds a style pass
 make dev
 ```
 
@@ -155,6 +156,7 @@ make dev
 | `MWQ_IMAGE_COMFY_FLUX2_VARIANT` | `distilled` | `distilled`: 4 steps, CFG 1. `base`: 20 steps, CFG 5; needs the base model file |
 | `MWQ_IMAGE_COMFY_FLUX2_TEXT_ENCODER_DEVICE` | `default` | `cpu` runs the text encoder on the CPU to save GPU memory |
 | `MWQ_IMAGE_COMFY_FLUX2_ROOM_REFERENCE` | `sketch` | `sketch`: one image with the room sketched in. `plan`: blanked context plus a separate floor plan (see ADR-0032) |
+| `MWQ_IMAGE_COMFY_FLUX2_ROOM_PASSES` | `2` | `2`: a layout pass, then a description pass that edits its result (ADR-0034). `1`: the layout pass only, about half the time |
 
 The AI panel shows "Local FLUX.2 klein · ComfyUI" and "Ready · distilled model" (or
 base). Backgrounds are text-to-image at 960 × 640 with the same camera-first prompt as
@@ -166,8 +168,16 @@ plain wall (open-door symbols were rendered badly). The prompt starts with your 
 description, adds a default floor line if the description does not mention a floor (so
 the off-white placeholder is not read as the floor colour), adds render style and
 palette, then gives the edit instruction and the scale. Doors are not listed in the
-prompt: a written list made the model draw doors lying on the floor. Pixels outside the room are
-always protected exactly. The smoke command in this document tests
+prompt: a written list made the model draw doors lying on the floor.
+
+By default each room takes two passes in one ComfyUI job (ADR-0034). The first pass, above,
+sets the walls, doors and layout. The second edits the first pass's result with a prompt
+built only from your description: make the floor as described (or clearly textured, never
+plain or pale), fill the whole room with fitting furnishings rather than lining the walls,
+and give it the described character, while keeping walls, doors and the surroundings.
+Expect roughly twice the time of one pass. The first pass's image is saved in ComfyUI's
+output folder as `quill/pass1_*.png` for comparison; Quill keeps only the final image.
+Pixels outside the room are always protected exactly. The smoke command in this document tests
 SDXL only.
 
 Memory: the model, its 4B text encoder and the VAE do not fit in 8 GB of VRAM at once.
@@ -308,4 +318,9 @@ Still to record (SDXL items 1–3, then FLUX.2 klein):
 6. ADR-0033 trial done (2026-10-08): scale and wall tops consistent, about 12 seconds per
    room; open-door symbol and extra floor doors fixed by drawing doors closed and
    dropping the door list. Still open: floors drift toward the off-white placeholder,
-   furniture hugs the walls, and room character (clutter, whimsy) is weak.
+   furniture hugs the walls, and room character (clutter, whimsy) is weak. The base
+   variant gave slightly more character but fixed nothing else, in about 100 seconds.
+7. Next: two-pass rooms (ADR-0034). Regenerate the main room, storeroom and bedroom; compare
+   with `quill/pass1_*.png` in ComfyUI's output folder. Check floor material, whether
+   the centre is furnished, whether clutter and whimsy show, that walls and doors survive
+   the second pass, and record time (soft limit about 30 seconds).

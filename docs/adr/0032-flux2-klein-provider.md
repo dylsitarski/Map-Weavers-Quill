@@ -9,6 +9,8 @@ window, sketch (`room-sketch-v2`, floor-plan door symbols) and prompts
 (`flux2-klein-room-sketch-v2`, `flux2-klein-room-plan-v3`, room facts first) changed in
 ADR-0033.
 
+Update 2026-10-08: room edits run a second, description-only pass by default (ADR-0034).
+
 ## Context
 
 Owner trials with SDXL (ADR-0028, ADR-0029, ADR-0031) showed that wall *edges* can be

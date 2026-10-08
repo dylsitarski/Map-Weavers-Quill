@@ -6,6 +6,9 @@ SamplerCustomAdvanced. Room edits use one of two reference strategies:
 - sketch (default): one image, the context crop with an architectural sketch of the room
   drawn in (off-white floor, dark walls, door states);
 - plan: two images, the context crop with the room blanked, and a separate floor plan.
+With two room passes (the default, ADR-0034), the same graph then edits its own result
+once more with a description-only prompt, so the first pass sets the layout and the
+second the room's floor, furnishings and character.
 """
 
 import os
@@ -29,6 +32,8 @@ from quill.providers import Capability, GenerateRequest, ProviderDescriptor
 
 WORKFLOW_VERSION = "comfy-flux2-klein-v1"
 EDIT_WORKFLOW_VERSION = "comfy-flux2-klein-edit-v1"
+TWO_PASS_WORKFLOW_VERSION = "comfy-flux2-klein-edit-2pass-v1"
+ROOM_PASSES = (1, 2)
 PLAN_VERSION = "room-plan-v1"
 SKETCH_VERSION = "room-sketch-v3"
 ROOM_REFERENCES = ("sketch", "plan")
@@ -51,6 +56,8 @@ class Flux2Config:
     text_encoder_device: str = "default"
     # How the room layout reaches the model (ADR-0032): sketch or plan.
     room_reference: str = "sketch"
+    # Room edits: 1 = layout pass only; 2 = layout pass, then a description pass (ADR-0034).
+    room_passes: int = 2
 
     def __post_init__(self) -> None:
         validate_endpoint(self.url, self.timeout)
@@ -63,6 +70,8 @@ class Flux2Config:
             raise ValueError("FLUX.2 text encoder device must be default or cpu.")
         if self.room_reference not in ROOM_REFERENCES:
             raise ValueError("FLUX.2 room reference must be sketch or plan.")
+        if self.room_passes not in ROOM_PASSES:
+            raise ValueError("FLUX.2 room passes must be 1 or 2.")
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> "Flux2Config":
@@ -77,7 +86,16 @@ class Flux2Config:
             env.get("MWQ_IMAGE_COMFY_FLUX2_VARIANT") or defaults.variant,
             env.get("MWQ_IMAGE_COMFY_FLUX2_TEXT_ENCODER_DEVICE") or defaults.text_encoder_device,
             env.get("MWQ_IMAGE_COMFY_FLUX2_ROOM_REFERENCE") or defaults.room_reference,
+            _passes(env.get("MWQ_IMAGE_COMFY_FLUX2_ROOM_PASSES"), defaults.room_passes),
         )
+
+
+def _passes(value: str | None, default: int) -> int:
+    if not value:
+        return default
+    if value.strip() not in {"1", "2"}:
+        raise ValueError("FLUX.2 room passes must be 1 or 2.")
+    return int(value)
 
 
 def workflow(
@@ -85,8 +103,15 @@ def workflow(
     request: GenerateRequest,
     source: str | None = None,
     plan: str | None = None,
+    refine: str | None = None,
 ) -> dict[str, Any]:
-    """Fixed graph; output node "7" is the single SaveImage. Never accepts user graphs."""
+    """Fixed graph; output node "7" is the final SaveImage. Never accepts user graphs.
+
+    With ``refine`` (a second prompt), the first pass's latent becomes the reference of a
+    second edit with that prompt and the same noise, sampler and steps. Node "7" then
+    saves the second pass; the first pass is also saved, as ``quill/pass1``, for
+    inspection in ComfyUI's output folder only.
+    """
     steps, cfg = VARIANTS[config.variant]
     clip: dict[str, Any] = {"clip_name": config.text_encoder, "type": "flux2"}
     if config.text_encoder_device != "default":
@@ -153,6 +178,38 @@ def workflow(
         }
         positive, negative = [pos, 0], [neg, 0]
     graph["12"]["inputs"].update(positive=positive, negative=negative)
+    if refine is not None:
+        graph["40"] = {"class_type": "CLIPTextEncode", "inputs": {"clip": ["2", 0], "text": refine}}
+        graph["41"] = (
+            {"class_type": "ConditioningZeroOut", "inputs": {"conditioning": ["40", 0]}}
+            if config.variant == "distilled"
+            else {"class_type": "CLIPTextEncode", "inputs": {"clip": ["2", 0], "text": ""}}
+        )
+        for node, conditioning in (("42", "40"), ("43", "41")):
+            graph[node] = {
+                "class_type": "ReferenceLatent",
+                "inputs": {"conditioning": [conditioning, 0], "latent": ["13", 0]},
+            }
+        graph["44"] = {
+            "class_type": "CFGGuider",
+            "inputs": {"model": ["1", 0], "positive": ["42", 0], "negative": ["43", 0], "cfg": cfg},
+        }
+        graph["45"] = {
+            "class_type": "SamplerCustomAdvanced",
+            "inputs": {
+                "noise": ["11", 0],
+                "guider": ["44", 0],
+                "sampler": ["9", 0],
+                "sigmas": ["8", 0],
+                "latent_image": ["6", 0],
+            },
+        }
+        graph["10"]["inputs"]["samples"] = ["45", 0]
+        graph["46"] = {"class_type": "VAEDecode", "inputs": {"samples": ["13", 0], "vae": ["3", 0]}}
+        graph["47"] = {
+            "class_type": "SaveImage",
+            "inputs": {"images": ["46", 0], "filename_prefix": "quill/pass1"},
+        }
     return graph
 
 
@@ -197,6 +254,9 @@ class Flux2Provider(ComfyBase):
     def _accepts_layout(self) -> bool:
         return True
 
+    def _accepts_refine(self) -> bool:
+        return self.config.room_passes == 2
+
     def _validate(self, request: GenerateRequest) -> None:
         super()._validate(request)
         if request.negativePrompt:
@@ -206,7 +266,7 @@ class Flux2Provider(ComfyBase):
 
     def _check_info(self, info: dict[str, Any]) -> None:
         check = GenerateRequest(requestId="check", prompt="", width=1024, height=1024)
-        self._require_nodes(info, workflow(self.config, check, "source.png", "plan.png"))
+        self._require_nodes(info, workflow(self.config, check, "source.png", "plan.png", "x"))
         types = info["CLIPLoader"]["input"]["required"]["type"][0]
         if not isinstance(types, list) or "flux2" not in types:
             raise failure(
@@ -240,12 +300,24 @@ class Flux2Provider(ComfyBase):
         return uploads
 
     def _graph(self, request: GenerateRequest, names: dict[str, str]) -> dict[str, Any]:
-        return workflow(self.config, request, names.get("source"), names.get("plan"))
+        refine = request.extensions.get("quill.refine")
+        return workflow(
+            self.config,
+            request,
+            names.get("source"),
+            names.get("plan"),
+            str(refine["prompt"]) if refine else None,
+        )
 
     def _provenance(self, request: GenerateRequest, names: dict[str, str]) -> dict[str, Any]:
         steps, cfg = VARIANTS[self.config.variant]
         return {
-            "workflowVersion": EDIT_WORKFLOW_VERSION if "source" in names else WORKFLOW_VERSION,
+            "workflowVersion": TWO_PASS_WORKFLOW_VERSION
+            if "quill.refine" in request.extensions
+            else EDIT_WORKFLOW_VERSION
+            if "source" in names
+            else WORKFLOW_VERSION,
+            "roomPasses": 2 if "quill.refine" in request.extensions else 1,
             "model": self.config.model,
             "textEncoder": self.config.text_encoder,
             "textEncoderDevice": self.config.text_encoder_device,
@@ -262,7 +334,7 @@ class Flux2Provider(ComfyBase):
                     else PLAN_VERSION,
                     "controlHash": request.extensions["quill.layout"]["controlRef"],
                 }
-                if request.extensions
+                if "quill.layout" in request.extensions
                 else {}
             ),
         }
@@ -320,3 +392,37 @@ def room_instruction(description: str, style: dict[str, str], reference: str) ->
         if key in STYLE_LABELS and value.strip()
     ]
     return "\n".join(lines) + "\n" + _ROOM_INSTRUCTIONS[reference]
+
+
+REFINE_TEMPLATE = "flux2-klein-room-refine-v1"
+REFINE_FLOOR = (
+    "Give the floor a clearly textured material that suits this room, such as wood planks, "
+    "flagstones or packed earth; it must not be plain, flat or pale."
+)
+
+
+def room_refine_instruction(description: str, style: dict[str, str]) -> str:
+    """Second-pass prompt: the room already has walls and doors; make it match the
+    description, with a real floor and furnishings across the whole room."""
+    described = description.strip() or "An interior room."
+    floor = (
+        "Make the floor exactly as described, with visible material and texture."
+        if re.search(r"\bfloor", description, re.IGNORECASE)
+        else REFINE_FLOOR
+    )
+    styled = " ".join(
+        f"{STYLE_LABELS[key]}: {value.strip()}."
+        for key, value in style.items()
+        if key in STYLE_LABELS and value.strip()
+    )
+    return (
+        "Restyle the interior of the room near the centre of image 1 to match this "
+        f"description:\n{described}\n"
+        f"{floor} Fill the whole room with furnishings and objects that fit the description, "
+        "spread across the floor and not only along the walls, with floor visible between "
+        "them. Give the room the character the description asks for. "
+        + (styled + " " if styled else "")
+        + "Keep the room's walls, dark wall tops and doors exactly where they are, and keep "
+        "everything outside the room unchanged. Orthographic overhead view of a tabletop "
+        "battlemap, no perspective, no text, labels or grid."
+    )

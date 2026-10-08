@@ -239,6 +239,10 @@ class ComfyBase:
     def _accepts_layout(self) -> bool:
         return False
 
+    def _accepts_refine(self) -> bool:
+        """Whether a second, description-only room pass (``quill.refine``) is supported."""
+        return False
+
     def _uploads(
         self, source: Image.Image | None, mask: Image.Image | None, control: Image.Image | None
     ) -> list[tuple[str, str, Image.Image]]:
@@ -344,13 +348,26 @@ class ComfyBase:
             )
         if request.extensions:
             layout = request.extensions.get("quill.layout")
+            refine = request.extensions.get("quill.refine")
+            allowed = (
+                {"quill.layout", "quill.refine"} if self._accepts_refine() else {"quill.layout"}
+            )
             if (
                 not isinstance(request, InpaintRequest)
                 or not self._accepts_layout()
-                or set(request.extensions) != {"quill.layout"}
+                or "quill.layout" not in request.extensions
+                or not set(request.extensions) <= allowed
                 or not isinstance(layout, dict)
                 or set(layout) != {"controlRef"}
                 or not isinstance(layout.get("controlRef"), str)
+                or (
+                    refine is not None
+                    and (
+                        set(refine) != {"prompt"}
+                        or not isinstance(text := refine.get("prompt"), str)
+                        or not text.strip()
+                    )
+                )
             ):
                 raise failure(
                     "unsupported_capability", "Unsupported room layout conditioning request."
@@ -415,7 +432,7 @@ class ComfyBase:
         if isinstance(request, InpaintRequest):
             source = self._image(request.sourceRef, size, "RGB")
             mask = self._image(request.maskRef, size, "L")
-        if request.extensions:
+        if "quill.layout" in request.extensions:
             control = self._image(
                 str(request.extensions["quill.layout"]["controlRef"]), size, "RGB"
             )

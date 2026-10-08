@@ -32,7 +32,8 @@ furniture scale varying with room size, placeholder floors, and doors not always
 honoured. Rooms now use a fixed-scale context window and room-first prompts, with doors
 drawn closed (ADR-0033): in trial, scale and wall tops were consistent at about 12
 seconds per room, but floors still drift toward the placeholder colour, furniture stays
-along the walls, and room descriptions show weakly. Those are the next problems.
+along the walls, and room descriptions show weakly. A second klein pass now restyles each
+room from its description (ADR-0034, about twice the time). Next: a trial of that.
 
 Verification evidence and the development log are in [docs/HISTORY.md](docs/HISTORY.md).
 

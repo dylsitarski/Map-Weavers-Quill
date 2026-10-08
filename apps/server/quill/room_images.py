@@ -10,7 +10,13 @@ from pydantic import Field, JsonValue
 from quill.backgrounds import BackgroundResult
 from quill.comfyui import ComfyBase, ComfyProvider
 from quill.exports import artwork_size, composite_artwork
-from quill.flux2 import ROOM_TEMPLATES, Flux2Provider, room_instruction
+from quill.flux2 import (
+    REFINE_TEMPLATE,
+    ROOM_TEMPLATES,
+    Flux2Provider,
+    room_instruction,
+    room_refine_instruction,
+)
 from quill.layout_guidance import room_scale, room_sketch, scale_prompt, wall_guide
 from quill.models import Bounds, Contract, GenerationRecord, Point, Project, RasterLayer
 from quill.projects import project_store, validate_project
@@ -60,6 +66,8 @@ def generate_room(request: RoomImageRequest) -> BackgroundResult:
     # FLUX.2 klein room-reference strategy (ADR-0032), or None for other providers.
     reference = provider.config.room_reference if isinstance(provider, Flux2Provider) else None
     klein = reference is not None
+    # Second, description-only klein pass (ADR-0034), or None.
+    refine: str | None = None
     if sdxl:
         prompt = prompt_text(room.prompt, effective_style, room=True)
     elif reference is not None:
@@ -114,6 +122,13 @@ def generate_room(request: RoomImageRequest) -> BackgroundResult:
                 input_hashes.append(store.put_asset(png(full)))
                 guide = window.guide(full)
             extensions = {"quill.layout": {"controlRef": provider.put(png(guide))}}
+            if isinstance(provider, Flux2Provider) and provider.config.room_passes == 2:
+                refine = (
+                    room_refine_instruction(room.prompt, effective_style)
+                    + "\n"
+                    + scale_prompt(scale, controlled=False)
+                )
+                extensions["quill.refine"] = {"prompt": refine}
     result = asyncio.run(
         provider.inpaint(
             InpaintRequest(
@@ -192,6 +207,7 @@ def generate_room(request: RoomImageRequest) -> BackgroundResult:
                     if window
                     else {}
                 ),
+                **({"refinePrompt": refine, "refineTemplate": REFINE_TEMPLATE} if refine else {}),
                 "roomPrompt": room.prompt,
                 "styleOverrides": dict(room.styleOverrides),
                 "effectiveStyle": {key: value for key, value in effective_style.items()},

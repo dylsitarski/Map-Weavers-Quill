@@ -144,6 +144,12 @@ criterion to its tests.
     wall) and the door list was removed. Verified with 110 Python, 32 TypeScript and 41
     browser tests.
 
+16. **Base variant check and two-pass rooms (2026-10-08, ADR-0034).** The owner tried the
+    base klein variant on the main room: slightly more character, the same floor and
+    empty-centre problems, about 100 seconds. Klein rooms now run a second pass in the same
+    ComfyUI job that edits the first pass's result with a description-only prompt.
+    Verified with 111 Python, 32 TypeScript and 41 browser tests; not yet trialled.
+
 Outstanding before Milestone 3 can close: good room floors, filled room centres and
 visible room character with klein,
 recorded runtime and peak VRAM, explicit building/open-air intent, and geometry-aware backgrounds

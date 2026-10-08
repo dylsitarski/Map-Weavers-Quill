@@ -1085,7 +1085,8 @@ Milestone 3 status:
   rooms from a layout reference (by default the room sketched into its context, with door
   states) (ADR-0032); a fixed-scale room window, room-first klein prompts with a door
   list and floor-plan door symbols, no Environment default, random seeds and pruned
-  generation history (ADR-0033). All are covered by offline tests only.
+  generation history (ADR-0033); a second, description-only klein room pass (ADR-0034).
+  All are covered by offline tests only.
 - Owner trials: the first found abstract room art and oblique perspective (addressed by
   ADR-0028); the second found coherent top-down images but wrong furniture scale,
   invented partitions and backgrounds that ignore the architecture (addressed in part
@@ -1104,8 +1105,10 @@ Milestone 3 status:
   room; the open-door symbol and a written door list caused bad or extra doors, so doors
   are now drawn closed and not listed. Floors still drift toward the placeholder,
   furniture hugs the walls and room character is weak.
-- Next: fix placeholder floors, empty room centres and weak room character (time soft
-  limit about 30 seconds); then explicit building/open-air intent and geometry-aware
+- The base klein variant gave slightly more character but fixed nothing else in about 100
+  seconds. Klein rooms now run a second, description-only pass (ADR-0034).
+- Next: owner trial of two-pass rooms for floors, filled centres and room character
+  (time soft limit about 30 seconds); then explicit building/open-air intent and geometry-aware
   backgrounds (ADR-0023).
 - Not implemented: hosted generation, geometry-aware exteriors, exact furniture sizing,
   hard architectural pixel enforcement, provider-side job interruption. Flux Fill is
