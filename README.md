@@ -34,9 +34,9 @@ drawn closed (ADR-0033): in trial, scale and wall tops were consistent at about 
 seconds per room, but floors still drift toward the placeholder colour, furniture stays
 along the walls, and room descriptions show weakly. A second klein pass now restyles each
 room from its description (ADR-0034): in trial, character and furnishing improved
-markedly at about 24 seconds per room, but tiny rooms expanded beyond their walls and
-doors were unreliable. Tiny rooms now get a smaller window; door placement is the main
-open problem.
+markedly at about 24 seconds per room, but rooms grew beyond their walls and doors were
+unreliable. Klein now samples only inside the room, with the surroundings held fixed
+(ADR-0035), and tiny rooms get a smaller window. Next: a trial of that; doors remain open.
 
 Verification evidence and the development log are in [docs/HISTORY.md](docs/HISTORY.md).
 

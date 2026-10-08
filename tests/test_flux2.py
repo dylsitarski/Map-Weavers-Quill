@@ -205,6 +205,57 @@ class Flux2ProtocolTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.getpixel((512, 512)), (9, 99, 199))
         self.assertEqual(self.provider.last_run["layoutReference"], "room-sketch-v3")
 
+    async def test_latent_masking_pins_the_surroundings_in_both_passes(self):
+        size = (1024, 1024)
+        source = Image.new("RGB", size, (200, 10, 10))
+        mask = Image.new("L", size)
+        mask.paste(255, (256, 256, 768, 768))
+        images = (source, mask, Image.new("RGB", size))
+        refs = [self.provider.put(png(i)) for i in images]
+        request = InpaintRequest(
+            requestId="r",
+            prompt="Image 1",
+            width=1024,
+            height=1024,
+            seed=3,
+            sourceRef=refs[0],
+            maskRef=refs[1],
+            maskConvention="white-edit-black-preserve",
+            extensions={
+                "quill.layout": {"controlRef": refs[2]},
+                "quill.refine": {"prompt": "Restyle the room"},
+            },
+        )
+        await self.provider.inpaint(request)
+        # The upload carries the room as inverted alpha, so LoadImage's mask is the room.
+        ((_, data),) = self.fake.uploads
+        with Image.open(BytesIO(data)) as upload:
+            self.assertEqual(upload.mode, "RGBA")
+            self.assertEqual(upload.getpixel((10, 10))[3], 255)
+            self.assertEqual(upload.getpixel((512, 512))[3], 0)
+        g = self.fake.graph
+        self.assertEqual(g["50"]["class_type"], "GrowMask")
+        self.assertEqual(g["50"]["inputs"]["mask"], ["20", 1])
+        # Pass 1 samples from the encoded reference under the mask, not an empty latent.
+        self.assertEqual(g["51"]["inputs"], {"samples": ["21", 0], "mask": ["50", 0]})
+        self.assertEqual(g["13"]["inputs"]["latent_image"], ["51", 0])
+        # Pass 2 samples from pass 1 under the same mask.
+        self.assertEqual(g["52"]["inputs"], {"samples": ["13", 0], "mask": ["50", 0]})
+        self.assertEqual(g["45"]["inputs"]["latent_image"], ["52", 0])
+        self.assertEqual(self.provider.last_run["roomMasking"], "latent")
+        # Unmasked: whole-window generation from an empty latent and an RGB upload.
+        self.fake.uploads.clear()
+        unmasked = self.make(Flux2Config(room_masking="none"))
+        self.assertEqual([unmasked.put(png(i)) for i in images], refs)
+        await unmasked.inpaint(request)
+        g = self.fake.graph
+        self.assertNotIn("50", g)
+        self.assertEqual(g["13"]["inputs"]["latent_image"], ["6", 0])
+        self.assertEqual(g["45"]["inputs"]["latent_image"], ["6", 0])
+        with Image.open(BytesIO(self.fake.uploads[0][1])) as upload:
+            self.assertEqual(upload.mode, "RGB")
+        self.assertEqual(unmasked.last_run["workflowVersion"], "comfy-flux2-klein-edit-2pass-v1")
+
     async def test_second_pass_edits_the_first_pass_with_the_refine_prompt(self):
         size = (1024, 1024)
         source = Image.new("RGB", size, (200, 10, 10))
@@ -240,7 +291,7 @@ class Flux2ProtocolTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("48", g)
         self.assertEqual(g["45"]["inputs"]["guider"], ["44", 0])
         self.assertEqual(g["45"]["inputs"]["noise"], ["11", 0])
-        self.assertEqual(g["45"]["inputs"]["latent_image"], ["6", 0])
+        self.assertEqual(g["45"]["inputs"]["latent_image"], ["52", 0])
         # The final image is the second pass; the first is saved only for inspection.
         self.assertEqual(g["10"]["inputs"]["samples"], ["45", 0])
         self.assertEqual(g["7"]["inputs"]["images"], ["10", 0])
@@ -256,7 +307,7 @@ class Flux2ProtocolTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(raw.getpixel((10, 10)), (9, 99, 199))  # Not clipped.
         run = self.provider.last_run
         self.assertNotIn("raw", run)
-        self.assertEqual(run["workflowVersion"], "comfy-flux2-klein-edit-2pass-v1")
+        self.assertEqual(run["workflowVersion"], "comfy-flux2-klein-edit-2pass-v1-masked")
         self.assertEqual(run["roomPasses"], 2)
         # Base variant: an empty-text negative, as in the first pass.
         base = self.make(Flux2Config(variant="base"))
@@ -337,7 +388,7 @@ class Flux2ProtocolTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.getpixel((10, 10)), (200, 10, 10))
         self.assertEqual(result.getpixel((512, 512)), (9, 99, 199))
         run = self.provider.last_run
-        self.assertEqual(run["workflowVersion"], "comfy-flux2-klein-edit-v1")
+        self.assertEqual(run["workflowVersion"], "comfy-flux2-klein-edit-v1-masked")
         self.assertEqual(run["layoutReference"], "room-plan-v1")
         self.assertEqual(run["controlHash"], refs[2])
 
@@ -370,6 +421,7 @@ class Flux2ProtocolTests(unittest.IsolatedAsyncioTestCase):
             {"model": "../klein.safetensors"},
             {"room_reference": "mask"},
             {"room_passes": 3},
+            {"room_masking": "pixel"},
             {"vae": "vae.ckpt"},
             {"url": "http://example.com:8188"},
         ):
@@ -386,6 +438,9 @@ class Flux2ProtocolTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(config.room_reference, "plan")
         self.assertEqual(Flux2Config.from_env({}).room_reference, "sketch")
         self.assertEqual(Flux2Config.from_env({}).room_passes, 2)
+        self.assertEqual(Flux2Config.from_env({}).room_masking, "latent")
+        masking = {"MWQ_IMAGE_COMFY_FLUX2_ROOM_MASKING": "none"}
+        self.assertEqual(Flux2Config.from_env(masking).room_masking, "none")
         passes = {"MWQ_IMAGE_COMFY_FLUX2_ROOM_PASSES": "1"}
         self.assertEqual(Flux2Config.from_env(passes).room_passes, 1)
         with self.assertRaises(ValueError):
@@ -515,7 +570,7 @@ class Flux2EditorTests(unittest.TestCase):
         self.assertNotIn("negativePrompt", parameters)
         # Two passes by default: layout, then a description-only edit of that result.
         self.assertEqual(
-            parameters["comfyui"]["workflowVersion"], "comfy-flux2-klein-edit-2pass-v1"
+            parameters["comfyui"]["workflowVersion"], "comfy-flux2-klein-edit-2pass-v1-masked"
         )
         self.assertEqual(parameters["refineTemplate"], "flux2-klein-room-refine-v2")
         # Both passes are kept unclipped, at map size, for debugging bundles.

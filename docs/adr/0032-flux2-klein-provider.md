@@ -9,7 +9,8 @@ window, sketch (`room-sketch-v2`, floor-plan door symbols) and prompts
 (`flux2-klein-room-sketch-v2`, `flux2-klein-room-plan-v3`, room facts first) changed in
 ADR-0033.
 
-Update 2026-10-08: room edits run a second, description-only pass by default (ADR-0034).
+Update 2026-10-08: room edits run a second, description-only pass by default (ADR-0034),
+and sample only inside the room mask instead of from an empty latent (ADR-0035).
 
 ## Context
 

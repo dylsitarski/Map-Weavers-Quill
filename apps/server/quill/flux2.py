@@ -8,7 +8,10 @@ SamplerCustomAdvanced. Room edits use one of two reference strategies:
 - plan: two images, the context crop with the room blanked, and a separate floor plan.
 With two room passes (the default, ADR-0034), the same graph then edits its own result
 once more with a description-only prompt, so the first pass sets the layout and the
-second the room's floor, furnishings and character.
+second the room's floor, furnishings and character. With latent room masking (the
+default, ADR-0035), both passes sample only inside the (slightly grown) room mask: the
+surroundings stay pinned to the encoded reference at every step, so the model must fit
+the room inside its walls instead of composing a larger building around it.
 """
 
 import os
@@ -19,7 +22,7 @@ from typing import Any
 from uuid import uuid4
 
 import httpx
-from PIL import Image
+from PIL import Image, ImageChops
 
 from quill.comfyui import (
     ComfyBase,
@@ -34,6 +37,8 @@ WORKFLOW_VERSION = "comfy-flux2-klein-v1"
 EDIT_WORKFLOW_VERSION = "comfy-flux2-klein-edit-v1"
 TWO_PASS_WORKFLOW_VERSION = "comfy-flux2-klein-edit-2pass-v1"
 ROOM_PASSES = (1, 2)
+ROOM_MASKING = ("latent", "none")
+MASK_GROW = 16  # Working pixels: the whole wall band may be redrawn to blend.
 PLAN_VERSION = "room-plan-v1"
 SKETCH_VERSION = "room-sketch-v3"
 ROOM_REFERENCES = ("sketch", "plan")
@@ -58,6 +63,9 @@ class Flux2Config:
     room_reference: str = "sketch"
     # Room edits: 1 = layout pass only; 2 = layout pass, then a description pass (ADR-0034).
     room_passes: int = 2
+    # Room sampling: "latent" pins everything outside the room mask (ADR-0035); "none"
+    # regenerates the whole window from an empty latent, as before.
+    room_masking: str = "latent"
 
     def __post_init__(self) -> None:
         validate_endpoint(self.url, self.timeout)
@@ -72,6 +80,8 @@ class Flux2Config:
             raise ValueError("FLUX.2 room reference must be sketch or plan.")
         if self.room_passes not in ROOM_PASSES:
             raise ValueError("FLUX.2 room passes must be 1 or 2.")
+        if self.room_masking not in ROOM_MASKING:
+            raise ValueError("FLUX.2 room masking must be latent or none.")
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> "Flux2Config":
@@ -87,6 +97,7 @@ class Flux2Config:
             env.get("MWQ_IMAGE_COMFY_FLUX2_TEXT_ENCODER_DEVICE") or defaults.text_encoder_device,
             env.get("MWQ_IMAGE_COMFY_FLUX2_ROOM_REFERENCE") or defaults.room_reference,
             _passes(env.get("MWQ_IMAGE_COMFY_FLUX2_ROOM_PASSES"), defaults.room_passes),
+            env.get("MWQ_IMAGE_COMFY_FLUX2_ROOM_MASKING") or defaults.room_masking,
         )
 
 
@@ -178,6 +189,18 @@ def workflow(
         }
         positive, negative = [pos, 0], [neg, 0]
     graph["12"]["inputs"].update(positive=positive, negative=negative)
+    masked = source is not None and config.room_masking == "latent"
+    if masked:
+        # The first reference's mask output is the room (the upload's alpha is inverted).
+        graph["50"] = {
+            "class_type": "GrowMask",
+            "inputs": {"mask": ["20", 1], "expand": MASK_GROW, "tapered_corners": True},
+        }
+        graph["51"] = {
+            "class_type": "SetLatentNoiseMask",
+            "inputs": {"samples": ["21", 0], "mask": ["50", 0]},
+        }
+        graph["13"]["inputs"]["latent_image"] = ["51", 0]
     if refine is not None:
         graph["40"] = {"class_type": "CLIPTextEncode", "inputs": {"clip": ["2", 0], "text": refine}}
         graph["41"] = (
@@ -204,6 +227,12 @@ def workflow(
                 "latent_image": ["6", 0],
             },
         }
+        if masked:
+            graph["52"] = {
+                "class_type": "SetLatentNoiseMask",
+                "inputs": {"samples": ["13", 0], "mask": ["50", 0]},
+            }
+            graph["45"]["inputs"]["latent_image"] = ["52", 0]
         graph["10"]["inputs"]["samples"] = ["45", 0]
         graph["46"] = {"class_type": "VAEDecode", "inputs": {"samples": ["13", 0], "vae": ["3", 0]}}
         graph["47"] = {
@@ -293,14 +322,23 @@ class Flux2Provider(ComfyBase):
                 if control is not None
                 else Image.composite(Image.new("RGB", source.size, SKETCH_FLOOR), source, mask)
             )
-            uploads.append(("source", f"quill-{uuid4().hex}.png", reference))
+            uploads.append(("source", f"quill-{uuid4().hex}.png", self._masked(reference, mask)))
         elif source is not None and mask is not None:
             # The model sees the surroundings, with the room itself blanked out.
             blanked = Image.composite(Image.new("RGB", source.size, BLANK), source, mask)
-            uploads.append(("source", f"quill-{uuid4().hex}.png", blanked))
+            uploads.append(("source", f"quill-{uuid4().hex}.png", self._masked(blanked, mask)))
             if control is not None:
                 uploads.append(("plan", f"quill-plan-{uuid4().hex}.png", room_plan(mask, control)))
         return uploads
+
+    def _masked(self, reference: Image.Image, mask: Image.Image) -> Image.Image:
+        """With latent masking, carry the room mask as inverted alpha: ComfyUI's LoadImage
+        returns 1 - alpha as its mask, so the mask output is the room."""
+        if self.config.room_masking != "latent":
+            return reference
+        rgba = reference.convert("RGBA")
+        rgba.putalpha(ImageChops.invert(mask.convert("L")))
+        return rgba
 
     def _graph(self, request: GenerateRequest, names: dict[str, str]) -> dict[str, Any]:
         refine = request.extensions.get("quill.refine")
@@ -315,12 +353,20 @@ class Flux2Provider(ComfyBase):
     def _provenance(self, request: GenerateRequest, names: dict[str, str]) -> dict[str, Any]:
         steps, cfg = VARIANTS[self.config.variant]
         return {
-            "workflowVersion": TWO_PASS_WORKFLOW_VERSION
-            if "quill.refine" in request.extensions
-            else EDIT_WORKFLOW_VERSION
+            "workflowVersion": (
+                TWO_PASS_WORKFLOW_VERSION
+                if "quill.refine" in request.extensions
+                else EDIT_WORKFLOW_VERSION
+            )
+            + ("-masked" if self.config.room_masking == "latent" else "")
             if "source" in names
             else WORKFLOW_VERSION,
             "roomPasses": 2 if "quill.refine" in request.extensions else 1,
+            **(
+                {"roomMasking": self.config.room_masking, "maskGrow": MASK_GROW}
+                if "source" in names
+                else {}
+            ),
             "model": self.config.model,
             "textEncoder": self.config.text_encoder,
             "textEncoderDevice": self.config.text_encoder_device,

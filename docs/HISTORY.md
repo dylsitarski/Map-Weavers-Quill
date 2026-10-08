@@ -160,7 +160,14 @@ criterion to its tests.
     unclipped and exported in debugging bundles. Verified with 113 Python, 32 TypeScript
     and 41 browser tests.
 
-Outstanding before Milestone 3 can close: reliable doors, good room floors, filled room centres and
+18. **Storeroom trial and masked sampling (2026-10-08, ADR-0035).** The 10-ft storeroom
+    grew up and sideways into the forest in both of two attempts, redrawing its neighbours
+    too: klein regenerated the whole working window from an empty latent and only Quill's
+    clipping bounded the room. Both klein passes now start from the encoded reference
+    under a `SetLatentNoiseMask` of the (16 px grown) room, so the surroundings stay fixed
+    during sampling. Verified with 114 Python, 32 TypeScript and 41 browser tests.
+
+Outstanding before Milestone 3 can close: rooms that stay inside their walls, reliable doors, good room floors, filled room centres and
 visible room character with klein,
 recorded runtime and peak VRAM, explicit building/open-air intent, and geometry-aware backgrounds
 (ADR-0023). Flux Fill was considered and deferred; hosted generation moved to

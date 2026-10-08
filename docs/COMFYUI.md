@@ -145,6 +145,7 @@ export MWQ_IMAGE_PROVIDER=comfyui-flux2-klein
 # export MWQ_IMAGE_COMFY_FLUX2_TEXT_ENCODER_DEVICE=cpu   # keep the encoder off an 8 GB GPU
 # export MWQ_IMAGE_COMFY_FLUX2_ROOM_REFERENCE=plan   # or sketch (default)
 # export MWQ_IMAGE_COMFY_FLUX2_ROOM_PASSES=1   # layout pass only; 2 (default) adds a style pass
+# export MWQ_IMAGE_COMFY_FLUX2_ROOM_MASKING=none   # regenerate the whole window (old behavior)
 make dev
 ```
 
@@ -156,6 +157,7 @@ make dev
 | `MWQ_IMAGE_COMFY_FLUX2_VARIANT` | `distilled` | `distilled`: 4 steps, CFG 1. `base`: 20 steps, CFG 5; needs the base model file |
 | `MWQ_IMAGE_COMFY_FLUX2_TEXT_ENCODER_DEVICE` | `default` | `cpu` runs the text encoder on the CPU to save GPU memory |
 | `MWQ_IMAGE_COMFY_FLUX2_ROOM_REFERENCE` | `sketch` | `sketch`: one image with the room sketched in. `plan`: blanked context plus a separate floor plan (see ADR-0032) |
+| `MWQ_IMAGE_COMFY_FLUX2_ROOM_MASKING` | `latent` | `latent`: sample only inside the room; the surroundings stay fixed during sampling (ADR-0035). `none`: regenerate the whole window and clip afterwards |
 | `MWQ_IMAGE_COMFY_FLUX2_ROOM_PASSES` | `2` | `2`: a layout pass, then a description pass that edits its result (ADR-0034). `1`: the layout pass only, about half the time |
 
 The AI panel shows "Local FLUX.2 klein · ComfyUI" and "Ready · distilled model" (or
@@ -179,6 +181,10 @@ Expect roughly twice the time of one pass. The first pass's image is saved in Co
 output folder as `quill/pass1_*.png`. Quill also keeps it, and the final image before
 clipping to the room, for debugging bundles (`pass-1-unclipped`, `final-unclipped`). Both
 prompts ask for doors only where the brown bands are.
+
+Both passes sample only inside the room (slightly grown so the walls can blend): the
+surroundings are held fixed at every sampling step, so the model has to fit the room
+inside its walls rather than drawing a larger building that Quill then clips (ADR-0035).
 Pixels outside the room are always protected exactly. The smoke command in this document tests
 SDXL only.
 
@@ -327,7 +333,9 @@ Still to record (SDXL items 1–3, then FLUX.2 klein):
 7. Two-pass trial done (2026-10-08): much better character and filled rooms, about 24
    seconds per room. The 5-ft outhouse expanded into a larger invented hut (in pass 1);
    door bands stayed flat strips and extra doors were invented.
-8. Next: regenerate the outhouse (now a 20-ft window) and the main room and bedroom.
-   Check that the outhouse stays inside its walls, whether doors are drawn at the brown
-   bands and nowhere else, and send a debugging bundle: it now includes each pass
-   unclipped.
+8. The 10-ft storeroom also grew past its walls into the forest (2026-10-08), so rooms now
+   sample only inside their mask (ADR-0035).
+9. Next: regenerate the storeroom, outhouse and bedroom. Check that rooms stay inside
+   their walls with all walls visible, whether the room edge shows seams, whether the
+   floor placeholder survives, where doors appear, and the time. Send a debugging bundle:
+   it includes each pass unclipped.
