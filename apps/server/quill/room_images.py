@@ -11,7 +11,7 @@ from quill.backgrounds import BackgroundResult
 from quill.comfyui import ComfyBase, ComfyProvider
 from quill.exports import artwork_size, composite_artwork
 from quill.flux2 import ROOM_TEMPLATES, Flux2Provider, room_instruction
-from quill.layout_guidance import door_list, room_scale, room_sketch, scale_prompt, wall_guide
+from quill.layout_guidance import room_scale, room_sketch, scale_prompt, wall_guide
 from quill.models import Bounds, Contract, GenerationRecord, Point, Project, RasterLayer
 from quill.projects import project_store, validate_project
 from quill.provider_config import (
@@ -63,7 +63,7 @@ def generate_room(request: RoomImageRequest) -> BackgroundResult:
     if sdxl:
         prompt = prompt_text(room.prompt, effective_style, room=True)
     elif reference is not None:
-        prompt = room_instruction(room.prompt, effective_style, reference, door_list(project, room))
+        prompt = room_instruction(room.prompt, effective_style, reference)
     profile, alignment = raster_profile(provider)
     size = max(artwork_size(project, store), profile, key=lambda size: size[0])
     mask = polygon_mask(room.polygon, size)

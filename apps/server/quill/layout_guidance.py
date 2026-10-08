@@ -3,7 +3,7 @@
 import math
 
 from PIL import Image, ImageDraw
-from shapely.geometry import Point, Polygon  # type: ignore[import-untyped]
+from shapely.geometry import Polygon  # type: ignore[import-untyped]
 
 from quill.doors import owners
 from quill.models import Project, Room, Wall
@@ -58,16 +58,6 @@ def wall_guide(project: Project, size: tuple[int, int]) -> Image.Image:
     return guide
 
 
-def _inward(room: Room, wall: Wall) -> tuple[float, float]:
-    """Unit normal of a wall pointing into the room, in native coordinates (+y up)."""
-    dx, dy = wall.end.x - wall.start.x, wall.end.y - wall.start.y
-    length = math.hypot(dx, dy)
-    nx, ny = -dy / length, dx / length
-    mx, my = (wall.start.x + wall.end.x) / 2, (wall.start.y + wall.end.y) / 2
-    inside = Polygon([(p.x, p.y) for p in room.polygon]).contains(Point(mx + nx, my + ny))
-    return (nx, ny) if inside else (-nx, -ny)
-
-
 def _room_doors(project: Project, room: Room) -> list[tuple[Wall, float, list]]:
     walls = []
     for wall in project.walls:
@@ -77,24 +67,6 @@ def _room_doors(project: Project, room: Room) -> list[tuple[Wall, float, list]]:
     return walls
 
 
-SIDES = ("right", "top-right", "top", "top-left", "left", "bottom-left", "bottom", "bottom-right")
-DOOR_STATES = {
-    "open": "an open door swung into the room",
-    "closed": "a closed door",
-    "locked": "a closed door",
-}
-
-
-def door_list(project: Project, room: Room) -> list[str]:
-    """Plain-language door facts for one room, as seen in the image (top is +y)."""
-    lines = []
-    for wall, _, openings in _room_doors(project, room):
-        nx, ny = _inward(room, wall)
-        side = SIDES[round(math.degrees(math.atan2(-ny, -nx)) / 45) % 8]
-        lines += [f"{DOOR_STATES[door.state]} in the {side} wall" for _, _, door in openings]
-    return lines
-
-
 def room_sketch(
     project: Project, size: tuple[int, int], room: Room, window: RoomWindow | None = None
 ) -> Image.Image:
@@ -102,17 +74,16 @@ def room_sketch(
     or at map raster ``size`` without one (the stored provenance copy).
 
     Walls are dark bands at the project's wall thickness, so they have the same physical
-    width in every room. Doors use floor-plan symbols: a closed or locked door is a brown
-    leaf across its opening; an open door is a leaf swung into the room from its hinge
-    with a thin quarter-circle swing arc. Secret doors and windows are drawn as wall.
-    Other rooms' walls are omitted. Black pixels are transparent when composited.
+    width in every room. Every door is drawn closed, whatever its state: a brown band of
+    wall thickness filling its opening (open-door symbols were rendered badly and left
+    in the image). Secret doors and windows are drawn as wall. Other rooms' walls are
+    omitted. Black pixels are transparent when composited.
     """
     sketch = Image.new("RGB", (WORKING_SIDE,) * 2 if window else size)
     draw = ImageDraw.Draw(sketch)
     sx, sy = size[0] / project.map.width, size[1] / project.map.height
     zoom = window.scale if window else 1.0
     width = max(3, round(project.map.style.wallThicknessPx * sx * zoom))
-    leaf, arc = max(2, width // 2), max(1, width // 4)
 
     def point(wall: Wall, t: float) -> tuple[float, float]:
         x = (wall.start.x + (wall.end.x - wall.start.x) * t) * sx
@@ -126,22 +97,8 @@ def room_sketch(
             for x, y in ends:  # Round joints so corners have no notches.
                 r = width / 2
                 draw.ellipse((x - r, y - r, x + r, y + r), fill=SKETCH_WALL)
-        nx, ny = _inward(room, wall)
-        for low, high, door in openings:
-            hinge, jamb = point(wall, low), point(wall, high)
-            if door.state != "open":
-                draw.line([hinge, jamb], fill=SKETCH_DOOR, width=leaf)
-                continue
-            radius = math.dist(hinge, jamb)
-            tip = (hinge[0] + nx * radius, hinge[1] - ny * radius)  # Rows point down.
-            draw.line([hinge, tip], fill=SKETCH_DOOR, width=leaf)
-            angles = [
-                math.degrees(math.atan2(y - hinge[1], x - hinge[0])) % 360 for x, y in (tip, jamb)
-            ]
-            if (angles[1] - angles[0]) % 360 > 180:
-                angles.reverse()
-            box = (hinge[0] - radius, hinge[1] - radius, hinge[0] + radius, hinge[1] + radius)
-            draw.arc(box, angles[0], angles[1], fill=SKETCH_DOOR, width=arc)
+        for low, high, _ in openings:
+            draw.line([point(wall, low), point(wall, high)], fill=SKETCH_DOOR, width=width)
     return sketch
 
 

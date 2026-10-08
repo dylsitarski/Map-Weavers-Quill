@@ -135,7 +135,17 @@ criterion to its tests.
     locked; accepting artwork prunes history records of replaced artwork. Verified with
     111 Python, 32 TypeScript and 41 browser tests; not yet trialled on a GPU.
 
-Outstanding before Milestone 3 can close: an owner trial of ADR-0033's room changes,
+15. **Seventh owner trial (2026-10-08, ADR-0033).** Furniture scale matched better
+    across rooms, wall tops were thin and even, about 12 seconds per room. The open-door
+    symbol was rendered badly and partly remained; door-like objects appeared on the
+    floor, likely from the written door list; floors drifted toward the off-white
+    placeholder even when described; furniture hugged the walls; room descriptions
+    (cluttered, whimsical) showed weakly. Doors are now drawn closed (secret doors as
+    wall) and the door list was removed. Verified with 110 Python, 32 TypeScript and 41
+    browser tests.
+
+Outstanding before Milestone 3 can close: good room floors, filled room centres and
+visible room character with klein,
 recorded runtime and peak VRAM, explicit building/open-air intent, and geometry-aware backgrounds
 (ADR-0023). Flux Fill was considered and deferred; hosted generation moved to
 Milestone 5.

@@ -6,7 +6,6 @@ from PIL import Image
 from quill.layout_guidance import (
     SKETCH_DOOR,
     SKETCH_WALL,
-    door_list,
     room_scale,
     room_sketch,
     scale_prompt,
@@ -74,7 +73,7 @@ class LayoutGuidanceTests(unittest.TestCase):
         project.doors = []
         self.assertEqual(wall_guide(project, (960, 640)).getpixel(pixel(door.position)), 255)
 
-    def test_room_sketch_draws_wall_thickness_and_door_symbols(self):
+    def test_room_sketch_draws_wall_thickness_and_closed_doors(self):
         project = document()
         door = project.doors[0]
         wall = next(w for w in project.walls if w.id == door.wallId)
@@ -94,8 +93,10 @@ class LayoutGuidanceTests(unittest.TestCase):
         self.assertEqual(closed.getpixel(pixel(0.1)), SKETCH_WALL)
         self.assertEqual(closed.getpixel(pixel(0.1, inward=2)), SKETCH_WALL)  # 6 px in.
         self.assertEqual(closed.getpixel(pixel(0.1, inward=4)), (0, 0, 0))  # Thin wall.
-        self.assertEqual(closed.getpixel(pixel(door.position)), SKETCH_DOOR)  # Closed leaf.
-        self.assertEqual(closed.getpixel(pixel(door.position, inward=10)), (0, 0, 0))
+        # A closed door fills its opening at wall thickness, not wider.
+        self.assertEqual(closed.getpixel(pixel(door.position)), SKETCH_DOOR)
+        self.assertEqual(closed.getpixel(pixel(door.position, inward=2)), SKETCH_DOOR)
+        self.assertEqual(closed.getpixel(pixel(door.position, inward=4)), (0, 0, 0))
         # Wall width is the same physical size whatever the room's size.
         project.map.style.wallThicknessPx = 10
         self.assertEqual(
@@ -103,12 +104,13 @@ class LayoutGuidanceTests(unittest.TestCase):
             SKETCH_WALL,
         )
         project.map.style.wallThicknessPx = 5
-        door.state = "open"
-        opened = room_sketch(project, (960, 640), room, window)
-        self.assertEqual(opened.getpixel(pixel(door.position)), (0, 0, 0))  # Clear opening.
-        # The leaf stands into the room from the hinge (the door's low end).
-        low = door.position - door.width / 2 / 200
-        self.assertEqual(opened.getpixel(pixel(low, inward=door.width / 2)), SKETCH_DOOR)
+        # Open and locked doors are drawn closed too (open symbols rendered badly).
+        for state in ("open", "locked"):
+            door.state = state
+            self.assertEqual(
+                list(room_sketch(project, (960, 640), room, window).getdata()),
+                list(closed.getdata()),
+            )
         # Raster-size copy for provenance.
         self.assertEqual(room_sketch(project, (960, 640), room).size, (960, 640))
         door.secret = True
@@ -129,16 +131,3 @@ class LayoutGuidanceTests(unittest.TestCase):
         self.assertEqual(other.getpixel((400, 480)), SKETCH_WALL)
         self.assertEqual(other.getpixel((80, 480)), (0, 0, 0))  # Room 0's far wall omitted.
         self.assertIsInstance(other, Image.Image)
-
-    def test_door_list_names_image_side_and_state(self):
-        project = document()
-        door = project.doors[0]
-        self.assertEqual(door_list(project, project.rooms[0]), ["a closed door in the right wall"])
-        # The same shared-wall door is on room 1's left wall.
-        door.state = "open"
-        self.assertEqual(
-            door_list(project, project.rooms[1]),
-            ["an open door swung into the room in the left wall"],
-        )
-        door.secret = True
-        self.assertEqual(door_list(project, project.rooms[0]), [])

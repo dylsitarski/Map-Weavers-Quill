@@ -29,8 +29,10 @@ inpainting model (ADR-0031), but SDXL still does not reliably draw a large enclo
 as indoors. A second local model family, FLUX.2 klein (ADR-0032), draws whole rooms
 indoors with walls in place in about 20 seconds. Its sketch-reference trial showed
 furniture scale varying with room size, placeholder floors, and doors not always
-honoured; rooms now use a fixed-scale context window, room-first prompts with a door
-list, and floor-plan door symbols (ADR-0033). Next: a trial of those changes.
+honoured. Rooms now use a fixed-scale context window and room-first prompts, with doors
+drawn closed (ADR-0033): in trial, scale and wall tops were consistent at about 12
+seconds per room, but floors still drift toward the placeholder colour, furniture stays
+along the walls, and room descriptions show weakly. Those are the next problems.
 
 Verification evidence and the development log are in [docs/HISTORY.md](docs/HISTORY.md).
 
@@ -146,7 +148,8 @@ local SDXL (below).
   (forest, desert) in the background prompt and in each room's prompt.
 - **Room artwork**: select a room, open AI, enter its prompt and optional style
   overrides (blank fields inherit the map style), Apply, then **Generate preview**.
-  Describe the room's contents and floor; door positions and states come from the map.
+  Describe the room's contents and floor. Doors come from the map and are currently
+  always drawn closed; secret doors look like wall.
 
 Each generation uses a new random seed; check **Lock seed** (or type a seed) to reuse
 one. Accepting artwork drops the history records of artwork it replaces, so

@@ -41,6 +41,6 @@ Status as of 2026-10-06.
 | 0030 | Deterministic wall/door overlay drawn by Quill | **Parked**; exists only on the PR #1 branch, not on main | |
 | [0031](0031-sdxl-inpainting-model.md) | `InpaintModelConditioning` and optional dedicated SDXL inpainting UNet for rooms | Implemented; trialled: context good, walls partly followed with a full ControlNet, interiors not reliably indoors | 0025, 0029 |
 | [0032](0032-flux2-klein-provider.md) | Local FLUX.2 klein provider: reference-image room edits (sketch or plan) | Implemented; plan and sketch trials done; sketch and prompts revised by 0033 | 0025, 0031, 0023, 0033 |
-| [0033](0033-fixed-room-window-and-room-prompts.md) | Fixed-scale room window, room-first prompts, floor-plan door symbols, no Environment, random seeds, history pruning | Implemented; GPU trial pending | 0028, 0032, 0021, 0022 |
+| [0033](0033-fixed-room-window-and-room-prompts.md) | Fixed-scale room window, room-first prompts, floor-plan door symbols, no Environment, random seeds, history pruning | Implemented; first trial done; doors now drawn closed, door list removed | 0028, 0032, 0021, 0022 |
 
 M0–M8 refer to milestones in [PROJECT_MANIFEST.md](../../PROJECT_MANIFEST.md) §16.

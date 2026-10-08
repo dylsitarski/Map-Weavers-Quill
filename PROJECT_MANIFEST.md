@@ -2,7 +2,7 @@
 
 **Document status:** Canonical implementation brief  
 **Version:** 0.3.2
-**Last updated:** 2026-10-06
+**Last updated:** 2026-10-08
 **Audience:** Human maintainers and AI software-engineering agents  
 **Project name:** Map-Weaver's Quill  
 
@@ -1100,8 +1100,13 @@ Milestone 3 status:
 - Sixth trial (klein sketch reference): fully indoors, but furniture scale varied with
   room size, undescribed floors stayed off-white, doors were not always honoured, rooms
   looked alike and the map Environment leaked into interiors (addressed by ADR-0033).
-- Next: owner trial of ADR-0033 (time soft limit about 30 seconds); then explicit
-  building/open-air intent and geometry-aware backgrounds (ADR-0023).
+- Seventh trial (ADR-0033): consistent scale and thin wall tops, about 12 seconds per
+  room; the open-door symbol and a written door list caused bad or extra doors, so doors
+  are now drawn closed and not listed. Floors still drift toward the placeholder,
+  furniture hugs the walls and room character is weak.
+- Next: fix placeholder floors, empty room centres and weak room character (time soft
+  limit about 30 seconds); then explicit building/open-air intent and geometry-aware
+  backgrounds (ADR-0023).
 - Not implemented: hosted generation, geometry-aware exteriors, exact furniture sizing,
   hard architectural pixel enforcement, provider-side job interruption. Flux Fill is
   deferred. A deterministic wall/door overlay was prototyped and parked (docs/HISTORY.md).

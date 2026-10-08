@@ -30,7 +30,7 @@ from quill.providers import Capability, GenerateRequest, ProviderDescriptor
 WORKFLOW_VERSION = "comfy-flux2-klein-v1"
 EDIT_WORKFLOW_VERSION = "comfy-flux2-klein-edit-v1"
 PLAN_VERSION = "room-plan-v1"
-SKETCH_VERSION = "room-sketch-v1"
+SKETCH_VERSION = "room-sketch-v3"
 ROOM_REFERENCES = ("sketch", "plan")
 SKETCH_FLOOR = (236, 232, 222)  # Off-white "paper" floor inside the room.
 # Distilled klein: 4 steps, CFG 1, zeroed negative. Base klein: 20 steps, CFG 5.
@@ -268,7 +268,7 @@ class Flux2Provider(ComfyBase):
         }
 
 
-ROOM_TEMPLATES = {"sketch": "flux2-klein-room-sketch-v2", "plan": "flux2-klein-room-plan-v3"}
+ROOM_TEMPLATES = {"sketch": "flux2-klein-room-sketch-v3", "plan": "flux2-klein-room-plan-v4"}
 MATCH_MAP = (
     "Match the surrounding map's rendering technique, lighting and level of detail, but "
     "give this room its own furnishings, materials and colors as described."
@@ -277,13 +277,12 @@ _ROOM_INSTRUCTIONS = {
     "sketch": (
         "Edit image 1, a top-down tabletop battlemap. It contains a floor-plan sketch of the "
         "room described above: the flat off-white area is the room's floor, dark bands are "
-        "its walls, and brown floor-plan symbols mark its doors. A brown bar across the wall "
-        "is a closed door. A brown bar standing out from the wall with a thin quarter-circle "
-        "arc is an open door, swung into the room. Render the room as a finished "
-        "roof-removed interior seen from directly above: keep the walls exactly along the "
-        "dark bands as narrow dark wall tops of the same width, turn the off-white area into "
-        "the described floor and furnishings, and draw each door as a real door in its shown "
-        "state. No off-white fill or brown symbols may remain. "
+        "its walls, and brown bands set into the walls are closed doors. Render the room as "
+        "a finished roof-removed interior seen from directly above: keep the walls exactly "
+        "along the dark bands as narrow dark wall tops of the same width, turn the "
+        "off-white area into the described floor and furnishings, and draw each brown band "
+        "as a closed wooden door set in the wall. No off-white fill or flat brown may "
+        "remain. "
         + MATCH_MAP
         + " Keep everything outside the room unchanged. Orthographic overhead view, no "
         "perspective, no text, labels or grid."
@@ -308,15 +307,13 @@ DEFAULT_FLOOR = (
 )
 
 
-def room_instruction(
-    description: str, style: dict[str, str], reference: str, doors: list[str]
-) -> str:
-    """Room facts first (the user's description unchanged, floor, doors, style), then
-    the edit instruction for the configured reference strategy."""
+def room_instruction(description: str, style: dict[str, str], reference: str) -> str:
+    """Room facts first (the user's description unchanged, floor, style), then the edit
+    instruction for the configured reference strategy. Doors are shown only in the
+    reference: a written door list made the model draw extra doors on the floor."""
     lines = [description.strip() or "An interior room."]
     if not re.search(r"\bfloor", description, re.IGNORECASE):
         lines.append(DEFAULT_FLOOR)
-    lines.append("Doors: " + "; ".join(doors) + "." if doors else "Doors: this room has no doors.")
     lines += [
         f"{STYLE_LABELS[key]}: {value.strip()}."
         for key, value in style.items()

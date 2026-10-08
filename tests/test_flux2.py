@@ -198,7 +198,7 @@ class Flux2ProtocolTests(unittest.IsolatedAsyncioTestCase):
         result = decode(self.provider.assets[next(reversed(self.provider.assets))])
         self.assertEqual(result.getpixel((10, 10)), (200, 10, 10))
         self.assertEqual(result.getpixel((512, 512)), (9, 99, 199))
-        self.assertEqual(self.provider.last_run["layoutReference"], "room-sketch-v1")
+        self.assertEqual(self.provider.last_run["layoutReference"], "room-sketch-v3")
 
     async def test_plan_reference_sends_blanked_context_and_plan(self):
         self.provider = self.make(Flux2Config(room_reference="plan"))
@@ -318,26 +318,21 @@ class Flux2ProtocolTests(unittest.IsolatedAsyncioTestCase):
 
     def test_room_instruction_puts_room_facts_first(self):
         style = {"renderStyle": "inked", "palette": " "}
-        text = room_instruction(
-            "Cluttered storeroom with crates", style, "sketch", ["a closed door in the top wall"]
-        )
+        text = room_instruction("Cluttered storeroom with crates", style, "sketch")
         lines = text.splitlines()
         self.assertEqual(
-            lines[:4],
-            [
-                "Cluttered storeroom with crates",
-                DEFAULT_FLOOR,
-                "Doors: a closed door in the top wall.",
-                "Rendering style: inked.",
-            ],
+            lines[:3],
+            ["Cluttered storeroom with crates", DEFAULT_FLOOR, "Rendering style: inked."],
         )
-        self.assertTrue(lines[4].startswith("Edit image 1"))
+        self.assertTrue(lines[3].startswith("Edit image 1"))
+        # Doors are shown only in the sketch; a written list put doors on the floor.
+        self.assertNotIn("Doors:", text)
+        self.assertIn("closed wooden door set in the wall", text)
         self.assertNotIn("Palette", text)
         self.assertNotIn("same art style", text)
         self.assertIn("its own furnishings, materials and colors", text)
-        described = room_instruction("Bedroom, mossy flagstone FLOORS", {}, "plan", [])
+        described = room_instruction("Bedroom, mossy flagstone FLOORS", {}, "plan")
         self.assertNotIn(DEFAULT_FLOOR, described)
-        self.assertIn("Doors: this room has no doors.", described)
         self.assertIn("Image 2 is its floor plan", described)
 
 
@@ -400,20 +395,19 @@ class Flux2EditorTests(unittest.TestCase):
         result = BackgroundResult.model_validate_json(json.dumps(job["result"]))
         generation = result.generation
         self.assertEqual(generation.providerId, "comfyui-flux2-klein")
-        # Room facts first: the description, then doors from geometry, then the edit.
+        # Room facts first: the description, then the edit instruction.
         lines = generation.prompt.splitlines()
         self.assertEqual(lines[0], room.prompt)
-        self.assertIn("Doors: a closed door in the right wall.", lines)
-        self.assertTrue(generation.prompt.index("Doors:") < generation.prompt.index("Edit image 1"))
+        self.assertNotIn("Doors:", generation.prompt)
         self.assertIn("one 5-ft grid square is 128 pixels wide", generation.prompt)
         self.assertNotIn("Follow the supplied wall lines", generation.prompt)
         parameters = generation.parameters
-        self.assertEqual(parameters["promptTemplate"], "flux2-klein-room-sketch-v2")
+        self.assertEqual(parameters["promptTemplate"], "flux2-klein-room-sketch-v3")
         self.assertTrue(parameters["layoutConditioning"])
         self.assertNotIn("negativePrompt", parameters)
         self.assertEqual(parameters["comfyui"]["workflowVersion"], "comfy-flux2-klein-edit-v1")
         self.assertEqual(len(generation.inputHashes), 3)
-        self.assertEqual(parameters["comfyui"]["layoutReference"], "room-sketch-v1")
+        self.assertEqual(parameters["comfyui"]["layoutReference"], "room-sketch-v3")
         # One sketch reference at the working size, with off-white floor and dark walls.
         ((_, data),) = self.fake.uploads
         reference = decode(data)

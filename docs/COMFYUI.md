@@ -118,8 +118,8 @@ either provider.
 
 FLUX.2 [klein] 4B follows prompts better than SDXL and edits images from reference
 pictures. By default Quill sends each room as one reference: the surroundings with a
-floor-plan sketch of the room drawn in (off-white floor, thin dark walls, floor-plan door
-symbols). It needs a
+floor-plan sketch of the room drawn in (off-white floor, thin dark walls, brown closed
+doors). It needs a
 ComfyUI version recent enough to offer the `flux2` text-encoder type; update ComfyUI if
 readiness says so. No ControlNet is needed. The 4B model is Apache-2.0; check each model
 card for the text encoder and VAE.
@@ -160,13 +160,13 @@ The AI panel shows "Local FLUX.2 klein · ComfyUI" and "Ready · distilled model
 base). Backgrounds are text-to-image at 960 × 640 with the same camera-first prompt as
 SDXL. Rooms use the same working window, context and scale data as SDXL, but as an image
 edit (ADR-0032, ADR-0033). The sketch is drawn at the working scale, so walls are the
-project's wall thickness (about 13 px of 1024) in every room. Doors use floor-plan
-symbols: a closed or locked door is a brown leaf across the opening; an open door is a
-leaf swung into the room with a thin quarter-circle arc; secret doors and windows are
-plain wall. The prompt starts with your room description, adds a default floor line if
-the description does not mention a floor (so the off-white placeholder is not read as
-the floor colour), lists the doors by wall side and state, adds render style and
-palette, then gives the edit instruction and the scale. Pixels outside the room are
+project's wall thickness (about 13 px of 1024) in every room. Every door is drawn closed,
+whatever its state, as a brown band filling its opening; secret doors and windows are
+plain wall (open-door symbols were rendered badly). The prompt starts with your room
+description, adds a default floor line if the description does not mention a floor (so
+the off-white placeholder is not read as the floor colour), adds render style and
+palette, then gives the edit instruction and the scale. Doors are not listed in the
+prompt: a written list made the model draw doors lying on the floor. Pixels outside the room are
 always protected exactly. The smoke command in this document tests
 SDXL only.
 
@@ -304,8 +304,8 @@ Still to record (SDXL items 1–3, then FLUX.2 klein):
    sketch, door states match, and record time (soft limit about 30 seconds).
 5. FLUX.2 klein `sketch` trial done (2026-10-06, see docs/HISTORY.md): rooms indoors, but
    scale varied by room size, floors had to be described, doors were not always
-   honoured, and rooms looked alike. Next, after ADR-0033: regenerate the bedroom,
-   storeroom and main room with unlocked seeds. Check that furniture scale matches
-   across rooms, wall tops are thin and even, open doors are drawn open where the
-   sketch shows them, undescribed floors are not off-white, and each room's own
-   description (clutter, whimsy) shows through. Record time.
+   honoured, and rooms looked alike.
+6. ADR-0033 trial done (2026-10-08): scale and wall tops consistent, about 12 seconds per
+   room; open-door symbol and extra floor doors fixed by drawing doors closed and
+   dropping the door list. Still open: floors drift toward the off-white placeholder,
+   furniture hugs the walls, and room character (clutter, whimsy) is weak.

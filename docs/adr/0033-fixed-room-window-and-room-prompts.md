@@ -1,8 +1,13 @@
 # ADR-0033: Fixed-scale room window, room-first prompts and floor-plan door symbols
 
-Status: Implemented; GPU trial pending. Changes the room working transform of ADR-0028
+Status: Implemented; first trial done (2026-10-08, below). Changes the room working transform of ADR-0028
 (for both ComfyUI families), the klein sketch and prompts of ADR-0032, and the style
 inheritance of ADR-0021/ADR-0022 (Environment is no longer used).
+
+Update 2026-10-08: after the first trial, the sketch draws every non-secret door closed
+(a brown band of wall thickness filling the opening; `room-sketch-v3`), and the klein
+prompt no longer lists doors (`flux2-klein-room-sketch-v3`, `flux2-klein-room-plan-v4`).
+Items 2 and 3 below are superseded on those points.
 
 ## Context
 
@@ -103,3 +108,12 @@ the window (`test_comfy_editor.py`); Environment ignored for rooms and backgroun
 (`test_room_images.py`, `test_backgrounds.py`); background scale text; record pruning
 (`artwork-layers.test.ts`); random and locked seeds and the removed Environment field
 (browser tests).
+
+First owner trial (2026-10-08, klein distilled, cottage map): furniture scale matched
+better across rooms and wall tops were thin and even; about 12 seconds per room. But the
+open-door symbol was rendered badly and partly left in the image; door-like objects were
+drawn lying on the floor, most likely prompted by the written door list; floors drifted
+toward the off-white placeholder even when described; furniture stayed along the walls
+with an empty centre; and distinctive room descriptions (cluttered, whimsical) still did
+not show. Response: doors are drawn closed and the door list is removed (update above).
+Floors, empty centres and weak room character remain open.
