@@ -30,6 +30,7 @@ INPUT_ROLES = ("source", "mask", "guide")
 # Masks and guides/sketches need exact pixels and compress well; artwork does not.
 EXACT_ROLES = {"mask", "guide"}
 WARN_BYTES = 25 * 1024 * 1024
+DIAGNOSTIC_FILES = {"firstPass": "pass-1-unclipped", "raw": "final-unclipped"}
 
 
 def slug(text: str) -> str:
@@ -132,6 +133,13 @@ def write_generation(
         writer.save(key, folder / f"input-{index + 1}-{role}", crop, exact=role in EXACT_ROLES)
     if record.outputHash:
         writer.save(record.outputHash, folder / "output", crop)
+    # Unclipped klein passes (ADR-0034): what the model drew, before the room mask.
+    diagnostics = record.parameters.get("diagnosticImages")
+    if isinstance(diagnostics, dict):
+        for name, file in DIAGNOSTIC_FILES.items():
+            key = diagnostics.get(name)
+            if isinstance(key, str):
+                writer.save(key, folder / file, crop)
 
 
 def summary(project: Project) -> str:
@@ -282,7 +290,9 @@ def export(
             "generations/    accepted generations: prompt.txt (exact model prompt;\n"
             "                refine-prompt.txt for a second klein room pass),\n"
             "                record.json (all parameters), input and output images;\n"
-            "                *-crop files show the room's working window\n"
+            "                *-crop files show the room's working window;\n"
+            "                pass-1-unclipped and final-unclipped (klein) show what the\n"
+            "                model drew before Quill clipped it to the room\n"
             "jobs/           queued previews for this project, including unaccepted ones\n"
             + (
                 "                (background jobs from every project are included)\n"

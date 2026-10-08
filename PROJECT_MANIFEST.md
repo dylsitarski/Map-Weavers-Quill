@@ -1107,8 +1107,12 @@ Milestone 3 status:
   furniture hugs the walls and room character is weak.
 - The base klein variant gave slightly more character but fixed nothing else in about 100
   seconds. Klein rooms now run a second, description-only pass (ADR-0034).
-- Next: owner trial of two-pass rooms for floors, filled centres and room character
-  (time soft limit about 30 seconds); then explicit building/open-air intent and geometry-aware
+- Eighth trial (two-pass, ADR-0034): markedly better character and filled rooms at about
+  24 seconds; the 5-ft outhouse expanded into an invented larger hut and doors stayed
+  unreliable. Rooms under 10 ft now get a smaller window; both passes are kept for
+  debugging.
+- Next: trial the tiny-room window and door wording; if doors stay unreliable, decide
+  how doors are drawn (time soft limit about 30 seconds); then explicit building/open-air intent and geometry-aware
   backgrounds (ADR-0023).
 - Not implemented: hosted generation, geometry-aware exteriors, exact furniture sizing,
   hard architectural pixel enforcement, provider-side job interruption. Flux Fill is

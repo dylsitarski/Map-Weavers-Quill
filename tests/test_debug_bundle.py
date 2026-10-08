@@ -16,7 +16,7 @@ from quill.projects import ProjectStore, SaveRequest
 from quill.room_images import RoomImageRequest, generate_room
 from test_projects import document
 
-from scripts.export_debug_bundle import export
+from scripts.export_debug_bundle import Writer, export, write_generation
 
 
 def digest(path: Path) -> str:
@@ -133,6 +133,21 @@ class DebugBundleTests(unittest.TestCase):
         self.assertNotIn("Missing", (out / "README.txt").read_text())
         with zipfile.ZipFile(archive) as bundle:
             self.assertIn("bundle/summary.txt", bundle.namelist())
+
+    def test_unclipped_pass_images_are_exported_when_recorded(self):
+        record = self.project.generations[1]
+        record.parameters["diagnosticImages"] = {
+            "firstPass": self.room_output,
+            "raw": self.room_output,
+        }
+        db = self.store.connect()
+        try:
+            write_generation(Writer(db), record, self.data / "diag")
+        finally:
+            db.close()
+        for name in ("pass-1-unclipped", "final-unclipped"):
+            self.assertTrue((self.data / "diag" / f"{name}.webp").exists(), name)
+            self.assertTrue((self.data / "diag" / f"{name}-crop.webp").exists(), name)
 
     def test_background_jobs_are_opt_in(self):
         out = self.data / "with-backgrounds"

@@ -9,7 +9,8 @@ Update 2026-10-08: after the first trial, the sketch draws every non-secret door
 prompt no longer lists doors (`flux2-klein-room-sketch-v3`, `flux2-klein-room-plan-v4`).
 Items 2 and 3 below are superseded on those points.
 
-Update 2026-10-08: klein rooms add a second, description-only pass (ADR-0034).
+Update 2026-10-08: klein rooms add a second, description-only pass (ADR-0034). Rooms under
+10 ft now get a smaller window, at least 20 ft (ADR-0034).
 
 ## Context
 

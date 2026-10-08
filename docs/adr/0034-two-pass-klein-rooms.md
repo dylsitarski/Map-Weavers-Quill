@@ -1,7 +1,12 @@
 # ADR-0034: Two-pass FLUX.2 klein room edits
 
-Status: Implemented; GPU trial pending. Extends ADR-0032 and ADR-0033 (klein only; SDXL and
+Status: Implemented; first trial done (below). Extends ADR-0032 and ADR-0033 (klein only; SDXL and
 the mock provider are unchanged).
+
+Update 2026-10-08: after the first trial, rooms under 10 ft get a smaller window (at least
+20 ft) so they span a quarter of it; both prompts say to add no doors other than the brown
+bands (pass 2: `flux2-klein-room-refine-v2`, pass 1: `flux2-klein-room-sketch-v4`); and
+both passes' unclipped images are kept for debugging bundles. Details below.
 
 ## Context
 
@@ -26,8 +31,8 @@ best.
   `comfy-flux2-klein-edit-2pass-v1`). Pass 1 is unchanged (ADR-0033). Pass 2 uses pass 1's
   output latent as its only `ReferenceLatent`, starts from an empty latent with the same
   noise seed, sampler, steps and CFG, and has its own prompt; node 7 saves pass 2. Pass 1
-  is decoded and saved too, as `quill/pass1_*.png`, for inspection in ComfyUI only; Quill
-  does not fetch or store it.
+  is decoded and saved too, as `quill/pass1_*.png`; since the first trial Quill fetches it
+  for diagnostics (below).
 - The pass-2 prompt (`flux2-klein-room-refine-v1`) starts with "Restyle the interior of the
   room near the centre of image 1 to match this description", then the user's description
   unchanged, a floor line (exactly as described, or a clearly textured material that is not
@@ -62,3 +67,39 @@ the base-variant negative, offline refusal of a refine request without layout, w
 empty prompt or with one pass configured, configuration and environment parsing, the
 refine prompt's content, and the queued room job recording `refinePrompt` and the
 two-pass workflow version.
+
+## First trial and follow-up (2026-10-08)
+
+Owner trial on the cottage map, about 24 seconds per room as estimated. Room character
+improved markedly: the main room's floor became the described wood and the room filled
+with furniture and clutter across the floor. Remaining problems, with the owner's pass-1
+and final images from ComfyUI's output folder:
+
+- **Tiny rooms expand.** The 5-ft outhouse was drawn as a large hut about 20 ft across,
+  with the sketched square as a box in its middle, already in pass 1. Clipping to the
+  room then left floor only, or walls on some sides. At the fixed 40-ft window the room
+  was 64 px of 1024; 10-ft rooms (256 px) stayed inside their walls. Pass 2 kept pass 1's
+  walls closely (main room), so the second pass is not the cause; giving pass 2 the sketch
+  as a second reference was tried in code and dropped before trial on this evidence.
+- **Doors.** Brown door bands survived as flat strips in both passes, and pass 1 invented
+  extra doors (main room top wall, bedroom top wall). Exterior bottom door of the main
+  room stayed a strip.
+
+Follow-up:
+
+- `RoomWindow.around` takes a minimum: the window is `min(40 ft, max(20 ft, 4 × room
+  extent))`, still growing for large rooms. Rooms 10 ft and larger are unchanged; a 5-ft
+  room gets a 20-ft window (256 px wide, 51.2 px/ft). Scale now differs by at most 2× and
+  only for rooms under 10 ft; the prompt states the actual scale.
+- Pass 1 asks for "no other doors"; pass 2 says any flat brown strip in a wall is a closed
+  door to draw as a wooden door, and to add no other doors.
+- Diagnostics: for every ComfyUI room edit, the provider keeps the unclipped final image
+  and (two-pass klein) the pass-1 image; Quill restores both to map size and stores them,
+  recorded as `diagnosticImages` (`raw`, `firstPass`). Debugging bundles write
+  `pass-1-unclipped` and `final-unclipped`. This adds two image assets per room
+  generation, including unaccepted previews.
+
+Verification: tiny-room window sizes (`test_sdxl_authoring.py`), diagnostics fetched,
+unclipped and stored at map size (`test_flux2.py`), and exported
+(`test_debug_bundle.py`).
+

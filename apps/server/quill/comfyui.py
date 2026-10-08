@@ -229,6 +229,8 @@ class ComfyBase:
         self.transport = transport
         self.assets: dict[str, bytes] = {}
         self.last_run: dict[str, Any] = {}
+        # Unclipped result images of the last room edit, by name, for debugging only.
+        self.diagnostics: dict[str, str] = {}
 
     def descriptor(self) -> ProviderDescriptor:
         raise NotImplementedError
@@ -424,9 +426,40 @@ class ComfyBase:
         ):
             raise ValueError
 
+    def _diagnostic_nodes(self, request: GenerateRequest) -> dict[str, str]:
+        """Extra SaveImage nodes fetched for debugging, as {node id: name}."""
+        return {}
+
+    async def _output(self, client: httpx.AsyncClient, record: dict, node: str) -> bytes:
+        """Bytes of the single image a SaveImage node wrote to ComfyUI's quill folder."""
+        outputs = record["outputs"][node]["images"]
+        if len(outputs) != 1:
+            raise ValueError
+        output = outputs[0]
+        if not isinstance(output, dict):
+            raise ValueError
+        filename, subfolder = output["filename"], output.get("subfolder", "")
+        if (
+            not isinstance(filename, str)
+            or not filename
+            or any(c in filename for c in "/\\")
+            or not filename.endswith(".png")
+            or not isinstance(subfolder, str)
+            or subfolder != "quill"
+            or output.get("type") != "output"
+        ):
+            raise ValueError
+        return await self._request(
+            client,
+            "GET",
+            "/view",
+            params={"filename": filename, "subfolder": subfolder, "type": "output"},
+        )
+
     async def _run(self, request: GenerateRequest) -> GenerationResult:
         self._validate(request)
         self.last_run = {}
+        self.diagnostics = {}
         size = (request.width, request.height)
         source = mask = control = None
         if isinstance(request, InpaintRequest):
@@ -474,30 +507,20 @@ class ComfyBase:
                         if status.get("completed") is True:
                             break
                     await asyncio.sleep(0.5)
-                outputs = record["outputs"]["7"]["images"]
-                if len(outputs) != 1:
-                    raise ValueError
-                output = outputs[0]
-                if not isinstance(output, dict):
-                    raise ValueError
-                filename, subfolder = output["filename"], output.get("subfolder", "")
-                if (
-                    not isinstance(filename, str)
-                    or not filename
-                    or any(c in filename for c in "/\\")
-                    or not filename.endswith(".png")
-                    or not isinstance(subfolder, str)
-                    or subfolder != "quill"
-                    or output.get("type") != "output"
-                ):
-                    raise ValueError
-                data = await self._request(
-                    client,
-                    "GET",
-                    "/view",
-                    params={"filename": filename, "subfolder": subfolder, "type": "output"},
-                )
+                data = await self._output(client, record, "7")
                 result_image = self._decode(data, size, "RGB")
+                self.diagnostics = {}
+                if source is not None and mask is not None:
+                    # Unclipped images for debugging only; never placed in artwork.
+                    self.diagnostics["raw"] = self.put(self._png(result_image))
+                    for node, name in self._diagnostic_nodes(request).items():
+                        try:
+                            extra = self._decode(
+                                await self._output(client, record, node), size, "RGB"
+                            )
+                        except Exception:  # Diagnostics never fail a generation.
+                            continue
+                        self.diagnostics[name] = self.put(self._png(extra))
                 if source is not None and mask is not None:
                     # Outside-mask pixels always come from the source, whatever the model did.
                     result_image = Image.composite(result_image, source, mask)

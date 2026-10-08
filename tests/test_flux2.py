@@ -34,6 +34,7 @@ from quill.main import app, readiness_message
 from quill.projects import ProjectStore, SaveRequest
 from quill.provider_config import create_provider, load_provider_config, provider_config
 from quill.providers import GenerateRequest, InpaintRequest, ProviderFailure
+from quill.raster import image as raster_image
 from test_projects import document
 
 
@@ -96,20 +97,23 @@ class FakeComfy:
                     "klein-job": {
                         "status": {"completed": True, "status_str": "success"},
                         "outputs": {
-                            "7": {
+                            node: {
                                 "images": [
-                                    {"filename": "k.png", "subfolder": "quill", "type": "output"}
+                                    {"filename": name, "subfolder": "quill", "type": "output"}
                                 ]
                             }
+                            for node, name in (("7", "k.png"), ("47", "pass1.png"))
+                            if node in self.graph
                         },
                     }
                 },
             )
         if path == "/view":
             inputs = self.graph["6"]["inputs"]
+            # The first pass is told apart from the final image by colour.
+            color = (40, 40, 40) if request.url.params["filename"] == "pass1.png" else (9, 99, 199)
             return httpx.Response(
-                200,
-                content=png(Image.new("RGB", (inputs["width"], inputs["height"]), (9, 99, 199))),
+                200, content=png(Image.new("RGB", (inputs["width"], inputs["height"]), color))
             )
         raise AssertionError(path)
 
@@ -232,6 +236,8 @@ class Flux2ProtocolTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(g["42"]["inputs"], {"conditioning": ["40", 0], "latent": ["13", 0]})
         self.assertEqual(g["43"]["inputs"], {"conditioning": ["41", 0], "latent": ["13", 0]})
         self.assertEqual(g["44"]["inputs"]["positive"], ["42", 0])
+        self.assertEqual(g["44"]["inputs"]["negative"], ["43", 0])
+        self.assertNotIn("48", g)
         self.assertEqual(g["45"]["inputs"]["guider"], ["44", 0])
         self.assertEqual(g["45"]["inputs"]["noise"], ["11", 0])
         self.assertEqual(g["45"]["inputs"]["latent_image"], ["6", 0])
@@ -241,7 +247,15 @@ class Flux2ProtocolTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(g["47"]["inputs"]["filename_prefix"], "quill/pass1")
         result = decode(self.provider.assets[next(reversed(self.provider.assets))])
         self.assertEqual(result.getpixel((10, 10)), (200, 10, 10))  # Outside still exact.
+        # Unclipped diagnostics: the first pass and the final image before clipping.
+        diagnostics = self.provider.diagnostics
+        self.assertEqual(set(diagnostics), {"raw", "firstPass"})
+        first = decode(self.provider.assets[diagnostics["firstPass"]])
+        self.assertEqual(first.getpixel((10, 10)), (40, 40, 40))
+        raw = decode(self.provider.assets[diagnostics["raw"]])
+        self.assertEqual(raw.getpixel((10, 10)), (9, 99, 199))  # Not clipped.
         run = self.provider.last_run
+        self.assertNotIn("raw", run)
         self.assertEqual(run["workflowVersion"], "comfy-flux2-klein-edit-2pass-v1")
         self.assertEqual(run["roomPasses"], 2)
         # Base variant: an empty-text negative, as in the first pass.
@@ -420,9 +434,11 @@ class Flux2ProtocolTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("not only along the walls", refine)
         self.assertIn("Rendering style: inked.", refine)
         self.assertIn("keep everything outside the room unchanged", refine)
+        self.assertIn("draw it as a wooden door in that wall. Add no other doors.", refine)
         self.assertIn(
             "Make the floor exactly as described", room_refine_instruction("Oak floor", {})
         )
+        self.assertIn("with no other doors", text)
         described = room_instruction("Bedroom, mossy flagstone FLOORS", {}, "plan")
         self.assertNotIn(DEFAULT_FLOOR, described)
         self.assertIn("Image 2 is its floor plan", described)
@@ -494,14 +510,22 @@ class Flux2EditorTests(unittest.TestCase):
         self.assertIn("one 5-ft grid square is 128 pixels wide", generation.prompt)
         self.assertNotIn("Follow the supplied wall lines", generation.prompt)
         parameters = generation.parameters
-        self.assertEqual(parameters["promptTemplate"], "flux2-klein-room-sketch-v3")
+        self.assertEqual(parameters["promptTemplate"], "flux2-klein-room-sketch-v4")
         self.assertTrue(parameters["layoutConditioning"])
         self.assertNotIn("negativePrompt", parameters)
         # Two passes by default: layout, then a description-only edit of that result.
         self.assertEqual(
             parameters["comfyui"]["workflowVersion"], "comfy-flux2-klein-edit-2pass-v1"
         )
-        self.assertEqual(parameters["refineTemplate"], "flux2-klein-room-refine-v1")
+        self.assertEqual(parameters["refineTemplate"], "flux2-klein-room-refine-v2")
+        # Both passes are kept unclipped, at map size, for debugging bundles.
+        unclipped = parameters["diagnosticImages"]
+        self.assertEqual(set(unclipped), {"raw", "firstPass"})
+        first = raster_image(self.store.get_asset(unclipped["firstPass"]))
+        self.assertEqual(first.size, (960, 640))
+        crop = parameters["crop"]
+        self.assertEqual(first.getpixel((crop[0] + 2, crop[1] + 2)), (40, 40, 40, 255))
+        self.assertEqual(first.getpixel((crop[2] + 2, crop[1] + 2))[3], 0)
         self.assertTrue(parameters["refinePrompt"].startswith("Restyle the interior"))
         self.assertIn(room.prompt, parameters["refinePrompt"])
         self.assertIn("128 pixels wide", parameters["refinePrompt"])

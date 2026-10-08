@@ -51,6 +51,22 @@ class SdxlAuthoringTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             RoomWindow.around(Image.new("L", (960, 640)), 320, 16)
 
+    def test_window_shrinks_for_tiny_rooms_down_to_the_minimum(self):
+        mask = Image.new("L", (960, 640))
+        mask.paste(255, (400, 300, 440, 340))  # A 5-ft room: 40 raster px.
+        window = RoomWindow.around(mask, 320, 16, 160)
+        self.assertEqual(window.side, 160)  # 20 ft, so the room spans a quarter.
+        mask = Image.new("L", (960, 640))
+        mask.paste(255, (400, 300, 410, 310))  # Smaller still: the 20-ft minimum holds.
+        self.assertEqual(RoomWindow.around(mask, 320, 16, 160).side, 160)
+        mask = Image.new("L", (960, 640))
+        mask.paste(255, (400, 300, 460, 340))  # 7.5 ft: 4 × 60 px.
+        self.assertEqual(RoomWindow.around(mask, 320, 16, 160).side, 240)
+        mask = Image.new("L", (960, 640))
+        mask.paste(255, (400, 300, 480, 380))  # 10 ft and larger: the full window.
+        self.assertEqual(RoomWindow.around(mask, 320, 16, 160).side, 320)
+        self.assertEqual(RoomWindow.around(mask, 320, 16).side, 320)
+
     def test_window_grows_for_large_rooms_and_pads_only_past_the_map(self):
         source = Image.new("RGB", (960, 640), (10, 200, 30))
         mask = Image.new("L", source.size)

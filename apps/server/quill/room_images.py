@@ -29,6 +29,7 @@ from quill.provider_config import (
 from quill.providers import InpaintRequest
 from quill.raster import context_crop, image, masked_layer, png, polygon_mask
 from quill.sdxl_authoring import (
+    MIN_WINDOW_CELLS,
     NEGATIVE,
     WINDOW_CELLS,
     RoomWindow,
@@ -81,8 +82,10 @@ def generate_room(request: RoomImageRequest) -> BackgroundResult:
     window = None
     if comfy:
         # A fixed physical window (ADR-0033) gives every room the same working scale.
-        cells = WINDOW_CELLS * project.map.grid.sizePx * size[0] / project.map.width
-        window = RoomWindow.around(mask, round(cells), margin)
+        cell = project.map.grid.sizePx * size[0] / project.map.width
+        window = RoomWindow.around(
+            mask, round(WINDOW_CELLS * cell), margin, round(MIN_WINDOW_CELLS * cell)
+        )
         crop = window.crop
     else:
         crop = context_crop(mask, margin=margin, alignment=alignment)
@@ -122,7 +125,11 @@ def generate_room(request: RoomImageRequest) -> BackgroundResult:
                 input_hashes.append(store.put_asset(png(full)))
                 guide = window.guide(full)
             extensions = {"quill.layout": {"controlRef": provider.put(png(guide))}}
-            if isinstance(provider, Flux2Provider) and provider.config.room_passes == 2:
+            if (
+                isinstance(provider, Flux2Provider)
+                and reference is not None
+                and provider.config.room_passes == 2
+            ):
                 refine = (
                     room_refine_instruction(room.prompt, effective_style)
                     + "\n"
@@ -155,6 +162,13 @@ def generate_room(request: RoomImageRequest) -> BackgroundResult:
     generated.paste(output, crop[:2])
     # Enforce outside-mask preservation ourselves, regardless of provider behavior.
     output_hash = store.put_asset(png(masked_layer(generated, mask)))
+    # Unclipped window images (each klein pass, ADR-0034) for debugging bundles only.
+    diagnostics: dict[str, JsonValue] = {}
+    if window and isinstance(provider, ComfyBase):
+        for name, key in provider.diagnostics.items():
+            unclipped = Image.new("RGBA", size)
+            unclipped.paste(window.restore(image(provider.assets[key])), crop[:2])
+            diagnostics[name] = store.put_asset(png(unclipped))
     return BackgroundResult(
         layer=RasterLayer(
             id=uuid4(),
@@ -208,6 +222,7 @@ def generate_room(request: RoomImageRequest) -> BackgroundResult:
                     else {}
                 ),
                 **({"refinePrompt": refine, "refineTemplate": REFINE_TEMPLATE} if refine else {}),
+                **({"diagnosticImages": diagnostics} if diagnostics else {}),
                 "roomPrompt": room.prompt,
                 "styleOverrides": dict(room.styleOverrides),
                 "effectiveStyle": {key: value for key, value in effective_style.items()},

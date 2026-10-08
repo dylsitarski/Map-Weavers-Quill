@@ -150,7 +150,17 @@ criterion to its tests.
     ComfyUI job that edits the first pass's result with a description-only prompt.
     Verified with 111 Python, 32 TypeScript and 41 browser tests; not yet trialled.
 
-Outstanding before Milestone 3 can close: good room floors, filled room centres and
+17. **Eighth owner trial (2026-10-08, two-pass klein).** About 24 seconds per room. Room
+    character and furnishing improved markedly (main room: described wood floor, clutter
+    across the room). The owner's pass-1 and final ComfyUI images showed that the 5-ft
+    outhouse grew into a larger invented hut already in pass 1, and that pass 2 kept pass
+    1's walls; door bands stayed flat strips and extra doors appeared. Response
+    (ADR-0034 update): rooms under 10 ft get a window of at least 20 ft so they span a
+    quarter of the image; both prompts ask for no other doors; both passes are stored
+    unclipped and exported in debugging bundles. Verified with 113 Python, 32 TypeScript
+    and 41 browser tests.
+
+Outstanding before Milestone 3 can close: reliable doors, good room floors, filled room centres and
 visible room character with klein,
 recorded runtime and peak VRAM, explicit building/open-air intent, and geometry-aware backgrounds
 (ADR-0023). Flux Fill was considered and deferred; hosted generation moved to

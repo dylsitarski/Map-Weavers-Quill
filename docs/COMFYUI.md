@@ -176,7 +176,9 @@ built only from your description: make the floor as described (or clearly textur
 plain or pale), fill the whole room with fitting furnishings rather than lining the walls,
 and give it the described character, while keeping walls, doors and the surroundings.
 Expect roughly twice the time of one pass. The first pass's image is saved in ComfyUI's
-output folder as `quill/pass1_*.png` for comparison; Quill keeps only the final image.
+output folder as `quill/pass1_*.png`. Quill also keeps it, and the final image before
+clipping to the room, for debugging bundles (`pass-1-unclipped`, `final-unclipped`). Both
+prompts ask for doors only where the brown bands are.
 Pixels outside the room are always protected exactly. The smoke command in this document tests
 SDXL only.
 
@@ -193,7 +195,9 @@ memory. Not yet measured on the reference hardware.
 - **Rooms.** Quill takes a square window of real map context, 8 grid cells (40 ft) on a
   side, centred on the room and kept inside the map, and generates it at 1024 × 1024, so
   every room has the same working scale (25.6 px/ft, 128 px per 5-ft square). A room
-  wider than about 36 ft gets a larger window and a smaller scale. The result is scaled
+  wider than about 36 ft gets a larger window and a smaller scale. A room under 10 ft gets
+  a smaller window (at least 20 ft) so that it spans a quarter of the image; at 64 px wide
+  a 5-ft room was drawn as an object inside an invented, larger building (ADR-0034). The result is scaled
   back and clipped to the exact room mask, so pixels outside the room never change
   (ADR-0028, ADR-0033).
 - **Context.** The source image for a room excludes that room's previous artwork and
@@ -320,7 +324,10 @@ Still to record (SDXL items 1–3, then FLUX.2 klein):
    dropping the door list. Still open: floors drift toward the off-white placeholder,
    furniture hugs the walls, and room character (clutter, whimsy) is weak. The base
    variant gave slightly more character but fixed nothing else, in about 100 seconds.
-7. Next: two-pass rooms (ADR-0034). Regenerate the main room, storeroom and bedroom; compare
-   with `quill/pass1_*.png` in ComfyUI's output folder. Check floor material, whether
-   the centre is furnished, whether clutter and whimsy show, that walls and doors survive
-   the second pass, and record time (soft limit about 30 seconds).
+7. Two-pass trial done (2026-10-08): much better character and filled rooms, about 24
+   seconds per room. The 5-ft outhouse expanded into a larger invented hut (in pass 1);
+   door bands stayed flat strips and extra doors were invented.
+8. Next: regenerate the outhouse (now a 20-ft window) and the main room and bedroom.
+   Check that the outhouse stays inside its walls, whether doors are drawn at the brown
+   bands and nowhere else, and send a debugging bundle: it now includes each pass
+   unclipped.

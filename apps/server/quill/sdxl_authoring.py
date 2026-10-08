@@ -67,6 +67,10 @@ def clean_context(project: Project, room_id: UUID) -> tuple[Project, list[str]]:
 
 WORKING_SIDE = 1024  # Square model resolution for room edits.
 WINDOW_CELLS = 8  # Default window: 8 grid cells (40 ft on a 5-ft grid) on each side.
+MIN_WINDOW_CELLS = 4  # Smallest window for tiny rooms: 4 cells (20 ft).
+# A room spans at least 1/ROOM_SHARE of its window: a 5-ft room drawn 64 px wide in a
+# 1024 px image was treated as an object inside an invented, larger building (ADR-0034).
+ROOM_SHARE = 4
 
 
 @dataclass(frozen=True)
@@ -85,11 +89,19 @@ class RoomWindow:
     raster: tuple[int, int]
 
     @classmethod
-    def around(cls, mask: Image.Image, base: int, margin: int) -> "RoomWindow":
+    def around(
+        cls, mask: Image.Image, base: int, margin: int, minimum: int | None = None
+    ) -> "RoomWindow":
+        """Window of ``base`` pixels; with ``minimum``, rooms smaller than a quarter of
+        ``base`` get a smaller window (never below ``minimum``) so the room spans at least
+        a quarter of it. Rooms too large for the window grow it."""
         box = mask.getbbox()
         if box is None:
             raise ValueError("The room is too small at the current raster resolution.")
-        side = max(base, box[2] - box[0] + 2 * margin, box[3] - box[1] + 2 * margin)
+        extent = max(box[2] - box[0], box[3] - box[1])
+        if minimum is not None:
+            base = min(base, max(minimum, ROOM_SHARE * extent))
+        side = max(base, extent + 2 * margin)
 
         def start(low: int, high: int, limit: int) -> int:
             if side > limit:  # Centre on the map; padding falls outside it.

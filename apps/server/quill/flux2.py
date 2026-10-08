@@ -107,10 +107,10 @@ def workflow(
 ) -> dict[str, Any]:
     """Fixed graph; output node "7" is the final SaveImage. Never accepts user graphs.
 
-    With ``refine`` (a second prompt), the first pass's latent becomes the reference of a
-    second edit with that prompt and the same noise, sampler and steps. Node "7" then
-    saves the second pass; the first pass is also saved, as ``quill/pass1``, for
-    inspection in ComfyUI's output folder only.
+    With ``refine`` (a second prompt), the first pass's latent becomes the only reference of
+    a second edit with that prompt and the same noise, sampler and steps (ADR-0034). Node
+    "7" then saves the second pass; the first pass is also saved, as ``quill/pass1`` (node
+    "47"), and fetched for diagnostics.
     """
     steps, cfg = VARIANTS[config.variant]
     clip: dict[str, Any] = {"clip_name": config.text_encoder, "type": "flux2"}
@@ -257,6 +257,9 @@ class Flux2Provider(ComfyBase):
     def _accepts_refine(self) -> bool:
         return self.config.room_passes == 2
 
+    def _diagnostic_nodes(self, request: GenerateRequest) -> dict[str, str]:
+        return {"47": "firstPass"} if "quill.refine" in request.extensions else {}
+
     def _validate(self, request: GenerateRequest) -> None:
         super()._validate(request)
         if request.negativePrompt:
@@ -340,7 +343,7 @@ class Flux2Provider(ComfyBase):
         }
 
 
-ROOM_TEMPLATES = {"sketch": "flux2-klein-room-sketch-v3", "plan": "flux2-klein-room-plan-v4"}
+ROOM_TEMPLATES = {"sketch": "flux2-klein-room-sketch-v4", "plan": "flux2-klein-room-plan-v4"}
 MATCH_MAP = (
     "Match the surrounding map's rendering technique, lighting and level of detail, but "
     "give this room its own furnishings, materials and colors as described."
@@ -353,8 +356,8 @@ _ROOM_INSTRUCTIONS = {
         "a finished roof-removed interior seen from directly above: keep the walls exactly "
         "along the dark bands as narrow dark wall tops of the same width, turn the "
         "off-white area into the described floor and furnishings, and draw each brown band "
-        "as a closed wooden door set in the wall. No off-white fill or flat brown may "
-        "remain. "
+        "as a closed wooden door set in the wall, with no other doors. No off-white fill or "
+        "flat brown may remain. "
         + MATCH_MAP
         + " Keep everything outside the room unchanged. Orthographic overhead view, no "
         "perspective, no text, labels or grid."
@@ -394,7 +397,7 @@ def room_instruction(description: str, style: dict[str, str], reference: str) ->
     return "\n".join(lines) + "\n" + _ROOM_INSTRUCTIONS[reference]
 
 
-REFINE_TEMPLATE = "flux2-klein-room-refine-v1"
+REFINE_TEMPLATE = "flux2-klein-room-refine-v2"
 REFINE_FLOOR = (
     "Give the floor a clearly textured material that suits this room, such as wood planks, "
     "flagstones or packed earth; it must not be plain, flat or pale."
@@ -422,7 +425,9 @@ def room_refine_instruction(description: str, style: dict[str, str]) -> str:
         "spread across the floor and not only along the walls, with floor visible between "
         "them. Give the room the character the description asks for. "
         + (styled + " " if styled else "")
-        + "Keep the room's walls, dark wall tops and doors exactly where they are, and keep "
-        "everything outside the room unchanged. Orthographic overhead view of a tabletop "
-        "battlemap, no perspective, no text, labels or grid."
+        + "Keep the room's walls and dark wall tops exactly where they are and keep "
+        "everything outside the room unchanged. Any flat brown strip set into a wall is a "
+        "closed door: draw it as a wooden door in that wall. Add no other doors. "
+        "Orthographic overhead view of a tabletop battlemap, no perspective, no text, labels "
+        "or grid."
     )
