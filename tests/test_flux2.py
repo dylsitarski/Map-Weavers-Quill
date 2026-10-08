@@ -24,13 +24,14 @@ from quill.flux2 import (
     SKETCH_FLOOR,
     Flux2Config,
     Flux2Provider,
+    door_instruction,
     room_instruction,
     room_plan,
     room_refine_instruction,
     room_repaint_instruction,
     workflow,
 )
-from quill.layout_guidance import SKETCH_WALL
+from quill.layout_guidance import SKETCH_DOOR, SKETCH_WALL
 from quill.main import app, readiness_message
 from quill.projects import ProjectStore, SaveRequest
 from quill.provider_config import create_provider, load_provider_config, provider_config
@@ -50,15 +51,23 @@ def decode(data: bytes) -> Image.Image:
         return opened.convert("RGB")
 
 
+DOOR_COLOR = (200, 150, 50)
+
+
 class FakeComfy:
     """Synthetic ComfyUI with the klein models installed; records graph and uploads."""
 
     def __init__(self):
         self.calls: list[str] = []
         self.graph = None
+        self.graphs: list[dict] = []
         self.uploads: list[tuple[str, bytes]] = []
         self.models = ["flux-2-klein-4b-fp8.safetensors"]
         self.clip_types = ["stable_diffusion", "flux2"]
+
+    def final_name(self) -> str:
+        door = self.graph["7"]["inputs"]["filename_prefix"] == "quill/door"
+        return "door.png" if door else "k.png"
 
     def respond(self, request):
         path = request.url.path
@@ -90,6 +99,7 @@ class FakeComfy:
             )
         if path == "/prompt":
             self.graph = json.loads(request.content)["prompt"]
+            self.graphs.append(self.graph)
             return httpx.Response(200, json={"prompt_id": "klein-job"})
         if path == "/history/klein-job":
             return httpx.Response(
@@ -103,7 +113,10 @@ class FakeComfy:
                                     {"filename": name, "subfolder": "quill", "type": "output"}
                                 ]
                             }
-                            for node, name in (("7", "k.png"), ("47", "pass1.png"))
+                            for node, name in (
+                                ("7", self.final_name()),
+                                ("47", "pass1.png"),
+                            )
                             if node in self.graph
                         },
                     }
@@ -111,8 +124,10 @@ class FakeComfy:
             )
         if path == "/view":
             inputs = self.graph["6"]["inputs"]
-            # The first pass is told apart from the final image by colour.
-            color = (40, 40, 40) if request.url.params["filename"] == "pass1.png" else (9, 99, 199)
+            # The first pass and door edits are told apart from room images by colour.
+            color = {"pass1.png": (40, 40, 40), "door.png": DOOR_COLOR}.get(
+                request.url.params["filename"], (9, 99, 199)
+            )
             return httpx.Response(
                 200, content=png(Image.new("RGB", (inputs["width"], inputs["height"]), color))
             )
@@ -261,6 +276,59 @@ class Flux2ProtocolTests(unittest.IsolatedAsyncioTestCase):
         with Image.open(BytesIO(self.fake.uploads[0][1])) as upload:
             self.assertEqual(upload.mode, "RGB")
         self.assertEqual(unmasked.last_run["workflowVersion"], "comfy-flux2-klein-edit-2pass-v1")
+
+    async def test_door_edit_is_a_reference_free_masked_repaint(self):
+        size = (512, 512)
+        source = Image.new("RGB", size, (200, 10, 10))
+        source.paste(SKETCH_DOOR, (200, 240, 312, 272))
+        mask = Image.new("L", size)
+        mask.paste(255, (200, 240, 312, 272))
+        refs = [self.provider.put(png(i)) for i in (source, mask)]
+        request = InpaintRequest(
+            requestId="d",
+            prompt="A closed wooden door",
+            width=512,
+            height=512,
+            seed=4,
+            sourceRef=refs[0],
+            maskRef=refs[1],
+            maskConvention="white-edit-black-preserve",
+            extensions={"quill.door": {}},
+        )
+        await self.provider.inpaint(request)
+        ((_, data),) = self.fake.uploads
+        with Image.open(BytesIO(data)) as upload:  # Placeholder kept; strip as alpha 0.
+            self.assertEqual(upload.getpixel((256, 256)), (*SKETCH_DOOR, 0))
+            self.assertEqual(upload.getpixel((10, 10)), (200, 10, 10, 255))
+        g = self.fake.graph
+        self.assertNotIn("22", g)  # No ReferenceLatent: nothing to copy.
+        self.assertEqual(g["12"]["inputs"]["positive"], ["4", 0])
+        self.assertEqual(g["50"]["inputs"]["expand"], 8)
+        self.assertEqual(g["51"]["inputs"], {"samples": ["21", 0], "mask": ["50", 0]})
+        self.assertEqual(g["13"]["inputs"]["latent_image"], ["51", 0])
+        self.assertEqual(g["54"]["inputs"], {"sigmas": ["53", 0], "step": 2})  # 6 of 8 steps.
+        self.assertEqual(g["13"]["inputs"]["sigmas"], ["54", 1])
+        self.assertEqual(g["7"]["inputs"]["filename_prefix"], "quill/door")
+        result = decode(self.provider.assets[next(reversed(self.provider.assets))])
+        self.assertEqual(result.getpixel((10, 10)), (200, 10, 10))  # Outside exact.
+        self.assertEqual(result.getpixel((256, 256)), DOOR_COLOR)
+        run = self.provider.last_run
+        self.assertEqual((run["workflowVersion"], run["steps"]), ("comfy-flux2-klein-door-v1", 6))
+        # A door request must stand alone and be an inpaint request.
+        calls = len(self.fake.calls)
+        for bad in (
+            request.model_copy(
+                update={"extensions": {"quill.door": {}, "quill.layout": {"controlRef": "x"}}}
+            ),
+            request.model_copy(update={"extensions": {"quill.door": {"x": 1}}}),
+        ):
+            with self.assertRaises(ProviderFailure):
+                await self.provider.inpaint(bad)
+        with self.assertRaises(ProviderFailure):
+            await self.provider.generate(
+                self.request.model_copy(update={"extensions": {"quill.door": {}}})
+            )
+        self.assertEqual(len(self.fake.calls), calls)
 
     async def test_masked_second_pass_repaints_pass_one_without_a_reference(self):
         size = (1024, 1024)
@@ -463,6 +531,10 @@ class Flux2ProtocolTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(Flux2Config.from_env(denoise).refine_steps, 6)
         with self.assertRaises(ValueError):
             Flux2Config.from_env({"MWQ_IMAGE_COMFY_FLUX2_REFINE_DENOISE": "high"})
+        self.assertTrue(Flux2Config.from_env({}).door_pass)
+        self.assertFalse(Flux2Config.from_env({"MWQ_IMAGE_COMFY_FLUX2_DOOR_PASS": "0"}).door_pass)
+        with self.assertRaises(ValueError):
+            Flux2Config.from_env({"MWQ_IMAGE_COMFY_FLUX2_DOOR_PASS": "maybe"})
         passes = {"MWQ_IMAGE_COMFY_FLUX2_ROOM_PASSES": "1"}
         self.assertEqual(Flux2Config.from_env(passes).room_passes, 1)
         with self.assertRaises(ValueError):
@@ -524,6 +596,16 @@ class Flux2ProtocolTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn(
             "The floor is exactly as described", room_repaint_instruction("Dark wood floor", {})
         )
+        walls = room_instruction("Storeroom", {}, "sketch", doors=False)
+        self.assertIn("no doors or openings", walls)
+        self.assertNotIn("brown", walls)
+        self.assertIn(
+            "with no doors or openings in them",
+            room_repaint_instruction("Storeroom", {}, doors=False),
+        )
+        door = door_instruction(style)
+        self.assertIn("closed wooden door", door)
+        self.assertIn("Rendering style: inked.", door)
         described = room_instruction("Bedroom, mossy flagstone FLOORS", {}, "plan")
         self.assertNotIn(DEFAULT_FLOOR, described)
         self.assertIn("Image 2 is its floor plan", described)
@@ -595,14 +677,16 @@ class Flux2EditorTests(unittest.TestCase):
         self.assertIn("one 5-ft grid square is 128 pixels wide", generation.prompt)
         self.assertNotIn("Follow the supplied wall lines", generation.prompt)
         parameters = generation.parameters
-        self.assertEqual(parameters["promptTemplate"], "flux2-klein-room-sketch-v4")
+        # Door pass on: the room passes draw solid walls; doors come afterwards.
+        self.assertEqual(parameters["promptTemplate"], "flux2-klein-room-sketch-walls-v1")
+        self.assertIn("no doors or openings", generation.prompt)
         self.assertTrue(parameters["layoutConditioning"])
         self.assertNotIn("negativePrompt", parameters)
         # Two passes by default: layout, then a description-only edit of that result.
         self.assertEqual(
             parameters["comfyui"]["workflowVersion"], "comfy-flux2-klein-edit-repaint-v1"
         )
-        self.assertEqual(parameters["refineTemplate"], "flux2-klein-room-repaint-v1")
+        self.assertEqual(parameters["refineTemplate"], "flux2-klein-room-repaint-walls-v1")
         # Both passes are kept unclipped, at map size, for debugging bundles.
         unclipped = parameters["diagnosticImages"]
         self.assertEqual(set(unclipped), {"raw", "firstPass"})
@@ -616,16 +700,45 @@ class Flux2EditorTests(unittest.TestCase):
         )
         self.assertIn(room.prompt, parameters["refinePrompt"])
         self.assertIn("128 pixels wide", parameters["refinePrompt"])
-        self.assertEqual(self.fake.graph["40"]["inputs"]["text"], parameters["refinePrompt"])
+        room_graph, door_graph = self.fake.graphs[-2:]
+        self.assertEqual(room_graph["40"]["inputs"]["text"], parameters["refinePrompt"])
         self.assertEqual(len(generation.inputHashes), 3)
         self.assertEqual(parameters["comfyui"]["layoutReference"], "room-sketch-v3")
-        # One sketch reference at the working size, with off-white floor and dark walls.
-        ((_, data),) = self.fake.uploads
+        # One sketch reference at the working size, with off-white floor and dark walls,
+        # and no door bands; then one zoomed door upload with the brown placeholder.
+        (_, data), (_, door_data) = self.fake.uploads
         reference = decode(data)
         self.assertEqual(reference.size, (1024, 1024))
         colors = {color for _, color in reference.getcolors(1024 * 1024)}
         self.assertIn(SKETCH_FLOOR, colors)
         self.assertIn(SKETCH_WALL, colors)
+        self.assertNotIn(SKETCH_DOOR, colors)
+        with Image.open(BytesIO(door_data)) as door_upload:
+            self.assertEqual(door_upload.size, (512, 512))
+            alpha = door_upload.getchannel("A")
+            # Inverted alpha: the strip (room mask for LoadImage) is transparent.
+            self.assertEqual(alpha.getextrema(), (0, 255))
+            strip = next(
+                (x, y) for y in range(512) for x in range(512) if alpha.getpixel((x, y)) == 0
+            )
+            self.assertEqual(door_upload.convert("RGB").getpixel(strip), SKETCH_DOOR)
+        self.assertEqual(door_graph["7"]["inputs"]["filename_prefix"], "quill/door")
+        self.assertNotIn("22", door_graph)  # No reference image in the door edit.
+        door_pass = parameters["doorPass"]
+        self.assertEqual(door_pass["template"], "flux2-klein-door-v1")
+        self.assertEqual(door_pass["comfyui"]["workflowVersion"], "comfy-flux2-klein-door-v1")
+        (record,) = door_pass["doors"]
+        door = project.doors[0]
+        self.assertEqual(record["doorId"], str(door.id))
+        self.assertEqual(record["seed"], 3)  # Room seed + 1.
+        # The door lands exactly at its wall position, inside the room, and only there.
+        wall = next(w for w in project.walls if w.id == door.wallId)
+        y = wall.start.y + (wall.end.y - wall.start.y) * door.position
+        layer = raster_image(self.store.get_asset(result.layer.assetHash)).convert("RGB")
+        at_door = (round((wall.start.x - 1) * 0.8), round(640 - y * 0.8))
+        self.assertEqual(layer.getpixel(at_door), DOOR_COLOR)
+        self.assertNotEqual(layer.getpixel((at_door[0] - 20, at_door[1])), DOOR_COLOR)
+        self.assertNotEqual(layer.getpixel((at_door[0], at_door[1] + 30)), DOOR_COLOR)
         room.renderLayerId = result.layer.id
         project.layers = [bg.layer, result.layer]
         project.generations = [bg.generation, generation]

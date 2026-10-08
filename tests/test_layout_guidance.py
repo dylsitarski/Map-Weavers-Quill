@@ -6,6 +6,7 @@ from PIL import Image
 from quill.layout_guidance import (
     SKETCH_DOOR,
     SKETCH_WALL,
+    door_strips,
     room_scale,
     room_sketch,
     scale_prompt,
@@ -131,3 +132,28 @@ class LayoutGuidanceTests(unittest.TestCase):
         self.assertEqual(other.getpixel((400, 480)), SKETCH_WALL)
         self.assertEqual(other.getpixel((80, 480)), (0, 0, 0))  # Room 0's far wall omitted.
         self.assertIsInstance(other, Image.Image)
+
+    def test_door_free_sketch_and_door_strips(self):
+        project = document()
+        project.map.style.wallThicknessPx = 5  # 12.8 working px, drawn 13 wide.
+        door = project.doors[0]
+        wall = next(w for w in project.walls if w.id == door.wallId)
+        room = project.rooms[0]
+        window = window_for(project)
+        y = wall.start.y + (wall.end.y - wall.start.y) * door.position
+        at_door = tuple(round(v) for v in window.to_working(wall.start.x * 0.8, 640 - y * 0.8))
+        # Without doors the doorway is plain wall, for the separate door pass.
+        walls = room_sketch(project, (960, 640), room, window, doors=False)
+        self.assertEqual(walls.getpixel(at_door), SKETCH_WALL)
+        self.assertNotIn(SKETCH_DOOR, {c for _, c in walls.getcolors(1024 * 1024)})
+        ((found, quad),) = door_strips(project, (960, 640), room, window, pad=4)
+        self.assertEqual(found.id, door.id)
+        xs, ys = [x for x, _ in quad], [y for _, y in quad]
+        # A vertical wall: the strip spans the door's width along it (30 units = 76.8 px)
+        # and wall thickness (13 px) plus 4 px each side across it, centred on the wall.
+        self.assertAlmostEqual(max(ys) - min(ys), door.width * 0.8 * window.scale, places=3)
+        self.assertAlmostEqual(max(xs) - min(xs), 13 + 8, places=3)
+        self.assertAlmostEqual((max(xs) + min(xs)) / 2, at_door[0], delta=1)
+        self.assertAlmostEqual((max(ys) + min(ys)) / 2, at_door[1], delta=1)
+        door.secret = True
+        self.assertEqual(door_strips(project, (960, 640), room, window, pad=4), [])

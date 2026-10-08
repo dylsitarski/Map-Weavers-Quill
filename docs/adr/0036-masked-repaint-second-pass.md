@@ -1,6 +1,11 @@
 # ADR-0036: Masked klein rooms repaint pass 1 instead of re-editing it
 
-Status: Implemented; GPU trial pending. Changes the second pass of ADR-0034 when latent
+Status: Implemented; trialled 2026-10-08: placeholder floors replaced, walls kept.
+
+Update 2026-10-08: doors are no longer drawn by the room passes but by a separate door pass
+(ADR-0037).
+
+Original status: Implemented; GPU trial pending. Changes the second pass of ADR-0034 when latent
 masking (ADR-0035) is on, which is the default. The unmasked comparison mode keeps the
 ADR-0034 reference edit.
 

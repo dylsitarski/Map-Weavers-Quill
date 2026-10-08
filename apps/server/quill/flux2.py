@@ -40,6 +40,12 @@ REPAINT_WORKFLOW_VERSION = "comfy-flux2-klein-edit-repaint-v1"
 # Masked second pass (ADR-0036): the last steps of an 8-step schedule, from pass 1's
 # latent re-noised, with no reference image. 0.625 runs 5 steps from sigma ~0.94.
 REFINE_SCHEDULE_STEPS = 8
+# Door pass (ADR-0037): one masked repaint per door, zoomed in, from a brown door
+# placeholder re-noised to the last 6 of 8 steps (sigma ~0.97), with no reference.
+DOOR_WORKFLOW_VERSION = "comfy-flux2-klein-door-v1"
+DOOR_TEMPLATE = "flux2-klein-door-v1"
+DOOR_STEPS = 6
+DOOR_MASK_GROW = 8
 ROOM_PASSES = (1, 2)
 ROOM_MASKING = ("latent", "none")
 MASK_GROW = 16  # Working pixels: the whole wall band may be redrawn to blend.
@@ -72,6 +78,8 @@ class Flux2Config:
     room_masking: str = "latent"
     # Masked second pass: fraction of the refine schedule run (ComfyUI "denoise").
     refine_denoise: float = 0.625
+    # Draw doors in a separate zoomed, masked pass after the room (ADR-0037).
+    door_pass: bool = True
 
     def __post_init__(self) -> None:
         validate_endpoint(self.url, self.timeout)
@@ -111,7 +119,16 @@ class Flux2Config:
             _passes(env.get("MWQ_IMAGE_COMFY_FLUX2_ROOM_PASSES"), defaults.room_passes),
             env.get("MWQ_IMAGE_COMFY_FLUX2_ROOM_MASKING") or defaults.room_masking,
             _denoise(env.get("MWQ_IMAGE_COMFY_FLUX2_REFINE_DENOISE"), defaults.refine_denoise),
+            _flag(env.get("MWQ_IMAGE_COMFY_FLUX2_DOOR_PASS"), defaults.door_pass),
         )
+
+
+def _flag(value: str | None, default: bool) -> bool:
+    if not value:
+        return default
+    if value.strip().lower() not in {"1", "0", "true", "false"}:
+        raise ValueError("FLUX.2 door pass must be 1 or 0.")
+    return value.strip().lower() in {"1", "true"}
 
 
 def _denoise(value: str | None, default: float) -> float:
@@ -285,6 +302,39 @@ def workflow(
     return graph
 
 
+def door_workflow(config: Flux2Config, request: GenerateRequest, source: str) -> dict[str, Any]:
+    """Masked repaint of one door (ADR-0037): the uploaded crop, with a brown door
+    placeholder and the door strip as inverted alpha, is VAE-encoded and re-noised to the
+    last DOOR_STEPS of an 8-step schedule under the (slightly grown) strip mask. No
+    reference image, so the model cannot copy the plain wall; node "7" saves the result."""
+    graph = workflow(config, request)
+    graph["20"] = {"class_type": "LoadImage", "inputs": {"image": source}}
+    graph["21"] = {"class_type": "VAEEncode", "inputs": {"pixels": ["20", 0], "vae": ["3", 0]}}
+    graph["50"] = {
+        "class_type": "GrowMask",
+        "inputs": {"mask": ["20", 1], "expand": DOOR_MASK_GROW, "tapered_corners": True},
+    }
+    graph["51"] = {
+        "class_type": "SetLatentNoiseMask",
+        "inputs": {"samples": ["21", 0], "mask": ["50", 0]},
+    }
+    graph["53"] = {
+        "class_type": "Flux2Scheduler",
+        "inputs": {
+            "steps": REFINE_SCHEDULE_STEPS,
+            "width": request.width,
+            "height": request.height,
+        },
+    }
+    graph["54"] = {
+        "class_type": "SplitSigmas",
+        "inputs": {"sigmas": ["53", 0], "step": REFINE_SCHEDULE_STEPS - DOOR_STEPS},
+    }
+    graph["13"]["inputs"].update(latent_image=["51", 0], sigmas=["54", 1])
+    graph["7"]["inputs"]["filename_prefix"] = "quill/door"
+    return graph
+
+
 def room_sketch_reference(
     source: Image.Image, mask: Image.Image, sketch: Image.Image
 ) -> Image.Image:
@@ -329,6 +379,9 @@ class Flux2Provider(ComfyBase):
     def _accepts_refine(self) -> bool:
         return self.config.room_passes == 2
 
+    def _accepts_door(self) -> bool:
+        return True
+
     def _diagnostic_nodes(self, request: GenerateRequest) -> dict[str, str]:
         return {"47": "firstPass"} if "quill.refine" in request.extensions else {}
 
@@ -355,10 +408,19 @@ class Flux2Provider(ComfyBase):
         self._require_file(info, "VAELoader", "vae_name", self.config.vae, "FLUX.2 VAE")
 
     def _uploads(
-        self, source: Image.Image | None, mask: Image.Image | None, control: Image.Image | None
+        self,
+        request: GenerateRequest,
+        source: Image.Image | None,
+        mask: Image.Image | None,
+        control: Image.Image | None,
     ) -> list[tuple[str, str, Image.Image]]:
         uploads = []
-        if source is not None and mask is not None and self.config.room_reference == "sketch":
+        if source is not None and mask is not None and "quill.door" in request.extensions:
+            # The crop as given (Quill painted the placeholder), mask as inverted alpha.
+            door = source.convert("RGBA")
+            door.putalpha(ImageChops.invert(mask.convert("L")))
+            uploads.append(("source", f"quill-door-{uuid4().hex}.png", door))
+        elif source is not None and mask is not None and self.config.room_reference == "sketch":
             # One reference: the surroundings with the room drawn as a sketch to render.
             reference = (
                 room_sketch_reference(source, mask, control)
@@ -384,6 +446,8 @@ class Flux2Provider(ComfyBase):
         return rgba
 
     def _graph(self, request: GenerateRequest, names: dict[str, str]) -> dict[str, Any]:
+        if "quill.door" in request.extensions:
+            return door_workflow(self.config, request, names["source"])
         refine = request.extensions.get("quill.refine")
         return workflow(
             self.config,
@@ -395,6 +459,16 @@ class Flux2Provider(ComfyBase):
 
     def _provenance(self, request: GenerateRequest, names: dict[str, str]) -> dict[str, Any]:
         steps, cfg = VARIANTS[self.config.variant]
+        if "quill.door" in request.extensions:
+            return {
+                "workflowVersion": DOOR_WORKFLOW_VERSION,
+                "model": self.config.model,
+                "variant": self.config.variant,
+                "steps": DOOR_STEPS,
+                "scheduleSteps": REFINE_SCHEDULE_STEPS,
+                "cfg": cfg,
+                "maskGrow": DOOR_MASK_GROW,
+            }
         return {
             "workflowVersion": (
                 REPAINT_WORKFLOW_VERSION
@@ -445,7 +519,11 @@ class Flux2Provider(ComfyBase):
         }
 
 
-ROOM_TEMPLATES = {"sketch": "flux2-klein-room-sketch-v4", "plan": "flux2-klein-room-plan-v4"}
+ROOM_TEMPLATES = {
+    "sketch": "flux2-klein-room-sketch-v4",
+    "sketch-walls": "flux2-klein-room-sketch-walls-v1",
+    "plan": "flux2-klein-room-plan-v4",
+}
 MATCH_MAP = (
     "Match the surrounding map's rendering technique, lighting and level of detail, but "
     "give this room its own furnishings, materials and colors as described."
@@ -460,6 +538,19 @@ _ROOM_INSTRUCTIONS = {
         "off-white area into the described floor and furnishings, and draw each brown band "
         "as a closed wooden door set in the wall, with no other doors. No off-white fill or "
         "flat brown may remain. "
+        + MATCH_MAP
+        + " Keep everything outside the room unchanged. Orthographic overhead view, no "
+        "perspective, no text, labels or grid."
+    ),
+    # With the door pass (ADR-0037) the sketch has no door bands and walls stay solid.
+    "sketch-walls": (
+        "Edit image 1, a top-down tabletop battlemap. It contains a floor-plan sketch of the "
+        "room described above: the flat off-white area is the room's floor and dark bands "
+        "are its walls. Render the room as a finished roof-removed interior seen from "
+        "directly above: keep the walls exactly along the dark bands as narrow, solid dark "
+        "wall tops of the same width, with no doors or openings in them, and turn the "
+        "off-white area into the described floor and furnishings. No off-white fill may "
+        "remain. "
         + MATCH_MAP
         + " Keep everything outside the room unchanged. Orthographic overhead view, no "
         "perspective, no text, labels or grid."
@@ -484,7 +575,9 @@ DEFAULT_FLOOR = (
 )
 
 
-def room_instruction(description: str, style: dict[str, str], reference: str) -> str:
+def room_instruction(
+    description: str, style: dict[str, str], reference: str, *, doors: bool = True
+) -> str:
     """Room facts first (the user's description unchanged, floor, style), then the edit
     instruction for the configured reference strategy. Doors are shown only in the
     reference: a written door list made the model draw extra doors on the floor."""
@@ -496,18 +589,20 @@ def room_instruction(description: str, style: dict[str, str], reference: str) ->
         for key, value in style.items()
         if key in STYLE_LABELS and value.strip()
     ]
-    return "\n".join(lines) + "\n" + _ROOM_INSTRUCTIONS[reference]
+    key = reference if doors or reference != "sketch" else "sketch-walls"
+    return "\n".join(lines) + "\n" + _ROOM_INSTRUCTIONS[key]
 
 
 REFINE_TEMPLATE = "flux2-klein-room-refine-v2"
 REPAINT_TEMPLATE = "flux2-klein-room-repaint-v1"
+REPAINT_WALLS_TEMPLATE = "flux2-klein-room-repaint-walls-v1"
 REFINE_FLOOR = (
     "Give the floor a clearly textured material that suits this room, such as wood planks, "
     "flagstones or packed earth; it must not be plain, flat or pale."
 )
 
 
-def room_repaint_instruction(description: str, style: dict[str, str]) -> str:
+def room_repaint_instruction(description: str, style: dict[str, str], *, doors: bool = True) -> str:
     """Masked second-pass prompt (ADR-0036). There is no reference image to refer to: the
     prompt describes the finished room, and pass 1's layout comes from the re-noised
     latent."""
@@ -530,9 +625,14 @@ def room_repaint_instruction(description: str, style: dict[str, str]) -> str:
         "spread across the floor and not only along the walls, with floor visible between "
         "them, and the room has the character the description asks for. "
         + (styled + " " if styled else "")
-        + "Narrow dark wall tops run along the room's edges; doors are closed wooden doors "
-        "set in the walls, and there are no other doors. No perspective, no text, labels "
-        "or grid."
+        + (
+            "Narrow dark wall tops run along the room's edges; doors are closed wooden doors "
+            "set in the walls, and there are no other doors. "
+            if doors
+            else "Narrow, solid dark wall tops run along the room's edges, with no doors or "
+            "openings in them. "
+        )
+        + "No perspective, no text, labels or grid."
     )
 
 
@@ -562,4 +662,22 @@ def room_refine_instruction(description: str, style: dict[str, str]) -> str:
         "closed door: draw it as a wooden door in that wall. Add no other doors. "
         "Orthographic overhead view of a tabletop battlemap, no perspective, no text, labels "
         "or grid."
+    )
+
+
+def door_instruction(style: dict[str, str]) -> str:
+    """Door-pass prompt (ADR-0037); position and size come from the mask, not the text."""
+    styled = " ".join(
+        f"{STYLE_LABELS[key]}: {value.strip()}."
+        for key, value in style.items()
+        if key in STYLE_LABELS and value.strip()
+    )
+    return (
+        "Orthographic overhead view of a tabletop battlemap, seen from directly above, no "
+        "perspective. A closed wooden door is set into a wall: a narrow strip of wooden "
+        "planks with a simple frame, lying exactly in line with the wall and filling the "
+        "gap in it, the same width as the wall's dark top. It matches the wall and floor "
+        "around it in material, lighting and level of detail. "
+        + (styled + " " if styled else "")
+        + "No text, labels or grid."
     )

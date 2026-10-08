@@ -176,6 +176,15 @@ criterion to its tests.
     of pass 1's latent re-noised to the last 5 of 8 scheduler steps. Verified with 114
     Python, 32 TypeScript and 41 browser tests.
 
+20. **Tenth owner trial (2026-10-08, repaint pass) and door pass (ADR-0037).** The
+    storeroom floor became the described dark wood in both attempts, rooms gained
+    character and walls held. Doors were still lost (bedroom, repainted away), never
+    rendered (storeroom diagonal) or invented. The owner asked for a direct way to mark
+    door positions; a battlemap LoRA was discussed and deferred (none exists for klein).
+    Rooms now draw solid walls, then each door is repainted in its own zoomed, masked,
+    reference-free edit from a brown placeholder on its exact strip. Verified with 116
+    Python, 32 TypeScript and 41 browser tests.
+
 Outstanding before Milestone 3 can close: reliable doors, good room floors, filled room centres and
 visible room character with klein,
 recorded runtime and peak VRAM, explicit building/open-air intent, and geometry-aware backgrounds

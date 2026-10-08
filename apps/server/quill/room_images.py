@@ -4,23 +4,41 @@ import asyncio
 from typing import Annotated, Literal
 from uuid import UUID, uuid4
 
-from PIL import Image
+from PIL import Image, ImageDraw
 from pydantic import Field, JsonValue
 
 from quill.backgrounds import BackgroundResult
 from quill.comfyui import ComfyBase, ComfyProvider
 from quill.exports import artwork_size, composite_artwork
 from quill.flux2 import (
+    DOOR_TEMPLATE,
     REFINE_TEMPLATE,
     REPAINT_TEMPLATE,
+    REPAINT_WALLS_TEMPLATE,
     ROOM_TEMPLATES,
     Flux2Provider,
+    door_instruction,
     room_instruction,
     room_refine_instruction,
     room_repaint_instruction,
 )
-from quill.layout_guidance import room_scale, room_sketch, scale_prompt, wall_guide
-from quill.models import Bounds, Contract, GenerationRecord, Point, Project, RasterLayer
+from quill.layout_guidance import (
+    SKETCH_DOOR,
+    door_strips,
+    room_scale,
+    room_sketch,
+    scale_prompt,
+    wall_guide,
+)
+from quill.models import (
+    Bounds,
+    Contract,
+    GenerationRecord,
+    Point,
+    Project,
+    RasterLayer,
+    Room,
+)
 from quill.projects import project_store, validate_project
 from quill.provider_config import (
     check_provider,
@@ -34,6 +52,7 @@ from quill.sdxl_authoring import (
     MIN_WINDOW_CELLS,
     NEGATIVE,
     WINDOW_CELLS,
+    WORKING_SIDE,
     RoomWindow,
     clean_context,
     prompt_text,
@@ -46,6 +65,85 @@ class RoomImageRequest(Contract):
     project: Project
     roomId: UUID
     seed: Annotated[int, Field(ge=0, le=2147483647)]
+
+
+DOOR_PAD = 4  # Working pixels beyond the wall band on each side of a door strip.
+DOOR_MODEL_SIZE = 512
+
+
+def draw_doors(
+    provider: Flux2Provider,
+    project: Project,
+    size: tuple[int, int],
+    room: Room,
+    window: RoomWindow,
+    output: Image.Image,
+    style: dict[str, str],
+    seed: int,
+) -> tuple[Image.Image, dict[str, JsonValue]]:
+    """Door pass (ADR-0037): for each visible door of the room, crop the finished working
+    image around the doorway, paint a brown placeholder on the exact door strip, and let
+    the model repaint only that strip at 512 × 512. Position and size come from geometry;
+    the model only decides how the door looks."""
+    output = output.copy()
+    prompt = door_instruction(style)
+    records: list[JsonValue] = []
+    run: dict[str, JsonValue] = {}
+    for index, (door, quad) in enumerate(door_strips(project, size, room, window, DOOR_PAD)):
+        xs, ys = [x for x, _ in quad], [y for _, y in quad]
+        extent = max(max(xs) - min(xs), max(ys) - min(ys))
+        side = 256 if extent <= 192 else DOOR_MODEL_SIZE
+        cx, cy = (min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2
+        left = min(max(0, round(cx - side / 2)), WORKING_SIDE - side)
+        top = min(max(0, round(cy - side / 2)), WORKING_SIDE - side)
+        zoom = DOOR_MODEL_SIZE / side
+        strip = Image.new("L", (DOOR_MODEL_SIZE, DOOR_MODEL_SIZE))
+        ImageDraw.Draw(strip).polygon(
+            [((x - left) * zoom, (y - top) * zoom) for x, y in quad], fill=255
+        )
+        crop = output.crop((left, top, left + side, top + side)).resize(
+            (DOOR_MODEL_SIZE, DOOR_MODEL_SIZE), Image.Resampling.LANCZOS
+        )
+        crop.paste(SKETCH_DOOR, mask=strip)  # Placeholder: re-noised, not copied.
+        door_seed = (seed + index + 1) % 2147483648
+        result = asyncio.run(
+            provider.inpaint(
+                InpaintRequest(
+                    requestId=str(uuid4()),
+                    prompt=prompt,
+                    seed=door_seed,
+                    width=DOOR_MODEL_SIZE,
+                    height=DOOR_MODEL_SIZE,
+                    sourceRef=provider.put(png(crop)),
+                    maskRef=provider.put(png(strip)),
+                    maskConvention="white-edit-black-preserve",
+                    extensions={"quill.door": {}},
+                )
+            )
+        )
+        painted = image(provider.assets[result.assetHash]).convert("RGB")
+        if painted.size != (DOOR_MODEL_SIZE, DOOR_MODEL_SIZE):
+            raise ValueError("Provider output dimensions do not match the door crop.")
+        resample = Image.Resampling.LANCZOS
+        output.paste(
+            painted.resize((side, side), resample),
+            (left, top),
+            strip.resize((side, side), Image.Resampling.NEAREST),
+        )
+        run = dict(provider.last_run)
+        records.append({"doorId": str(door.id), "crop": [left, top, side], "seed": door_seed})
+    if not records:
+        return output, {}
+    return output, {
+        "template": DOOR_TEMPLATE,
+        "prompt": prompt,
+        "pad": DOOR_PAD,
+        "modelSize": DOOR_MODEL_SIZE,
+        "comfyui": {
+            key: run[key] for key in ("workflowVersion", "steps", "scheduleSteps", "maskGrow")
+        },
+        "doors": records,
+    }
 
 
 def generate_room(request: RoomImageRequest) -> BackgroundResult:
@@ -72,10 +170,14 @@ def generate_room(request: RoomImageRequest) -> BackgroundResult:
     # Second, description-only klein pass (ADR-0034), or None.
     refine: str | None = None
     repaint = False
+    # Doors drawn in their own zoomed, masked passes after the room (ADR-0037).
+    door_pass = (
+        isinstance(provider, Flux2Provider) and reference == "sketch" and provider.config.door_pass
+    )
     if sdxl:
         prompt = prompt_text(room.prompt, effective_style, room=True)
     elif reference is not None:
-        prompt = room_instruction(room.prompt, effective_style, reference)
+        prompt = room_instruction(room.prompt, effective_style, reference, doors=not door_pass)
     profile, alignment = raster_profile(provider)
     size = max(artwork_size(project, store), profile, key=lambda size: size[0])
     mask = polygon_mask(room.polygon, size)
@@ -121,8 +223,11 @@ def generate_room(request: RoomImageRequest) -> BackgroundResult:
             if reference == "sketch":
                 # The stored copy is at map size; the model's copy is drawn directly in
                 # working space so wall width is physically constant and lines are crisp.
-                input_hashes.append(store.put_asset(png(room_sketch(project, size, room))))
-                guide = room_sketch(project, size, room, window)
+                doors = not door_pass
+                input_hashes.append(
+                    store.put_asset(png(room_sketch(project, size, room, doors=doors)))
+                )
+                guide = room_sketch(project, size, room, window, doors=doors)
             else:
                 full = wall_guide(project, size)
                 input_hashes.append(store.put_asset(png(full)))
@@ -135,8 +240,10 @@ def generate_room(request: RoomImageRequest) -> BackgroundResult:
             ):
                 repaint = provider.config.room_masking == "latent"
                 refine = (
-                    (room_repaint_instruction if repaint else room_refine_instruction)(
-                        room.prompt, effective_style
+                    (
+                        room_repaint_instruction(room.prompt, effective_style, doors=not door_pass)
+                        if repaint
+                        else room_refine_instruction(room.prompt, effective_style)
                     )
                     + "\n"
                     + scale_prompt(scale, controlled=False)
@@ -162,6 +269,14 @@ def generate_room(request: RoomImageRequest) -> BackgroundResult:
     expected = source_crop.size
     if output.size != expected or (result.width, result.height) != expected:
         raise ValueError("Provider output dimensions do not match the requested room crop.")
+    # Room provenance and unclipped pass images, before any door edit replaces them.
+    details = generation_details(provider)
+    pass_images = dict(provider.diagnostics) if isinstance(provider, ComfyBase) else {}
+    door_details: dict[str, JsonValue] = {}
+    if door_pass and window and isinstance(provider, Flux2Provider):
+        output, door_details = draw_doors(
+            provider, project, size, room, window, output, effective_style, request.seed
+        )
     if window:
         output = window.restore(output)
     generated = Image.new("RGBA", size)
@@ -171,7 +286,7 @@ def generate_room(request: RoomImageRequest) -> BackgroundResult:
     # Unclipped window images (each klein pass, ADR-0034) for debugging bundles only.
     diagnostics: dict[str, JsonValue] = {}
     if window and isinstance(provider, ComfyBase):
-        for name, key in provider.diagnostics.items():
+        for name, key in pass_images.items():
             unclipped = Image.new("RGBA", size)
             unclipped.paste(window.restore(image(provider.assets[key])), crop[:2])
             diagnostics[name] = store.put_asset(png(unclipped))
@@ -208,14 +323,15 @@ def generate_room(request: RoomImageRequest) -> BackgroundResult:
             outputHash=output_hash,
             parameters={
                 "seed": request.seed,
-                **generation_details(provider),
+                **details,
+                **({"doorPass": door_details} if door_details else {}),
                 **layout_details,
                 "crop": list(crop),
                 "width": size[0],
                 "height": size[1],
                 "promptTemplate": "sdxl-room-layout-v2"
                 if sdxl
-                else ROOM_TEMPLATES[reference]
+                else ROOM_TEMPLATES["sketch-walls" if door_pass else reference]
                 if reference
                 else "room-style-v1",
                 **(
@@ -230,7 +346,11 @@ def generate_room(request: RoomImageRequest) -> BackgroundResult:
                 **(
                     {
                         "refinePrompt": refine,
-                        "refineTemplate": REPAINT_TEMPLATE if repaint else REFINE_TEMPLATE,
+                        "refineTemplate": (
+                            (REPAINT_WALLS_TEMPLATE if door_pass else REPAINT_TEMPLATE)
+                            if repaint
+                            else REFINE_TEMPLATE
+                        ),
                     }
                     if refine
                     else {}

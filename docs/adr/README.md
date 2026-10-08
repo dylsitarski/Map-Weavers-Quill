@@ -44,6 +44,7 @@ Status as of 2026-10-08.
 | [0033](0033-fixed-room-window-and-room-prompts.md) | Fixed-scale room window, room-first prompts, floor-plan door symbols, no Environment, random seeds, history pruning | Implemented; first trial done; doors now drawn closed, door list removed | 0028, 0032, 0021, 0022, 0034 |
 | [0034](0034-two-pass-klein-rooms.md) | Two-pass klein rooms: layout pass, then a description-only edit of its result | Implemented; first trial done; tiny-room window and pass diagnostics added | 0032, 0033, 0035 |
 | [0035](0035-latent-masked-klein-rooms.md) | Klein rooms sample only inside the room mask; surroundings pinned | Implemented; trialled: rooms stay inside walls; second pass then ineffective (0036) | 0032, 0034, 0036 |
-| [0036](0036-masked-repaint-second-pass.md) | Masked klein second pass repaints pass 1 from a partly noised latent, no reference | Implemented; GPU trial pending | 0034, 0035 |
+| [0036](0036-masked-repaint-second-pass.md) | Masked klein second pass repaints pass 1 from a partly noised latent, no reference | Implemented; trialled: placeholder floors fixed, doors still unreliable | 0034, 0035, 0037 |
+| [0037](0037-klein-door-pass.md) | Klein rooms draw solid walls; each door is a separate zoomed, masked repaint at its exact position | Implemented; GPU trial pending | 0033, 0036 |
 
 M0–M8 refer to milestones in [PROJECT_MANIFEST.md](../../PROJECT_MANIFEST.md) §16.

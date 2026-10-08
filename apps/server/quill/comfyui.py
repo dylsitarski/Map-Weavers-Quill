@@ -245,8 +245,16 @@ class ComfyBase:
         """Whether a second, description-only room pass (``quill.refine``) is supported."""
         return False
 
+    def _accepts_door(self) -> bool:
+        """Whether masked door edits (``quill.door``, no layout) are supported."""
+        return False
+
     def _uploads(
-        self, source: Image.Image | None, mask: Image.Image | None, control: Image.Image | None
+        self,
+        request: GenerateRequest,
+        source: Image.Image | None,
+        mask: Image.Image | None,
+        control: Image.Image | None,
     ) -> list[tuple[str, str, Image.Image]]:
         raise NotImplementedError
 
@@ -348,7 +356,14 @@ class ComfyBase:
                 "unsupported_capability",
                 "The reference workflow does not support extra parameters or reference images.",
             )
-        if request.extensions:
+        if "quill.door" in request.extensions:
+            if (
+                not isinstance(request, InpaintRequest)
+                or not self._accepts_door()
+                or request.extensions != {"quill.door": {}}
+            ):
+                raise failure("unsupported_capability", "Unsupported door edit request.")
+        elif request.extensions:
             layout = request.extensions.get("quill.layout")
             refine = request.extensions.get("quill.refine")
             allowed = (
@@ -469,7 +484,7 @@ class ComfyBase:
             control = self._image(
                 str(request.extensions["quill.layout"]["controlRef"]), size, "RGB"
             )
-        uploads = self._uploads(source, mask, control)
+        uploads = self._uploads(request, source, mask, control)
         names = {role: name for role, name, _ in uploads}
         graph = self._graph(request, names)
         try:
@@ -618,7 +633,11 @@ class ComfyProvider(ComfyBase):
         return self.config.controlnet is not None
 
     def _uploads(
-        self, source: Image.Image | None, mask: Image.Image | None, control: Image.Image | None
+        self,
+        request: GenerateRequest,
+        source: Image.Image | None,
+        mask: Image.Image | None,
+        control: Image.Image | None,
     ) -> list[tuple[str, str, Image.Image]]:
         """(role, unique upload name, image) for this family's LoadImage inputs."""
         uploads = []

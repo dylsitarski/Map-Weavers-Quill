@@ -147,6 +147,7 @@ export MWQ_IMAGE_PROVIDER=comfyui-flux2-klein
 # export MWQ_IMAGE_COMFY_FLUX2_ROOM_PASSES=1   # layout pass only; 2 (default) adds a style pass
 # export MWQ_IMAGE_COMFY_FLUX2_ROOM_MASKING=none   # regenerate the whole window (old behavior)
 # export MWQ_IMAGE_COMFY_FLUX2_REFINE_DENOISE=0.75   # stronger second pass (default 0.625)
+# export MWQ_IMAGE_COMFY_FLUX2_DOOR_PASS=0   # doors as brown bands in the room passes instead
 make dev
 ```
 
@@ -160,6 +161,7 @@ make dev
 | `MWQ_IMAGE_COMFY_FLUX2_ROOM_REFERENCE` | `sketch` | `sketch`: one image with the room sketched in. `plan`: blanked context plus a separate floor plan (see ADR-0032) |
 | `MWQ_IMAGE_COMFY_FLUX2_ROOM_MASKING` | `latent` | `latent`: sample only inside the room; the surroundings stay fixed during sampling (ADR-0035). `none`: regenerate the whole window and clip afterwards |
 | `MWQ_IMAGE_COMFY_FLUX2_REFINE_DENOISE` | `0.625` | Strength of the masked second pass, 0.125 to 1: higher changes more of pass 1 (floor, contents) but keeps less of its layout (ADR-0036) |
+| `MWQ_IMAGE_COMFY_FLUX2_DOOR_PASS` | `1` | `1`: rooms are drawn with solid walls, then each door is painted in its own zoomed, masked edit at its exact position (ADR-0037). `0`: doors as brown bands in the sketch |
 | `MWQ_IMAGE_COMFY_FLUX2_ROOM_PASSES` | `2` | `2`: a layout pass, then a description pass that edits its result (ADR-0034). `1`: the layout pass only, about half the time |
 
 The AI panel shows "Local FLUX.2 klein · ComfyUI" and "Ready · distilled model" (or
@@ -191,6 +193,12 @@ With masking, the second pass is a repaint rather than an edit: pass 1's result 
 re-noised (the last 5 of 8 scheduler steps by default) and redrawn from a prompt that
 describes the finished room, with no reference image to copy (ADR-0036). That is what
 replaces a placeholder floor left by pass 1.
+
+Doors are drawn last, one at a time (ADR-0037). The room passes draw solid walls. Then, for
+each door, Quill zooms in on the doorway (about 10 ft across at 512 × 512), paints a brown
+placeholder exactly on the door's strip of wall, and lets the model repaint only that strip
+as a closed wooden door. Position and size come from the map, not the model. All doors
+are drawn closed for now; secret doors stay plain wall. Each door adds a short ComfyUI job.
 Pixels outside the room are always protected exactly. The smoke command in this document tests
 SDXL only.
 
@@ -344,7 +352,9 @@ Still to record (SDXL items 1–3, then FLUX.2 klein):
 9. Masking trial done (2026-10-08): all rooms stayed inside their walls. But pass 2 copied
    pass 1 almost exactly, so the storeroom kept the off-white floor, and pass 1 added a
    door to the storeroom's top wall in one attempt. Pass 2 is now a repaint (ADR-0036).
-10. Next: regenerate the storeroom (twice) and bedroom. Compare `pass-1-unclipped` with
-    the final image: the floor should follow the description; check that walls and the
-    room shape survive pass 2 and where doors end up. If pass 2 changes too little or too
-    much, try `MWQ_IMAGE_COMFY_FLUX2_REFINE_DENOISE` 0.75 or 0.5. Record time.
+10. Repaint trial done (2026-10-08): the storeroom floor followed its description (dark
+    wood) and walls held; doors were still lost, unrendered or invented.
+11. Next: door pass (ADR-0037). Regenerate the main room (three doors, one diagonal), the
+    storeroom and the outhouse. Check that each door appears exactly at its position and
+    nowhere else, that walls are otherwise solid, how well doors match the walls, and the
+    time per room.

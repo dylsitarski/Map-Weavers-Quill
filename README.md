@@ -38,8 +38,9 @@ markedly at about 24 seconds per room, but rooms grew beyond their walls and doo
 unreliable. Klein now samples only inside the room, with the surroundings held fixed
 (ADR-0035): in trial, every room stayed inside its walls, but the second pass then copied
 the first, keeping placeholder floors. The second pass now repaints the first from a
-partly noised image without a reference (ADR-0036). Next: a trial of that; doors remain
-open.
+partly noised image without a reference (ADR-0036), which fixed placeholder floors. Doors
+are now painted in a separate zoomed pass at their exact positions (ADR-0037). Next: a
+trial of the door pass.
 
 Verification evidence and the development log are in [docs/HISTORY.md](docs/HISTORY.md).
 
@@ -155,8 +156,9 @@ local SDXL (below).
   (forest, desert) in the background prompt and in each room's prompt.
 - **Room artwork**: select a room, open AI, enter its prompt and optional style
   overrides (blank fields inherit the map style), Apply, then **Generate preview**.
-  Describe the room's contents and floor. Doors come from the map and are currently
-  always drawn closed; secret doors look like wall.
+  Describe the room's contents and floor. With FLUX.2 klein, doors are painted at their
+  exact map positions after the room; they are currently always drawn closed, and secret
+  doors look like wall.
 
 Each generation uses a new random seed; check **Lock seed** (or type a seed) to reuse
 one. Accepting artwork drops the history records of artwork it replaces, so

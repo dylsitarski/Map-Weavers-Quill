@@ -12,6 +12,9 @@ Items 2 and 3 below are superseded on those points.
 Update 2026-10-08: klein rooms add a second, description-only pass (ADR-0034). Rooms under
 10 ft now get a smaller window, at least 20 ft (ADR-0034).
 
+Update 2026-10-08 (door pass): with the default door pass, the sketch draws doorways as
+wall and doors are added afterwards (ADR-0037).
+
 ## Context
 
 The owner's second klein trial (2026-10-06, `sketch` reference, debugging bundle of the

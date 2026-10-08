@@ -1,12 +1,13 @@
 """Deterministic room wall guidance and physical scale; image rows point down."""
 
 import math
+from collections.abc import Callable
 
 from PIL import Image, ImageDraw
 from shapely.geometry import Polygon  # type: ignore[import-untyped]
 
 from quill.doors import owners
-from quill.models import Project, Room, Wall
+from quill.models import Door, Project, Room, Wall
 from quill.sdxl_authoring import WORKING_SIDE, RoomWindow
 
 # Sketch colors for reference-image room edits (ADR-0032). Pure black means "no sketch".
@@ -67,20 +68,10 @@ def _room_doors(project: Project, room: Room) -> list[tuple[Wall, float, list]]:
     return walls
 
 
-def room_sketch(
-    project: Project, size: tuple[int, int], room: Room, window: RoomWindow | None = None
-) -> Image.Image:
-    """Floor-plan sketch of one room's walls on black, in working space for ``window``
-    or at map raster ``size`` without one (the stored provenance copy).
-
-    Walls are dark bands at the project's wall thickness, so they have the same physical
-    width in every room. Every door is drawn closed, whatever its state: a brown band of
-    wall thickness filling its opening (open-door symbols were rendered badly and left
-    in the image). Secret doors and windows are drawn as wall. Other rooms' walls are
-    omitted. Black pixels are transparent when composited.
-    """
-    sketch = Image.new("RGB", (WORKING_SIDE,) * 2 if window else size)
-    draw = ImageDraw.Draw(sketch)
+def _sketch_space(
+    project: Project, size: tuple[int, int], window: RoomWindow | None
+) -> tuple[int, Callable[[Wall, float], tuple[float, float]]]:
+    """Wall width and a wall-point mapper in working space (or map raster space)."""
     sx, sy = size[0] / project.map.width, size[1] / project.map.height
     zoom = window.scale if window else 1.0
     width = max(3, round(project.map.style.wallThicknessPx * sx * zoom))
@@ -90,16 +81,70 @@ def room_sketch(
         y = size[1] - (wall.start.y + (wall.end.y - wall.start.y) * t) * sy
         return window.to_working(x, y) if window else (x, y)
 
+    return width, point
+
+
+def room_sketch(
+    project: Project,
+    size: tuple[int, int],
+    room: Room,
+    window: RoomWindow | None = None,
+    *,
+    doors: bool = True,
+) -> Image.Image:
+    """Floor-plan sketch of one room's walls on black, in working space for ``window``
+    or at map raster ``size`` without one (the stored provenance copy).
+
+    Walls are dark bands at the project's wall thickness, so they have the same physical
+    width in every room. With ``doors``, every door is drawn closed, whatever its state: a
+    brown band of wall thickness filling its opening (open-door symbols were rendered
+    badly and left in the image). Without, doorways are drawn as wall, for a separate door
+    pass (ADR-0037). Secret doors and windows are always wall. Other rooms' walls are
+    omitted. Black pixels are transparent when composited.
+    """
+    sketch = Image.new("RGB", (WORKING_SIDE,) * 2 if window else size)
+    draw = ImageDraw.Draw(sketch)
+    width, point = _sketch_space(project, size, window)
     for wall, _, openings in _room_doors(project, room):
-        for low, high in _solid(openings):
+        for low, high in _solid(openings if doors else []):
             ends = [point(wall, low), point(wall, high)]
             draw.line(ends, fill=SKETCH_WALL, width=width)
             for x, y in ends:  # Round joints so corners have no notches.
                 r = width / 2
                 draw.ellipse((x - r, y - r, x + r, y + r), fill=SKETCH_WALL)
-        for low, high, _ in openings:
-            draw.line([point(wall, low), point(wall, high)], fill=SKETCH_DOOR, width=width)
+        if doors:
+            for low, high, _ in openings:
+                draw.line([point(wall, low), point(wall, high)], fill=SKETCH_DOOR, width=width)
     return sketch
+
+
+def door_strips(
+    project: Project, size: tuple[int, int], room: Room, window: RoomWindow, pad: float
+) -> list[tuple[Door, list[tuple[float, float]]]]:
+    """Each visible door of a room as a quadrilateral in working pixels: the opening
+    along its wall, wall thickness plus ``pad`` on each side across it (ADR-0037)."""
+    width, point = _sketch_space(project, size, window)
+    strips = []
+    for wall, _, openings in _room_doors(project, room):
+        for low, high, door in openings:
+            (x0, y0), (x1, y1) = point(wall, low), point(wall, high)
+            length = math.hypot(x1 - x0, y1 - y0)
+            if not length:
+                continue
+            half = width / 2 + pad
+            nx, ny = -(y1 - y0) / length * half, (x1 - x0) / length * half
+            strips.append(
+                (
+                    door,
+                    [
+                        (x0 + nx, y0 + ny),
+                        (x1 + nx, y1 + ny),
+                        (x1 - nx, y1 - ny),
+                        (x0 - nx, y0 - ny),
+                    ],
+                )
+            )
+    return strips
 
 
 def room_scale(project: Project, room: Room, size: tuple[int, int], window: RoomWindow) -> dict:
