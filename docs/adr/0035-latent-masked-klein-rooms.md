@@ -1,6 +1,11 @@
 # ADR-0035: Latent-masked sampling for FLUX.2 klein rooms
 
-Status: Implemented; GPU trial pending. Changes the room sampling of ADR-0032 and ADR-0034
+Status: Implemented; trialled 2026-10-08: rooms stayed inside their walls.
+
+Update 2026-10-08: under the mask the second pass copied pass 1, so the masked second pass
+is now a reference-free repaint (ADR-0036).
+
+Original status: Implemented; GPU trial pending. Changes the room sampling of ADR-0032 and ADR-0034
 (klein only). SDXL already samples under its room mask (ADR-0031).
 
 ## Context

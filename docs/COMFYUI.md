@@ -146,6 +146,7 @@ export MWQ_IMAGE_PROVIDER=comfyui-flux2-klein
 # export MWQ_IMAGE_COMFY_FLUX2_ROOM_REFERENCE=plan   # or sketch (default)
 # export MWQ_IMAGE_COMFY_FLUX2_ROOM_PASSES=1   # layout pass only; 2 (default) adds a style pass
 # export MWQ_IMAGE_COMFY_FLUX2_ROOM_MASKING=none   # regenerate the whole window (old behavior)
+# export MWQ_IMAGE_COMFY_FLUX2_REFINE_DENOISE=0.75   # stronger second pass (default 0.625)
 make dev
 ```
 
@@ -158,6 +159,7 @@ make dev
 | `MWQ_IMAGE_COMFY_FLUX2_TEXT_ENCODER_DEVICE` | `default` | `cpu` runs the text encoder on the CPU to save GPU memory |
 | `MWQ_IMAGE_COMFY_FLUX2_ROOM_REFERENCE` | `sketch` | `sketch`: one image with the room sketched in. `plan`: blanked context plus a separate floor plan (see ADR-0032) |
 | `MWQ_IMAGE_COMFY_FLUX2_ROOM_MASKING` | `latent` | `latent`: sample only inside the room; the surroundings stay fixed during sampling (ADR-0035). `none`: regenerate the whole window and clip afterwards |
+| `MWQ_IMAGE_COMFY_FLUX2_REFINE_DENOISE` | `0.625` | Strength of the masked second pass, 0.125 to 1: higher changes more of pass 1 (floor, contents) but keeps less of its layout (ADR-0036) |
 | `MWQ_IMAGE_COMFY_FLUX2_ROOM_PASSES` | `2` | `2`: a layout pass, then a description pass that edits its result (ADR-0034). `1`: the layout pass only, about half the time |
 
 The AI panel shows "Local FLUX.2 klein · ComfyUI" and "Ready · distilled model" (or
@@ -185,6 +187,10 @@ prompts ask for doors only where the brown bands are.
 Both passes sample only inside the room (slightly grown so the walls can blend): the
 surroundings are held fixed at every sampling step, so the model has to fit the room
 inside its walls rather than drawing a larger building that Quill then clips (ADR-0035).
+With masking, the second pass is a repaint rather than an edit: pass 1's result is partly
+re-noised (the last 5 of 8 scheduler steps by default) and redrawn from a prompt that
+describes the finished room, with no reference image to copy (ADR-0036). That is what
+replaces a placeholder floor left by pass 1.
 Pixels outside the room are always protected exactly. The smoke command in this document tests
 SDXL only.
 
@@ -335,7 +341,10 @@ Still to record (SDXL items 1–3, then FLUX.2 klein):
    door bands stayed flat strips and extra doors were invented.
 8. The 10-ft storeroom also grew past its walls into the forest (2026-10-08), so rooms now
    sample only inside their mask (ADR-0035).
-9. Next: regenerate the storeroom, outhouse and bedroom. Check that rooms stay inside
-   their walls with all walls visible, whether the room edge shows seams, whether the
-   floor placeholder survives, where doors appear, and the time. Send a debugging bundle:
-   it includes each pass unclipped.
+9. Masking trial done (2026-10-08): all rooms stayed inside their walls. But pass 2 copied
+   pass 1 almost exactly, so the storeroom kept the off-white floor, and pass 1 added a
+   door to the storeroom's top wall in one attempt. Pass 2 is now a repaint (ADR-0036).
+10. Next: regenerate the storeroom (twice) and bedroom. Compare `pass-1-unclipped` with
+    the final image: the floor should follow the description; check that walls and the
+    room shape survive pass 2 and where doors end up. If pass 2 changes too little or too
+    much, try `MWQ_IMAGE_COMFY_FLUX2_REFINE_DENOISE` 0.75 or 0.5. Record time.

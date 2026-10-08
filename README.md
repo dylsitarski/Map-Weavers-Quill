@@ -36,7 +36,10 @@ along the walls, and room descriptions show weakly. A second klein pass now rest
 room from its description (ADR-0034): in trial, character and furnishing improved
 markedly at about 24 seconds per room, but rooms grew beyond their walls and doors were
 unreliable. Klein now samples only inside the room, with the surroundings held fixed
-(ADR-0035), and tiny rooms get a smaller window. Next: a trial of that; doors remain open.
+(ADR-0035): in trial, every room stayed inside its walls, but the second pass then copied
+the first, keeping placeholder floors. The second pass now repaints the first from a
+partly noised image without a reference (ADR-0036). Next: a trial of that; doors remain
+open.
 
 Verification evidence and the development log are in [docs/HISTORY.md](docs/HISTORY.md).
 

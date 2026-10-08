@@ -36,6 +36,10 @@ from quill.providers import Capability, GenerateRequest, ProviderDescriptor
 WORKFLOW_VERSION = "comfy-flux2-klein-v1"
 EDIT_WORKFLOW_VERSION = "comfy-flux2-klein-edit-v1"
 TWO_PASS_WORKFLOW_VERSION = "comfy-flux2-klein-edit-2pass-v1"
+REPAINT_WORKFLOW_VERSION = "comfy-flux2-klein-edit-repaint-v1"
+# Masked second pass (ADR-0036): the last steps of an 8-step schedule, from pass 1's
+# latent re-noised, with no reference image. 0.625 runs 5 steps from sigma ~0.94.
+REFINE_SCHEDULE_STEPS = 8
 ROOM_PASSES = (1, 2)
 ROOM_MASKING = ("latent", "none")
 MASK_GROW = 16  # Working pixels: the whole wall band may be redrawn to blend.
@@ -66,6 +70,8 @@ class Flux2Config:
     # Room sampling: "latent" pins everything outside the room mask (ADR-0035); "none"
     # regenerates the whole window from an empty latent, as before.
     room_masking: str = "latent"
+    # Masked second pass: fraction of the refine schedule run (ComfyUI "denoise").
+    refine_denoise: float = 0.625
 
     def __post_init__(self) -> None:
         validate_endpoint(self.url, self.timeout)
@@ -82,6 +88,12 @@ class Flux2Config:
             raise ValueError("FLUX.2 room passes must be 1 or 2.")
         if self.room_masking not in ROOM_MASKING:
             raise ValueError("FLUX.2 room masking must be latent or none.")
+        if not 1 / REFINE_SCHEDULE_STEPS <= self.refine_denoise <= 1:
+            raise ValueError("FLUX.2 refine denoise must be between 0.125 and 1.")
+
+    @property
+    def refine_steps(self) -> int:
+        return round(REFINE_SCHEDULE_STEPS * self.refine_denoise)
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> "Flux2Config":
@@ -98,7 +110,17 @@ class Flux2Config:
             env.get("MWQ_IMAGE_COMFY_FLUX2_ROOM_REFERENCE") or defaults.room_reference,
             _passes(env.get("MWQ_IMAGE_COMFY_FLUX2_ROOM_PASSES"), defaults.room_passes),
             env.get("MWQ_IMAGE_COMFY_FLUX2_ROOM_MASKING") or defaults.room_masking,
+            _denoise(env.get("MWQ_IMAGE_COMFY_FLUX2_REFINE_DENOISE"), defaults.refine_denoise),
         )
+
+
+def _denoise(value: str | None, default: float) -> float:
+    if not value:
+        return default
+    try:
+        return float(value)
+    except ValueError:
+        raise ValueError("FLUX.2 refine denoise must be a number.") from None
 
 
 def _passes(value: str | None, default: int) -> int:
@@ -208,14 +230,17 @@ def workflow(
             if config.variant == "distilled"
             else {"class_type": "CLIPTextEncode", "inputs": {"clip": ["2", 0], "text": ""}}
         )
-        for node, conditioning in (("42", "40"), ("43", "41")):
-            graph[node] = {
-                "class_type": "ReferenceLatent",
-                "inputs": {"conditioning": [conditioning, 0], "latent": ["13", 0]},
-            }
+        positive, negative = ["40", 0], ["41", 0]
+        if not masked:  # Reference edit of pass 1's result (ADR-0034).
+            for node, conditioning in (("42", "40"), ("43", "41")):
+                graph[node] = {
+                    "class_type": "ReferenceLatent",
+                    "inputs": {"conditioning": [conditioning, 0], "latent": ["13", 0]},
+                }
+            positive, negative = ["42", 0], ["43", 0]
         graph["44"] = {
             "class_type": "CFGGuider",
-            "inputs": {"model": ["1", 0], "positive": ["42", 0], "negative": ["43", 0], "cfg": cfg},
+            "inputs": {"model": ["1", 0], "positive": positive, "negative": negative, "cfg": cfg},
         }
         graph["45"] = {
             "class_type": "SamplerCustomAdvanced",
@@ -228,11 +253,29 @@ def workflow(
             },
         }
         if masked:
+            # Repaint (ADR-0036): no reference to copy; pass 1's latent, re-noised to the
+            # tail of a longer schedule, keeps the layout while the prompt changes the
+            # floor, contents and character. The surroundings stay pinned by the mask.
             graph["52"] = {
                 "class_type": "SetLatentNoiseMask",
                 "inputs": {"samples": ["13", 0], "mask": ["50", 0]},
             }
-            graph["45"]["inputs"]["latent_image"] = ["52", 0]
+            graph["53"] = {
+                "class_type": "Flux2Scheduler",
+                "inputs": {
+                    "steps": REFINE_SCHEDULE_STEPS,
+                    "width": request.width,
+                    "height": request.height,
+                },
+            }
+            graph["54"] = {
+                "class_type": "SplitSigmas",
+                "inputs": {
+                    "sigmas": ["53", 0],
+                    "step": REFINE_SCHEDULE_STEPS - config.refine_steps,
+                },
+            }
+            graph["45"]["inputs"].update(latent_image=["52", 0], sigmas=["54", 1])
         graph["10"]["inputs"]["samples"] = ["45", 0]
         graph["46"] = {"class_type": "VAEDecode", "inputs": {"samples": ["13", 0], "vae": ["3", 0]}}
         graph["47"] = {
@@ -354,17 +397,30 @@ class Flux2Provider(ComfyBase):
         steps, cfg = VARIANTS[self.config.variant]
         return {
             "workflowVersion": (
-                TWO_PASS_WORKFLOW_VERSION
-                if "quill.refine" in request.extensions
-                else EDIT_WORKFLOW_VERSION
+                REPAINT_WORKFLOW_VERSION
+                if "quill.refine" in request.extensions and self.config.room_masking == "latent"
+                else (
+                    TWO_PASS_WORKFLOW_VERSION
+                    if "quill.refine" in request.extensions
+                    else EDIT_WORKFLOW_VERSION
+                )
+                + ("-masked" if self.config.room_masking == "latent" else "")
             )
-            + ("-masked" if self.config.room_masking == "latent" else "")
             if "source" in names
             else WORKFLOW_VERSION,
             "roomPasses": 2 if "quill.refine" in request.extensions else 1,
             **(
                 {"roomMasking": self.config.room_masking, "maskGrow": MASK_GROW}
                 if "source" in names
+                else {}
+            ),
+            **(
+                {
+                    "refineDenoise": self.config.refine_denoise,
+                    "refineSteps": self.config.refine_steps,
+                    "refineScheduleSteps": REFINE_SCHEDULE_STEPS,
+                }
+                if "quill.refine" in request.extensions and self.config.room_masking == "latent"
                 else {}
             ),
             "model": self.config.model,
@@ -444,10 +500,40 @@ def room_instruction(description: str, style: dict[str, str], reference: str) ->
 
 
 REFINE_TEMPLATE = "flux2-klein-room-refine-v2"
+REPAINT_TEMPLATE = "flux2-klein-room-repaint-v1"
 REFINE_FLOOR = (
     "Give the floor a clearly textured material that suits this room, such as wood planks, "
     "flagstones or packed earth; it must not be plain, flat or pale."
 )
+
+
+def room_repaint_instruction(description: str, style: dict[str, str]) -> str:
+    """Masked second-pass prompt (ADR-0036). There is no reference image to refer to: the
+    prompt describes the finished room, and pass 1's layout comes from the re-noised
+    latent."""
+    described = description.strip() or "An interior room."
+    floor = (
+        "The floor is exactly as described, with visible material and texture."
+        if re.search(r"\bfloor", description, re.IGNORECASE)
+        else "The floor is a clearly textured material that suits this room, such as wood "
+        "planks, flagstones or packed earth, never plain, flat or pale."
+    )
+    styled = " ".join(
+        f"{STYLE_LABELS[key]}: {value.strip()}."
+        for key, value in style.items()
+        if key in STYLE_LABELS and value.strip()
+    )
+    return (
+        "Orthographic overhead view of one room on a tabletop battlemap, roof removed, seen "
+        f"from directly above:\n{described}\n"
+        f"{floor} Furnishings and objects that fit the description fill the whole room, "
+        "spread across the floor and not only along the walls, with floor visible between "
+        "them, and the room has the character the description asks for. "
+        + (styled + " " if styled else "")
+        + "Narrow dark wall tops run along the room's edges; doors are closed wooden doors "
+        "set in the walls, and there are no other doors. No perspective, no text, labels "
+        "or grid."
+    )
 
 
 def room_refine_instruction(description: str, style: dict[str, str]) -> str:

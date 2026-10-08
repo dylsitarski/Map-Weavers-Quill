@@ -11,6 +11,9 @@ both passes' unclipped images are kept for debugging bundles. Details below.
 Update 2026-10-08 (later): the 10-ft storeroom also grew past its walls, so both passes now
 sample only inside the room mask (ADR-0035).
 
+Update 2026-10-08 (masking trial): with latent masking, pass 2 repaints pass 1 from a partly
+noised latent without a reference image (ADR-0036).
+
 ## Context
 
 After ADR-0033, klein rooms have consistent scale, thin wall tops and correctly placed

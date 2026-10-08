@@ -1086,7 +1086,8 @@ Milestone 3 status:
   states) (ADR-0032); a fixed-scale room window, room-first klein prompts with a door
   list and floor-plan door symbols, no Environment default, random seeds and pruned
   generation history (ADR-0033); a second, description-only klein room pass (ADR-0034);
-  klein sampling restricted to the room mask (ADR-0035).
+  klein sampling restricted to the room mask (ADR-0035); a reference-free masked repaint
+  as the second pass (ADR-0036).
   All are covered by offline tests only.
 - Owner trials: the first found abstract room art and oblique perspective (addressed by
   ADR-0028); the second found coherent top-down images but wrong furniture scale,
@@ -1115,8 +1116,11 @@ Milestone 3 status:
 - The 10-ft storeroom also grew into the forest: klein regenerated the whole window and
   only Quill's clipping bounded the room. Both passes now sample only inside the room
   mask with the surroundings pinned (ADR-0035).
-- Next: trial masked sampling, the tiny-room window and door wording; if doors stay
-  unreliable, decide how doors are drawn (time soft limit about 30 seconds); then explicit building/open-air intent and geometry-aware
+- Ninth trial (masked sampling): every room stayed inside its walls, but the second pass
+  copied the first, so placeholder floors survived; one extra door appeared. The masked
+  second pass now repaints a partly noised pass 1 without a reference (ADR-0036).
+- Next: trial the repaint pass; if doors stay unreliable, decide how doors are drawn
+  (time soft limit about 30 seconds); then explicit building/open-air intent and geometry-aware
   backgrounds (ADR-0023).
 - Not implemented: hosted generation, geometry-aware exteriors, exact furniture sizing,
   hard architectural pixel enforcement, provider-side job interruption. Flux Fill is

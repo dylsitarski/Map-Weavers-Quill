@@ -167,7 +167,16 @@ criterion to its tests.
     under a `SetLatentNoiseMask` of the (16 px grown) room, so the surroundings stay fixed
     during sampling. Verified with 114 Python, 32 TypeScript and 41 browser tests.
 
-Outstanding before Milestone 3 can close: rooms that stay inside their walls, reliable doors, good room floors, filled room centres and
+19. **Ninth owner trial (2026-10-08, masked sampling) and repaint pass (ADR-0036).** All
+    rooms stayed inside their walls. The bundle's unclipped pass images showed the second
+    pass reproducing the first almost exactly, so the storeroom kept the off-white
+    placeholder floor despite "dark wooden floor"; pass 1 added a door to the storeroom's
+    top wall in one attempt. Under the mask, the pass-2 reference and the fixed
+    surroundings both equal pass 1. The masked second pass is now a reference-free repaint
+    of pass 1's latent re-noised to the last 5 of 8 scheduler steps. Verified with 114
+    Python, 32 TypeScript and 41 browser tests.
+
+Outstanding before Milestone 3 can close: reliable doors, good room floors, filled room centres and
 visible room character with klein,
 recorded runtime and peak VRAM, explicit building/open-air intent, and geometry-aware backgrounds
 (ADR-0023). Flux Fill was considered and deferred; hosted generation moved to

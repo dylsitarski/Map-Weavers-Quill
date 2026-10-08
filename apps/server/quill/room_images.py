@@ -12,10 +12,12 @@ from quill.comfyui import ComfyBase, ComfyProvider
 from quill.exports import artwork_size, composite_artwork
 from quill.flux2 import (
     REFINE_TEMPLATE,
+    REPAINT_TEMPLATE,
     ROOM_TEMPLATES,
     Flux2Provider,
     room_instruction,
     room_refine_instruction,
+    room_repaint_instruction,
 )
 from quill.layout_guidance import room_scale, room_sketch, scale_prompt, wall_guide
 from quill.models import Bounds, Contract, GenerationRecord, Point, Project, RasterLayer
@@ -69,6 +71,7 @@ def generate_room(request: RoomImageRequest) -> BackgroundResult:
     klein = reference is not None
     # Second, description-only klein pass (ADR-0034), or None.
     refine: str | None = None
+    repaint = False
     if sdxl:
         prompt = prompt_text(room.prompt, effective_style, room=True)
     elif reference is not None:
@@ -130,8 +133,11 @@ def generate_room(request: RoomImageRequest) -> BackgroundResult:
                 and reference is not None
                 and provider.config.room_passes == 2
             ):
+                repaint = provider.config.room_masking == "latent"
                 refine = (
-                    room_refine_instruction(room.prompt, effective_style)
+                    (room_repaint_instruction if repaint else room_refine_instruction)(
+                        room.prompt, effective_style
+                    )
                     + "\n"
                     + scale_prompt(scale, controlled=False)
                 )
@@ -221,7 +227,14 @@ def generate_room(request: RoomImageRequest) -> BackgroundResult:
                     if window
                     else {}
                 ),
-                **({"refinePrompt": refine, "refineTemplate": REFINE_TEMPLATE} if refine else {}),
+                **(
+                    {
+                        "refinePrompt": refine,
+                        "refineTemplate": REPAINT_TEMPLATE if repaint else REFINE_TEMPLATE,
+                    }
+                    if refine
+                    else {}
+                ),
                 **({"diagnosticImages": diagnostics} if diagnostics else {}),
                 "roomPrompt": room.prompt,
                 "styleOverrides": dict(room.styleOverrides),

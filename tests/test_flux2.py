@@ -27,6 +27,7 @@ from quill.flux2 import (
     room_instruction,
     room_plan,
     room_refine_instruction,
+    room_repaint_instruction,
     workflow,
 )
 from quill.layout_guidance import SKETCH_WALL
@@ -64,7 +65,7 @@ class FakeComfy:
         self.calls.append(path)
         if path == "/object_info":
             check = GenerateRequest(requestId="c", prompt="", width=1024, height=1024)
-            graph = workflow(Flux2Config(), check, "s.png", "p.png")
+            graph = workflow(Flux2Config(), check, "s.png", "p.png", "refine")
             info = {node["class_type"]: {} for node in graph.values()}
             info["UNETLoader"] = {"input": {"required": {"unet_name": [list(self.models)]}}}
             info["CLIPLoader"] = {
@@ -252,11 +253,16 @@ class Flux2ProtocolTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("50", g)
         self.assertEqual(g["13"]["inputs"]["latent_image"], ["6", 0])
         self.assertEqual(g["45"]["inputs"]["latent_image"], ["6", 0])
+        # Unmasked, pass 2 is still the reference edit of pass 1 on the full schedule.
+        self.assertEqual(g["42"]["inputs"], {"conditioning": ["40", 0], "latent": ["13", 0]})
+        self.assertEqual(g["44"]["inputs"]["positive"], ["42", 0])
+        self.assertEqual(g["45"]["inputs"]["sigmas"], ["8", 0])
+        self.assertNotIn("54", g)
         with Image.open(BytesIO(self.fake.uploads[0][1])) as upload:
             self.assertEqual(upload.mode, "RGB")
         self.assertEqual(unmasked.last_run["workflowVersion"], "comfy-flux2-klein-edit-2pass-v1")
 
-    async def test_second_pass_edits_the_first_pass_with_the_refine_prompt(self):
+    async def test_masked_second_pass_repaints_pass_one_without_a_reference(self):
         size = (1024, 1024)
         source = Image.new("RGB", size, (200, 10, 10))
         mask = Image.new("L", size)
@@ -283,15 +289,19 @@ class Flux2ProtocolTests(unittest.IsolatedAsyncioTestCase):
         g = self.fake.graph
         self.assertEqual(g["40"]["inputs"]["text"], "Restyle the room")
         self.assertEqual(g["41"]["inputs"], {"conditioning": ["40", 0]})  # Zeroed negative.
-        # The first pass's latent is the second pass's only reference.
-        self.assertEqual(g["42"]["inputs"], {"conditioning": ["40", 0], "latent": ["13", 0]})
-        self.assertEqual(g["43"]["inputs"], {"conditioning": ["41", 0], "latent": ["13", 0]})
-        self.assertEqual(g["44"]["inputs"]["positive"], ["42", 0])
-        self.assertEqual(g["44"]["inputs"]["negative"], ["43", 0])
-        self.assertNotIn("48", g)
+        # No reference image to copy: the prompt alone conditions the repaint.
+        self.assertNotIn("42", g)
+        self.assertEqual(g["44"]["inputs"]["positive"], ["40", 0])
+        self.assertEqual(g["44"]["inputs"]["negative"], ["41", 0])
         self.assertEqual(g["45"]["inputs"]["guider"], ["44", 0])
         self.assertEqual(g["45"]["inputs"]["noise"], ["11", 0])
+        # Pass 1's latent, re-noised to the last 5 of 8 scheduler steps, under the mask.
         self.assertEqual(g["45"]["inputs"]["latent_image"], ["52", 0])
+        self.assertEqual(g["52"]["inputs"]["samples"], ["13", 0])
+        self.assertEqual(g["53"]["class_type"], "Flux2Scheduler")
+        self.assertEqual(g["53"]["inputs"]["steps"], 8)
+        self.assertEqual(g["54"]["inputs"], {"sigmas": ["53", 0], "step": 3})
+        self.assertEqual(g["45"]["inputs"]["sigmas"], ["54", 1])
         # The final image is the second pass; the first is saved only for inspection.
         self.assertEqual(g["10"]["inputs"]["samples"], ["45", 0])
         self.assertEqual(g["7"]["inputs"]["images"], ["10", 0])
@@ -307,8 +317,14 @@ class Flux2ProtocolTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(raw.getpixel((10, 10)), (9, 99, 199))  # Not clipped.
         run = self.provider.last_run
         self.assertNotIn("raw", run)
-        self.assertEqual(run["workflowVersion"], "comfy-flux2-klein-edit-2pass-v1-masked")
+        self.assertEqual(run["workflowVersion"], "comfy-flux2-klein-edit-repaint-v1")
         self.assertEqual(run["roomPasses"], 2)
+        self.assertEqual((run["refineDenoise"], run["refineSteps"]), (0.625, 5))
+        # A stronger repaint runs more of the schedule.
+        strong = self.make(Flux2Config(refine_denoise=1.0))
+        self.assertEqual([strong.put(png(i)) for i in images], refs)
+        await strong.inpaint(request)
+        self.assertEqual(self.fake.graph["54"]["inputs"]["step"], 0)
         # Base variant: an empty-text negative, as in the first pass.
         base = self.make(Flux2Config(variant="base"))
         self.assertEqual([base.put(png(i)) for i in images], refs)
@@ -422,6 +438,8 @@ class Flux2ProtocolTests(unittest.IsolatedAsyncioTestCase):
             {"room_reference": "mask"},
             {"room_passes": 3},
             {"room_masking": "pixel"},
+            {"refine_denoise": 0.1},
+            {"refine_denoise": 1.5},
             {"vae": "vae.ckpt"},
             {"url": "http://example.com:8188"},
         ):
@@ -441,6 +459,10 @@ class Flux2ProtocolTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(Flux2Config.from_env({}).room_masking, "latent")
         masking = {"MWQ_IMAGE_COMFY_FLUX2_ROOM_MASKING": "none"}
         self.assertEqual(Flux2Config.from_env(masking).room_masking, "none")
+        denoise = {"MWQ_IMAGE_COMFY_FLUX2_REFINE_DENOISE": "0.75"}
+        self.assertEqual(Flux2Config.from_env(denoise).refine_steps, 6)
+        with self.assertRaises(ValueError):
+            Flux2Config.from_env({"MWQ_IMAGE_COMFY_FLUX2_REFINE_DENOISE": "high"})
         passes = {"MWQ_IMAGE_COMFY_FLUX2_ROOM_PASSES": "1"}
         self.assertEqual(Flux2Config.from_env(passes).room_passes, 1)
         with self.assertRaises(ValueError):
@@ -494,6 +516,14 @@ class Flux2ProtocolTests(unittest.IsolatedAsyncioTestCase):
             "Make the floor exactly as described", room_refine_instruction("Oak floor", {})
         )
         self.assertIn("with no other doors", text)
+        repaint = room_repaint_instruction("Cluttered storeroom with crates", style)
+        self.assertIn("seen from directly above:\nCluttered storeroom with crates\n", repaint)
+        self.assertIn("never plain, flat or pale", repaint)
+        self.assertIn("there are no other doors", repaint)
+        self.assertNotIn("image 1", repaint.lower())  # No reference image in this pass.
+        self.assertIn(
+            "The floor is exactly as described", room_repaint_instruction("Dark wood floor", {})
+        )
         described = room_instruction("Bedroom, mossy flagstone FLOORS", {}, "plan")
         self.assertNotIn(DEFAULT_FLOOR, described)
         self.assertIn("Image 2 is its floor plan", described)
@@ -570,9 +600,9 @@ class Flux2EditorTests(unittest.TestCase):
         self.assertNotIn("negativePrompt", parameters)
         # Two passes by default: layout, then a description-only edit of that result.
         self.assertEqual(
-            parameters["comfyui"]["workflowVersion"], "comfy-flux2-klein-edit-2pass-v1-masked"
+            parameters["comfyui"]["workflowVersion"], "comfy-flux2-klein-edit-repaint-v1"
         )
-        self.assertEqual(parameters["refineTemplate"], "flux2-klein-room-refine-v2")
+        self.assertEqual(parameters["refineTemplate"], "flux2-klein-room-repaint-v1")
         # Both passes are kept unclipped, at map size, for debugging bundles.
         unclipped = parameters["diagnosticImages"]
         self.assertEqual(set(unclipped), {"raw", "firstPass"})
@@ -581,7 +611,9 @@ class Flux2EditorTests(unittest.TestCase):
         crop = parameters["crop"]
         self.assertEqual(first.getpixel((crop[0] + 2, crop[1] + 2)), (40, 40, 40, 255))
         self.assertEqual(first.getpixel((crop[2] + 2, crop[1] + 2))[3], 0)
-        self.assertTrue(parameters["refinePrompt"].startswith("Restyle the interior"))
+        self.assertTrue(
+            parameters["refinePrompt"].startswith("Orthographic overhead view of one room")
+        )
         self.assertIn(room.prompt, parameters["refinePrompt"])
         self.assertIn("128 pixels wide", parameters["refinePrompt"])
         self.assertEqual(self.fake.graph["40"]["inputs"]["text"], parameters["refinePrompt"])
